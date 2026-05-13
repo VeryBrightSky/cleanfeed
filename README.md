@@ -11,6 +11,13 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.3.0 — 2026-05-13
+- **Pre-launch QA pass.** Comprehensive audit + cleanup for Chrome Web Store submission:
+  - Removed unused `activeTab` permission — we never invoke it (everything goes through `host_permissions` + `chrome.tabs.query`). Smaller permission ask = friendlier install prompt + lower rejection risk.
+  - Deleted the unreachable `login/` directory (3 files, ~14 KB). Since v1.2.4 the "I already paid" button routes through the official ExtPay SDK directly; the branded form had no inbound callers.
+  - Added a `chrome.runtime.lastError` guard around the popup's cached-paid-status read so a sleeping service worker no longer drops the popup into a broken state.
+  - Tidied a couple of stale code comments that referenced the removed login flow.
+
 ### v1.2.4 — 2026-05-13
 - Fixed branded login page — was calling ExtPay API directly without
   auth, causing 404. Now routes through background SW using official

@@ -7,7 +7,7 @@
  *       - clicking a locked Pro toggle
  *       - clicking the main "Unlock all 8 blockers" CTA
  *       (ESC + outside-click + close-button all dismiss it)
- *   • "I already paid" now opens our branded /login/login.html page
+ *   • "I already paid" routes through background.js to extpay.openLoginPage()
  */
 "use strict";
 
@@ -150,6 +150,13 @@ function pushSettingsToTabs() {
 async function refreshPaidStatus() {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage({ type: "cf:get-paid" }, (resp) => {
+      // Guard against a sleeping service worker / closed port —
+      // chrome.runtime.lastError is set when the callback fires without
+      // a valid response. Treat that as "no update" and keep cached state.
+      if (chrome.runtime.lastError) {
+        resolve();
+        return;
+      }
       if (resp && typeof resp.paid === "boolean") STATE.paid = resp.paid;
       resolve();
     });

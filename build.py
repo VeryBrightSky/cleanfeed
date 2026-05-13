@@ -26,7 +26,6 @@ INCLUDE_PATHS = [
     "popup",
     "options",
     "onboarding",
-    "login",       # v1.1.0 — branded login page
     "lib",
     "icons",
     "PRIVACY.md",

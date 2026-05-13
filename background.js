@@ -223,7 +223,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   // ---- ExtPay routing (every API call goes through here, never from
-  // popup/options/login/content — avoids the CORS error the old custom
+  // popup/options/content — avoids the CORS error the old custom
   // SDK hit when called from extension pages).
   if (msg.type === "cf:open-payment" || msg.type === "cf:open-payment-page") {
     // 'pro' targets our single one-time plan nickname.
