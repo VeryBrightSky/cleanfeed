@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Welcome to CleanFeed</title>
+  <link rel="stylesheet" href="welcome.css" />
+</head>
+<body>
+  <main class="cf-wrap">
+    <header class="cf-hero">
+      <img src="../icons/icon-128.png" width="64" height="64" alt="CleanFeed" />
+      <h1>Take YouTube back.</h1>
+      <p class="cf-tagline">
+        CleanFeed hides the parts of YouTube designed to keep you scrolling —
+        so you only see what you actually came for.
+      </p>
+    </header>
+
+    <section class="cf-cards">
+      <div class="cf-card">
+        <div class="cf-card-num">1</div>
+        <h3>Homepage feed</h3>
+        <p>The endless grid is gone. You&rsquo;ll see a calm empty page — search for what you want.</p>
+      </div>
+      <div class="cf-card">
+        <div class="cf-card-num">2</div>
+        <h3>Shorts</h3>
+        <p>Shelves disappear from the homepage, search, and the left nav. No more accidental swipes.</p>
+      </div>
+      <div class="cf-card pro">
+        <span class="cf-pro-pill">PRO</span>
+        <div class="cf-card-num">3</div>
+        <h3>Sidebar recommendations</h3>
+        <p>The rail of related videos on every watch page — gone. Read the video page, then leave.</p>
+      </div>
+      <div class="cf-card pro">
+        <span class="cf-pro-pill">PRO</span>
+        <div class="cf-card-num">4</div>
+        <h3>End-screen suggestions</h3>
+        <p>Those overlay cards in the last 20 seconds. The biggest rabbit-hole vector. Gone.</p>
+      </div>
+      <div class="cf-card pro">
+        <span class="cf-pro-pill">PRO</span>
+        <div class="cf-card-num">5</div>
+        <h3>Comments</h3>
+        <p>Replaced with a small &ldquo;show comments&rdquo; button — see them only when you choose.</p>
+      </div>
+      <div class="cf-card pro">
+        <span class="cf-pro-pill">PRO</span>
+        <div class="cf-card-num">6</div>
+        <h3>Trending / Explore</h3>
+        <p>Trending, Music, Gaming, News, Sports — the algorithm-driven section in the left nav. Hidden.</p>
+      </div>
+      <div class="cf-card pro">
+        <span class="cf-pro-pill">PRO</span>
+        <div class="cf-card-num">7</div>
+        <h3>Live chat</h3>
+        <p>Hides the live-chat panel on streams and premieres. Watch the video, skip the noise.</p>
+      </div>
+      <div class="cf-card pro">
+        <span class="cf-pro-pill">PRO</span>
+        <div class="cf-card-num">8</div>
+        <h3>Autoplay</h3>
+        <p>Auto-disables the autoplay toggle on every watch page. The player stops at the end of your video.</p>
+      </div>
+      <div class="cf-card pro">
+        <span class="cf-pro-pill">PRO</span>
+        <div class="cf-card-num">9</div>
+        <h3>Hide thumbnails</h3>
+        <p>Replaces every video thumbnail with a neutral placeholder. Choose by title, not by clickbait. Hover to peek.</p>
+      </div>
+      <div class="cf-card pro">
+        <span class="cf-pro-pill">PRO</span>
+        <div class="cf-card-num">10</div>
+        <h3>Hide subscription algorithm</h3>
+        <p>On <code>/feed/subscriptions</code>, hides the "For you" and "Most relevant" shelves — only your chronological feed remains.</p>
+      </div>
+    </section>
+
+    <section class="cf-cards">
+      <div class="cf-card pro">
+        <span class="cf-pro-pill">PRO</span>
+        <h3>Focus Lock</h3>
+        <p>Set a 4-digit PIN, lock every blocker on for 30 min – 2 hours – or until you choose to unlock. Need out early? Hold to disable for 60 seconds — the safety valve for real emergencies.</p>
+      </div>
+      <div class="cf-card">
+        <h3>Daily time tracker</h3>
+        <p>Free for everyone. See how many minutes you spent on YouTube today and this week — counted only when a tab is focused.</p>
+      </div>
+      <div class="cf-card pro">
+        <span class="cf-pro-pill">PRO</span>
+        <h3>Right-click a channel</h3>
+        <p>Right-click any video → <em>Block this channel with CleanFeed</em>. Their videos disappear everywhere they show up.</p>
+      </div>
+    </section>
+
+    <section class="cf-tiers">
+      <div class="cf-tier">
+        <h2>Free</h2>
+        <p class="cf-tier-price">$0</p>
+        <ul>
+          <li>Up to <strong>2 blockers</strong> active</li>
+          <li>Homepage feed &amp; Shorts</li>
+          <li>Forever — no trial expiry</li>
+        </ul>
+        <button id="cf-start-free" class="cf-btn">Start with free</button>
+      </div>
+      <div class="cf-tier cf-tier-pro">
+        <span class="cf-tier-tag">RECOMMENDED</span>
+        <h2>Pro</h2>
+        <p class="cf-tier-price">$4.99 <span class="cf-tier-once">one-time</span></p>
+        <ul>
+          <li>All <strong>10 blockers</strong> unlocked</li>
+          <li><strong>Focus Lock</strong> with PIN protection</li>
+          <li>Channel whitelist + right-click blocking</li>
+          <li>Custom CSS for power users</li>
+          <li>No subscription, no recurring charge</li>
+        </ul>
+        <button id="cf-upgrade" class="cf-btn cf-btn-primary">Upgrade — $4.99</button>
+        <button id="cf-already-paid" class="cf-link-inline" type="button">Already paid? Log in</button>
+      </div>
+    </section>
+
+    <section class="cf-howto">
+      <h3>How it works</h3>
+      <ol>
+        <li>Open <a href="https://youtube.com" target="_blank" rel="noopener noreferrer">YouTube</a> in any tab.</li>
+        <li>Click the CleanFeed icon (top-right of your browser) and flip on the blockers you want.</li>
+        <li>If you ever need comments back, a small <em>show comments</em> button appears at the bottom of every video.</li>
+        <li>For extra tuning, open the <a href="#" id="cf-open-options">Options page</a> — pin specific channels and write custom CSS rules.</li>
+      </ol>
+      <p class="cf-privacy">
+        CleanFeed runs entirely in your browser. No analytics, no telemetry, no servers we control.
+        <a href="https://github.com/" target="_blank" rel="noopener noreferrer">Privacy policy →</a>
+      </p>
+    </section>
+  </main>
+  <script src="welcome.js"></script>
+</body>
+</html>

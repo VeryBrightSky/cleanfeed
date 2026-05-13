@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CleanFeed</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body class="cf-fade-in">
+  <header class="cf-header">
+    <div class="cf-brand">
+      <img src="../icons/icon-32.png" width="22" height="22" alt="" />
+      <h1>CleanFeed</h1>
+    </div>
+    <span class="cf-tier" id="cf-tier-badge">FREE</span>
+  </header>
+
+  <!-- Focus Lock banner (shown when active) -->
+  <section id="cf-focus-banner" class="cf-focus-banner" hidden>
+    <div class="cf-focus-banner-head">
+      <span class="cf-focus-lock-icon" aria-hidden="true">🔒</span>
+      <div class="cf-focus-banner-text">
+        <strong>Focus Lock Active</strong>
+        <span id="cf-focus-remaining">--:--</span>
+      </div>
+    </div>
+    <button id="cf-focus-hold" class="cf-hold-btn" type="button">
+      <span class="cf-hold-label">Hold to unlock (60s)</span>
+      <span class="cf-hold-progress" id="cf-hold-progress"></span>
+    </button>
+    <p class="cf-focus-hint">The 60-second hold is the emergency bypass. Auto-unlocks when the timer runs out.</p>
+  </section>
+
+  <section class="cf-stats" aria-label="Session stats">
+    <div class="cf-stat">
+      <span class="cf-stat-value" id="cf-stat-total">0</span>
+      <span class="cf-stat-label">elements blocked this session</span>
+    </div>
+    <button id="cf-reset-stats" class="cf-link" type="button" title="Reset session count">reset</button>
+  </section>
+
+  <section class="cf-time-mini" aria-label="Time on YouTube">
+    <div class="cf-time-mini-cell">
+      <span class="cf-time-mini-value" id="cf-time-today-mini">0m</span>
+      <span class="cf-time-mini-label">today</span>
+    </div>
+    <span class="cf-time-mini-sep">·</span>
+    <div class="cf-time-mini-cell">
+      <span class="cf-time-mini-value" id="cf-time-week-mini">0m</span>
+      <span class="cf-time-mini-label">this week</span>
+    </div>
+  </section>
+
+  <section class="cf-pause-bar" aria-label="Pause">
+    <button id="cf-pause-btn" type="button" class="cf-pause-btn">
+      <svg class="cf-pause-icon" width="14" height="14" viewBox="0 0 24 24"
+           fill="none" stroke="currentColor" stroke-width="2.4"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="6" y="4" width="4" height="16" rx="1"/>
+        <rect x="14" y="4" width="4" height="16" rx="1"/>
+      </svg>
+      <svg class="cf-play-icon" width="14" height="14" viewBox="0 0 24 24"
+           fill="none" stroke="currentColor" stroke-width="2.4"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polygon points="6 3 20 12 6 21 6 3"/>
+      </svg>
+      <span class="cf-pause-text" id="cf-pause-text">Pause for 1 hour</span>
+    </button>
+  </section>
+
+  <main id="cf-blockers" class="cf-blockers" aria-label="Blockers">
+    <!-- toggles injected by popup.js -->
+  </main>
+
+  <section class="cf-upgrade" id="cf-upgrade-card" hidden>
+    <h2>Unlock all 10 blockers + Focus Lock</h2>
+    <p>Pro unlocks all 10 blockers, Focus Lock with PIN, channel whitelist and blocklist, and custom CSS. One-time payment.</p>
+    <div class="cf-upgrade-row">
+      <button id="cf-upgrade" class="cf-btn cf-btn-primary" type="button">Upgrade — $4.99</button>
+      <button id="cf-login" class="cf-btn cf-btn-ghost" type="button">I&nbsp;already&nbsp;paid</button>
+    </div>
+  </section>
+
+  <footer class="cf-footer">
+    <button id="cf-open-options" class="cf-link" type="button">Options</button>
+    <span class="cf-sep">·</span>
+    <button id="cf-open-onboarding" class="cf-link" type="button">Help</button>
+    <span class="cf-spacer"></span>
+    <span class="cf-version" id="cf-version">v1.1.0</span>
+  </footer>
+
+  <!-- Pro upsell modal — hidden by default, summoned by popup.js -->
+  <div id="cf-modal" class="cf-modal" hidden aria-hidden="true">
+    <div class="cf-modal-backdrop" data-cf-close-modal></div>
+    <div class="cf-modal-card" role="dialog" aria-modal="true" aria-labelledby="cf-modal-title">
+      <button class="cf-modal-close" type="button" data-cf-close-modal aria-label="Close">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="6" y1="6" x2="18" y2="18"/>
+          <line x1="6" y1="18" x2="18" y2="6"/>
+        </svg>
+      </button>
+      <h2 id="cf-modal-title">Unlock all 10 blockers + Focus Lock</h2>
+      <ul class="cf-modal-features">
+        <li>
+          <span class="cf-tick" aria-hidden="true">✓</span>
+          <span>All 10 blockers — sidebar, end-screens, comments, thumbnails, more</span>
+        </li>
+        <li>
+          <span class="cf-tick" aria-hidden="true">✓</span>
+          <span>Focus Lock — PIN-protected sessions for deep work</span>
+        </li>
+        <li>
+          <span class="cf-tick" aria-hidden="true">✓</span>
+          <span>Channel whitelist + right-click channel blocking</span>
+        </li>
+        <li>
+          <span class="cf-tick" aria-hidden="true">✓</span>
+          <span>Custom CSS &amp; lifetime updates</span>
+        </li>
+      </ul>
+      <div class="cf-modal-price">
+        <span class="cf-price">$4.99</span>
+        <span class="cf-price-sub">one-time · no subscription</span>
+      </div>
+      <button id="cf-modal-upgrade" type="button" class="cf-btn cf-btn-primary cf-btn-lg">Upgrade — $4.99</button>
+      <button id="cf-modal-login" type="button" class="cf-link cf-modal-login">Already paid? Log in</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

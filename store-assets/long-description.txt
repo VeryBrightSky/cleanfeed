@@ -1,0 +1,48 @@
+You opened YouTube to watch one tutorial.
+Forty minutes later you're three rabbit holes deep, watching someone
+react to a documentary about competitive Excel. Again.
+
+CleanFeed turns YouTube back into a tool.
+
+It hides the ten things YouTube uses to keep you scrolling — and lets
+you toggle each one independently:
+
+• The homepage recommendation grid (just a search bar, that's it)
+• Shorts shelves — homepage, search results, left-nav entry, gone
+• The sidebar full of "you'll definitely watch this next" videos
+• The end-screen overlay that hijacks the last 20 seconds of every video
+• The comments section (with a 'show comments' button if you actually want them)
+• The Trending / Music / Gaming / News / Sports menu
+• The live-chat panel on streams and premieres
+• Autoplay — auto-disabled on every watch page so the player never queues another
+• Every thumbnail — replaced with a neutral placeholder (hover to peek)
+• The "For you" / "Most relevant" algorithm sections on your Subscriptions page
+
+Search still works. Subscriptions still work. Playlists still work.
+You just have to *decide* what you're watching, instead of being
+fed it.
+
+Built for:
+— Students avoiding YouTube during study sessions
+— Knowledge workers who use YouTube for research, not entertainment
+— Anyone with ADHD who knows what algorithmic feed scrolling does to their day
+— People trying to use YouTube intentionally instead of compulsively
+
+Free tier: pick any 2 blockers, forever. Daily time tracker included.
+Pro tier: $4.99 one-time — unlocks all 10 blockers, plus Focus Lock
+(set a 4-digit PIN, lock every blocker on for 30 min – 2 h – or until
+you choose; 60-second hold-to-disable as the safety valve for real
+emergencies), channel whitelist + right-click blocklist, custom CSS,
+and lifetime updates.
+
+Need a break? One click pauses every blocker for an hour. Auto-resumes.
+
+Also works on YouTube Music (music.youtube.com) — same toggles.
+
+No subscription. No ads. No telemetry. No account.
+Everything runs locally in your browser. Privacy policy: zero data
+collected. Open source on GitHub.
+
+CleanFeed isn't trying to replace YouTube. It's trying to make YouTube
+behave like the rest of the internet — only show me the thing I asked
+for, then get out of my way.

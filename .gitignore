@@ -1,0 +1,38 @@
+# Node (we don't use npm but ignore in case anyone adds tooling)
+node_modules/
+package-lock.json
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor swap / project files
+*.swp
+.vscode/
+.idea/
+
+# Agent / harness scratch (not project code)
+.claude-flow/
+.claude/
+
+# Logs
+*.log
+
+# Build output (bulky, regenerated from source via `python3 build.py`)
+dist/*.zip
+
+# Local scratch / TODO notes
+notes.md
+TODO.local.md
+
+# Python (build script uses stdlib zipfile but in case anyone adds tooling)
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Save files / secrets — defense in depth
+.env
+.env.*
+*.key
+*.pem

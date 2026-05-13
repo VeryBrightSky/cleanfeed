@@ -1,0 +1,257 @@
+/* CleanFeed login page — branded, dark by default, 8px spacing rhythm */
+:root {
+  --bg:           #0c1420;
+  --bg-elev:      #15202e;
+  --bg-elev-2:    #1c2a3a;
+  --border:       #233346;
+  --text:         #e6edf6;
+  --text-dim:     #93a0b3;
+  --text-faint:   #5e6c7e;
+  --accent:       #3cc8c8;
+  --accent-2:     #6fffff;
+  --accent-glow:  rgba(60, 200, 200, 0.25);
+  --gold:         #f2cf5f;
+  --warn:         #ff7a8a;
+  --success:      #5ddca4;
+  --shadow-md:    0 10px 30px rgba(0, 0, 0, 0.40);
+  --shadow-lg:    0 20px 60px rgba(0, 0, 0, 0.55);
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px;
+  --ease: cubic-bezier(0.20, 0.80, 0.30, 1);
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg:       #f3f5f9;
+    --bg-elev:  #ffffff;
+    --bg-elev-2:#eef1f6;
+    --border:   #d4dae3;
+    --text:     #14202f;
+    --text-dim: #4a5566;
+    --text-faint:#7a8595;
+    --shadow-md:0 6px 18px rgba(20, 30, 50, 0.10);
+    --shadow-lg:0 16px 48px rgba(20, 30, 50, 0.16);
+  }
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(1200px 600px at 20% -10%, rgba(60, 200, 200, 0.08), transparent 60%),
+    radial-gradient(900px 600px at 90% 110%, rgba(242, 207, 95, 0.04), transparent 60%),
+    var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  display: grid;
+  place-items: center;
+  padding: 48px 24px;
+}
+
+/* ---- back link ---- */
+.cf-back {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: var(--r-sm);
+  transition: background 150ms var(--ease), color 150ms var(--ease);
+}
+.cf-back:hover {
+  color: var(--text);
+  background: var(--bg-elev);
+}
+
+/* ---- card ---- */
+.cf-card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 40px 32px 24px;
+  box-shadow: var(--shadow-lg);
+  animation: cf-card-in 320ms var(--ease) both;
+}
+@keyframes cf-card-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.cf-card-head {
+  text-align: center;
+  margin-bottom: 24px;
+}
+.cf-card-head img {
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+.cf-card-head h1 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+.cf-card-head p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+/* ---- form ---- */
+.cf-form { display: block; }
+.cf-field {
+  display: block;
+  margin-bottom: 16px;
+}
+.cf-label {
+  display: block;
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+input[type="email"] {
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text);
+  font: inherit;
+  font-size: 14.5px;
+  transition: border-color 150ms var(--ease), box-shadow 150ms var(--ease);
+}
+input[type="email"]:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+input[type="email"][aria-invalid="true"] {
+  border-color: var(--warn);
+  box-shadow: 0 0 0 3px rgba(255, 122, 138, 0.18);
+}
+.cf-error {
+  display: block;
+  min-height: 18px;
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--warn);
+}
+
+/* ---- buttons ---- */
+.cf-btn {
+  position: relative;
+  width: 100%;
+  padding: 12px 16px;
+  font: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-elev-2);
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 80ms var(--ease), background 150ms var(--ease),
+              box-shadow 150ms var(--ease), filter 150ms var(--ease);
+}
+.cf-btn:hover { background: var(--bg-elev); transform: translateY(-1px); }
+.cf-btn:active { transform: translateY(0); }
+.cf-btn:focus  { outline: none; box-shadow: 0 0 0 3px var(--accent-glow); }
+.cf-btn-primary {
+  background: linear-gradient(95deg, var(--accent) 0%, var(--accent-2) 100%);
+  color: #0b1828;
+  border: none;
+  box-shadow: 0 6px 14px rgba(60, 200, 200, 0.25);
+}
+.cf-btn-primary:hover { filter: brightness(1.06); }
+.cf-btn-ghost { background: transparent; }
+.cf-btn[disabled] { opacity: 0.6; cursor: not-allowed; }
+.cf-btn.is-loading .cf-btn-label { opacity: 0; }
+.cf-btn .cf-btn-spinner {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(11, 24, 40, 0.30);
+  border-top-color: #0b1828;
+  opacity: 0;
+  animation: cf-spin 700ms linear infinite;
+}
+.cf-btn.is-loading .cf-btn-spinner { opacity: 1; }
+@keyframes cf-spin { to { transform: rotate(360deg); } }
+
+/* ---- success / failure states ---- */
+.cf-success, .cf-failure {
+  text-align: center;
+  padding: 8px 0 0;
+  animation: cf-card-in 280ms var(--ease) both;
+}
+.cf-success h2, .cf-failure h2 {
+  margin: 12px 0 8px;
+  font-size: 17px;
+  font-weight: 600;
+}
+.cf-success p, .cf-failure p {
+  margin: 0 0 8px;
+  color: var(--text-dim);
+}
+.cf-success-icon, .cf-failure-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+}
+.cf-success-icon { color: #0b1828; background: var(--success); }
+.cf-failure-icon { color: #0b1828; background: var(--warn); }
+.cf-success-hint {
+  font-size: 12.5px;
+  color: var(--text-faint);
+  margin-bottom: 16px !important;
+}
+.cf-success .cf-btn-ghost,
+.cf-failure .cf-btn-primary { margin-top: 12px; }
+
+/* ---- footer ---- */
+.cf-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-top: 1px solid var(--border);
+  margin-top: 24px;
+  padding-top: 16px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.cf-link-cta {
+  background: none;
+  border: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: background 150ms var(--ease);
+}
+.cf-link-cta:hover { background: var(--bg-elev-2); }
+
+.cf-fineprint {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--text-faint);
+  text-align: center;
+  max-width: 420px;
+}

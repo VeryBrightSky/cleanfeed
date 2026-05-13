@@ -1,0 +1,16 @@
+Promotional copy for store carousel + featured spots.
+
+—— Tile (440×280) headline ——
+Take YouTube back.
+
+—— Marquee (1400×560) tagline ——
+The homepage feed, Shorts, sidebar recs, and end-screens — gone.
+You only see what you search for.
+
+—— Small (920×680) sub-tagline ——
+Six toggleable blockers. $4.99 one-time for Pro. Forever-free tier
+covers the two biggest distractions. Zero telemetry.
+
+—— Search snippet (under listing) ——
+Hide YouTube's feed, Shorts, recommendations, and comments. Built for
+focus, not for engagement. No ads, no subscription, no data collection.

@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CleanFeed — focus on YouTube. Hide the distractions.</title>
+  <meta name="description" content="A Chrome extension that hides YouTube's feed, Shorts, recommendations, comments, and thumbnails. Focus Lock + daily time tracker. $4.99 one-time, no subscription." />
+  <meta name="theme-color" content="#0f1722" />
+
+  <!-- Open Graph / social cards -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="CleanFeed — focus on YouTube" />
+  <meta property="og:description" content="Hide YouTube's feed, Shorts, recommendations, comments, thumbnails. Focus Lock + daily time tracker. $4.99 one-time." />
+  <meta property="og:image" content="https://{{GITHUB_USERNAME}}.github.io/cleanfeed/icon-128.png" />
+  <meta property="og:url" content="https://{{GITHUB_USERNAME}}.github.io/cleanfeed/" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="CleanFeed — focus on YouTube" />
+  <meta name="twitter:description" content="Hide YouTube's distractions. $4.99 one-time, no subscription." />
+
+  <link rel="icon" href="icon-128.png" type="image/png" />
+
+  <style>
+    :root {
+      --bg:        #0f1722;
+      --bg-elev:   #15202e;
+      --bg-elev-2: #1c2a3a;
+      --border:    #233346;
+      --text:      #e6edf6;
+      --text-dim:  #93a0b3;
+      --text-faint:#5e6c7e;
+      --accent:    #3cc8c8;
+      --accent-2:  #6fffff;
+      --accent-glow: rgba(60, 200, 200, 0.20);
+      --gold:      #f2cf5f;
+      --warn:      #ff7a8a;
+      --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.40);
+      --shadow-lg: 0 22px 60px rgba(0, 0, 0, 0.55);
+      --grad-accent: linear-gradient(95deg, #3cc8c8 0%, #6fffff 100%);
+      --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 22px;
+      --ease: cubic-bezier(0.20, 0.80, 0.30, 1);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      background:
+        radial-gradient(1100px 600px at 22% -10%, rgba(60, 200, 200, 0.10), transparent 60%),
+        radial-gradient(900px 600px at 90% 110%, rgba(242, 207, 95, 0.04), transparent 60%),
+        var(--bg);
+      color: var(--text);
+      font: 400 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI",
+            Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ---- nav ---- */
+    .nav {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px 28px 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .nav img { width: 32px; height: 32px; border-radius: 8px; }
+    .nav-brand { font-weight: 700; letter-spacing: 0.2px; }
+    .nav-spacer { flex: 1; }
+    .nav a {
+      color: var(--text-dim);
+      font-size: 14px;
+      padding: 8px 12px;
+      border-radius: var(--r-sm);
+      transition: color 150ms var(--ease), background 150ms var(--ease);
+    }
+    .nav a:hover { color: var(--text); background: var(--bg-elev); text-decoration: none; }
+
+    /* ---- hero ---- */
+    .hero {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 80px 28px 56px;
+      text-align: center;
+    }
+    .hero h1 {
+      font-size: clamp(36px, 7vw, 64px);
+      line-height: 1.05;
+      margin: 0 0 20px;
+      letter-spacing: -1.5px;
+      background: linear-gradient(120deg, #f6f9ff 0%, #b9d3da 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero .accent-line {
+      display: inline-block;
+      background: var(--grad-accent);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p {
+      max-width: 620px;
+      margin: 0 auto 32px;
+      font-size: 18px;
+      color: var(--text-dim);
+    }
+    .hero .ctas {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 22px;
+      font: inherit;
+      font-weight: 600;
+      font-size: 15px;
+      color: var(--text);
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      cursor: pointer;
+      transition: transform 100ms var(--ease),
+                  background 150ms var(--ease),
+                  box-shadow 150ms var(--ease),
+                  filter 150ms var(--ease);
+      text-decoration: none;
+    }
+    .btn:hover { transform: translateY(-2px); background: var(--bg-elev-2); text-decoration: none; }
+    .btn-primary {
+      background: var(--grad-accent);
+      color: #0b1828;
+      border: none;
+      box-shadow: 0 8px 24px rgba(60, 200, 200, 0.30);
+    }
+    .btn-primary:hover { filter: brightness(1.06); box-shadow: 0 12px 32px rgba(60, 200, 200, 0.45); }
+    .hero-note {
+      margin-top: 16px;
+      font-size: 13px;
+      color: var(--text-faint);
+    }
+
+    /* ---- screenshot mockup ---- */
+    .mockup {
+      max-width: 880px;
+      margin: 48px auto 0;
+      padding: 16px;
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: var(--r-xl);
+      box-shadow: var(--shadow-lg);
+    }
+    .mockup-inner {
+      background: #050810;
+      border-radius: var(--r-lg);
+      padding: 28px;
+      display: grid;
+      grid-template-columns: 1fr 280px;
+      gap: 20px;
+      min-height: 280px;
+    }
+    .mockup-feed {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+    }
+    .mockup-feed::after {
+      content: "Homepage feed hidden — use the search bar above.";
+      grid-column: span 2;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 13px;
+      padding: 80px 12px;
+      border: 1px dashed var(--border);
+      border-radius: var(--r-md);
+      background: linear-gradient(180deg, rgba(60, 200, 200, 0.03), rgba(20, 32, 48, 0));
+    }
+    .mockup-popup {
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      padding: 16px;
+      display: grid;
+      gap: 10px;
+      align-content: start;
+      font-size: 13px;
+    }
+    .mockup-popup-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 10px;
+      background: var(--bg-elev-2);
+      border-radius: var(--r-sm);
+    }
+    .mockup-toggle {
+      width: 28px; height: 16px;
+      border-radius: 999px;
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      position: relative;
+    }
+    .mockup-toggle::after {
+      content: "";
+      position: absolute;
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      top: 1px; left: 1px;
+      background: var(--text-dim);
+    }
+    .mockup-toggle.on { background: var(--accent-glow); border-color: var(--accent); }
+    .mockup-toggle.on::after { background: var(--accent); transform: translateX(12px); }
+    .mockup-stat {
+      text-align: center;
+      padding: 14px 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .mockup-stat strong { display: block; font-size: 22px; color: var(--text); }
+    .mockup-stat span { font-size: 11px; color: var(--text-dim); }
+
+    /* ---- features ---- */
+    .features {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 80px 28px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    .card {
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 28px;
+      box-shadow: var(--shadow-md);
+    }
+    .card-num {
+      display: inline-grid;
+      place-items: center;
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: var(--grad-accent);
+      color: #0b1828;
+      font-weight: 700;
+      font-size: 16px;
+      margin-bottom: 14px;
+    }
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 18px;
+      font-weight: 600;
+    }
+    .card p {
+      margin: 0;
+      color: var(--text-dim);
+      font-size: 14.5px;
+    }
+
+    /* ---- pricing ---- */
+    .pricing {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 24px 28px 96px;
+    }
+    .pricing-header { text-align: center; margin-bottom: 36px; }
+    .pricing-header h2 {
+      font-size: 28px;
+      margin: 0 0 8px;
+      letter-spacing: -0.4px;
+    }
+    .pricing-header p { color: var(--text-dim); margin: 0; }
+    .tiers {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .tier {
+      position: relative;
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 28px 24px 24px;
+      box-shadow: var(--shadow-md);
+    }
+    .tier h3 { margin: 0 0 4px; font-size: 16px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-dim); }
+    .tier .price {
+      font-size: 38px;
+      font-weight: 700;
+      letter-spacing: -1px;
+      margin: 8px 0 16px;
+    }
+    .tier .price-sub {
+      font-size: 13px;
+      color: var(--text-faint);
+      margin-left: 6px;
+      font-weight: 400;
+      letter-spacing: 0;
+    }
+    .tier ul {
+      list-style: none;
+      padding: 0; margin: 0 0 20px;
+      color: var(--text-dim);
+      font-size: 14.5px;
+      display: grid;
+      gap: 8px;
+    }
+    .tier ul li::before {
+      content: "✓";
+      color: var(--accent);
+      margin-right: 8px;
+      font-weight: 700;
+    }
+    .tier-pro {
+      background: linear-gradient(160deg, rgba(60, 200, 200, 0.08), var(--bg-elev) 70%);
+      border-color: rgba(60, 200, 200, 0.32);
+    }
+    .tier-tag {
+      position: absolute;
+      top: -10px; left: 24px;
+      background: var(--grad-accent);
+      color: #0b1828;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+    }
+
+    /* ---- footer ---- */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 28px;
+      text-align: center;
+      color: var(--text-faint);
+      font-size: 13px;
+    }
+    footer a { color: var(--text-dim); }
+    footer .row {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .build-note {
+      text-align: center;
+      padding: 16px 0;
+      color: var(--text-faint);
+      font-size: 12px;
+    }
+
+    /* ---- mobile ---- */
+    @media (max-width: 760px) {
+      .features { grid-template-columns: 1fr; padding: 56px 24px; }
+      .tiers { grid-template-columns: 1fr; }
+      .mockup-inner { grid-template-columns: 1fr; }
+      .nav { padding: 16px; }
+      .hero { padding: 56px 24px 40px; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <img src="icon-128.png" alt="" />
+    <span class="nav-brand">CleanFeed</span>
+    <span class="nav-spacer"></span>
+    <a href="#features">Features</a>
+    <a href="#pricing">Pricing</a>
+    <a href="https://github.com/{{GITHUB_USERNAME}}/cleanfeed">GitHub</a>
+  </nav>
+
+  <header class="hero">
+    <h1>Take YouTube <span class="accent-line">back.</span></h1>
+    <p>
+      CleanFeed hides the parts of YouTube designed to keep you scrolling —
+      so you only see what you actually came for. 10 toggleable blockers,
+      a Focus Lock for deep work, and a daily time tracker.
+    </p>
+    <div class="ctas">
+      <a href="#" class="btn btn-primary" id="cwsBtn">
+        Install from Chrome Web Store
+      </a>
+      <a href="https://github.com/{{GITHUB_USERNAME}}/cleanfeed" class="btn">
+        View source on GitHub
+      </a>
+    </div>
+    <p class="hero-note">Free tier · No account required · No telemetry</p>
+
+    <div class="mockup" aria-hidden="true">
+      <div class="mockup-inner">
+        <div class="mockup-feed"></div>
+        <aside class="mockup-popup">
+          <strong>CleanFeed</strong>
+          <div class="mockup-popup-row">Homepage feed <span class="mockup-toggle on"></span></div>
+          <div class="mockup-popup-row">Shorts everywhere <span class="mockup-toggle on"></span></div>
+          <div class="mockup-popup-row">Sidebar recs <span class="mockup-toggle"></span></div>
+          <div class="mockup-popup-row">End-screen suggestions <span class="mockup-toggle"></span></div>
+          <div class="mockup-popup-row">Comments <span class="mockup-toggle"></span></div>
+          <div class="mockup-stat">
+            <strong>47 min</strong>
+            <span>on YouTube today</span>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </header>
+
+  <section class="features" id="features">
+    <div class="card">
+      <span class="card-num">10</span>
+      <h3>Blockers, individually toggleable</h3>
+      <p>
+        Homepage feed, Shorts, sidebar recs, end-screens, comments,
+        Trending / Explore, live chat, autoplay, thumbnails, and the
+        "For you" sections on your subscription page. Pick what you
+        want gone.
+      </p>
+    </div>
+
+    <div class="card">
+      <span class="card-num">🔒</span>
+      <h3>Focus Lock for deep work</h3>
+      <p>
+        Set a 4-digit PIN, lock every blocker on for 30 min – 2 h, or
+        until you choose. PIN is salted-SHA256 hashed, never plaintext.
+        Need out early? Hold to unlock for 60 seconds — the friction
+        keeps impulsive unlocks at bay.
+      </p>
+    </div>
+
+    <div class="card">
+      <span class="card-num">⏱</span>
+      <h3>Daily time tracker</h3>
+      <p>
+        See how many minutes you actually spent on YouTube today and
+        this week. Counted only when a tab is focused and visible —
+        never background. Free for everyone.
+      </p>
+    </div>
+  </section>
+
+  <section class="pricing" id="pricing">
+    <div class="pricing-header">
+      <h2>Simple pricing — one time, no subscription.</h2>
+      <p>Pay once, keep forever. Lifetime updates included.</p>
+    </div>
+
+    <div class="tiers">
+      <article class="tier">
+        <h3>Free</h3>
+        <div class="price">$0<span class="price-sub">forever</span></div>
+        <ul>
+          <li>Any 2 blockers active</li>
+          <li>Homepage feed &amp; Shorts</li>
+          <li>Daily time tracker</li>
+          <li>1-hour pause</li>
+        </ul>
+        <a href="#" class="btn">Install free</a>
+      </article>
+
+      <article class="tier tier-pro">
+        <span class="tier-tag">RECOMMENDED</span>
+        <h3>Pro</h3>
+        <div class="price">$4.99<span class="price-sub">one-time</span></div>
+        <ul>
+          <li>All 10 blockers</li>
+          <li>Focus Lock with PIN protection</li>
+          <li>Channel whitelist &amp; right-click blocklist</li>
+          <li>Custom CSS for power users</li>
+          <li>Works on YouTube Music too</li>
+          <li>Lifetime updates</li>
+        </ul>
+        <a href="#" class="btn btn-primary">Upgrade — $4.99</a>
+      </article>
+    </div>
+  </section>
+
+  <p class="build-note">Open source · MIT licensed · No analytics anywhere · No data leaves your browser</p>
+
+  <footer>
+    <div class="row">
+      <div>© <span id="year"></span> {{DEVELOPER_NAME}} · CleanFeed</div>
+      <div>
+        <a href="PRIVACY.md">Privacy policy</a> ·
+        <a href="https://github.com/{{GITHUB_USERNAME}}/cleanfeed">GitHub</a> ·
+        <a href="mailto:{{SUPPORT_EMAIL}}">{{SUPPORT_EMAIL}}</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Tiny year stamp — no analytics, no nothing.
+    document.getElementById("year").textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>

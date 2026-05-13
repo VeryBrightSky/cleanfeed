@@ -1,0 +1,192 @@
+/* CleanFeed — injected stylesheet
+ *
+ * Each blocker maps body.cf-block-<id> → a selector list that hides those
+ * elements with display:none. Toggling is just a class flip on <body>,
+ * which is faster than DOM mutation and survives YouTube's SPA churn.
+ *
+ * !important is required because YouTube ships !important rules of its own
+ * for layout pieces.
+ */
+
+/* --- HOME FEED ----------------------------------------------------- */
+body.cf-block-home-feed ytd-browse[page-subtype="home"] ytd-rich-grid-renderer,
+body.cf-block-home-feed ytd-browse[page-subtype="home"] #header.ytd-rich-grid-renderer,
+body.cf-block-home-feed ytd-browse[page-subtype="home"] #contents.ytd-rich-grid-renderer,
+body.cf-block-home-feed ytd-browse[page-subtype="home"] ytd-feed-filter-chip-bar-renderer {
+  display: none !important;
+}
+
+/* Empty-state replacement: show a calm message instead of a blank page */
+body.cf-block-home-feed ytd-browse[page-subtype="home"]::after {
+  content: "CleanFeed — homepage feed hidden. Use the search bar above.";
+  display: block;
+  margin: 120px auto;
+  font-family: "Roboto", system-ui, sans-serif;
+  font-size: 18px;
+  text-align: center;
+  color: var(--yt-spec-text-secondary, #888);
+  letter-spacing: 0.3px;
+}
+
+/* --- SHORTS -------------------------------------------------------- */
+body.cf-block-shorts ytd-rich-shelf-renderer[is-shorts],
+body.cf-block-shorts ytd-reel-shelf-renderer,
+body.cf-block-shorts ytd-reel-item-renderer,
+body.cf-block-shorts ytd-shorts,
+body.cf-block-shorts ytd-rich-section-renderer:has(ytd-rich-shelf-renderer[is-shorts]),
+body.cf-block-shorts ytd-guide-entry-renderer:has(a[title="Shorts"]),
+body.cf-block-shorts ytd-mini-guide-entry-renderer:has(a[title="Shorts"]),
+body.cf-block-shorts ytd-guide-entry-renderer:has(yt-formatted-string[title="Shorts"]),
+body.cf-block-shorts grid-shelf-view-model:has([title="Shorts"]) {
+  display: none !important;
+}
+
+/* --- WATCH SIDEBAR ------------------------------------------------- */
+body.cf-block-watch-sidebar ytd-watch-flexy #secondary,
+body.cf-block-watch-sidebar ytd-watch-flexy #secondary-inner,
+body.cf-block-watch-sidebar ytd-watch-next-secondary-results-renderer,
+body.cf-block-watch-sidebar #related.ytd-watch-flexy,
+body.cf-block-watch-sidebar ytd-compact-video-renderer {
+  display: none !important;
+}
+/* Without the sidebar, the video can stretch wider for a cleaner read */
+body.cf-block-watch-sidebar ytd-watch-flexy[is-two-columns_] #primary.ytd-watch-flexy {
+  max-width: none !important;
+  width: 100% !important;
+}
+
+/* --- END SCREEN ---------------------------------------------------- */
+body.cf-block-end-screen .ytp-ce-element,
+body.cf-block-end-screen .ytp-ce-covering-overlay,
+body.cf-block-end-screen .ytp-ce-element-show,
+body.cf-block-end-screen .ytp-endscreen-content,
+body.cf-block-end-screen .html5-endscreen,
+body.cf-block-end-screen .ytp-pause-overlay {
+  display: none !important;
+}
+
+/* --- COMMENTS ------------------------------------------------------ */
+body.cf-block-comments ytd-comments#comments,
+body.cf-block-comments #comments.ytd-watch-flexy,
+body.cf-block-comments ytd-comments-header-renderer {
+  display: none !important;
+}
+
+/* "Show comments" inline restore button injected by content.js — */
+.cf-show-comments-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--yt-spec-additive-background, #1f1f1f);
+  color: var(--yt-spec-text-primary, #f1f1f1);
+  border: 1px solid var(--yt-spec-10-percent-layer, #3f3f3f);
+  border-radius: 18px;
+  padding: 8px 16px;
+  margin: 16px 0;
+  cursor: pointer;
+  font-family: "Roboto", system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 120ms ease;
+}
+.cf-show-comments-btn:hover {
+  background: var(--yt-spec-badge-chip-background, #2f2f2f);
+}
+/* When the user clicks "show comments", remove this body class via JS */
+body.cf-comments-shown ytd-comments#comments,
+body.cf-comments-shown #comments.ytd-watch-flexy,
+body.cf-comments-shown ytd-comments-header-renderer {
+  display: block !important;
+}
+body.cf-comments-shown .cf-show-comments-btn {
+  display: none !important;
+}
+
+/* --- THUMBNAILS ---------------------------------------------------- */
+/* Fade every video thumbnail image to 0% opacity, revealing the grey
+ * card behind it. The parent (ytd-thumbnail) keeps its layout so titles,
+ * durations, and chips stay readable. Hovering a card brings the image
+ * back at 50% so the user can still peek if they want.
+ */
+body.cf-block-thumbnails ytd-thumbnail img,
+body.cf-block-thumbnails yt-image img,
+body.cf-block-thumbnails .yt-thumbnail-view-model img,
+body.cf-block-thumbnails ytd-playlist-thumbnail img,
+body.cf-block-thumbnails ytd-moving-thumbnail-renderer img {
+  opacity: 0 !important;
+  transition: opacity 220ms cubic-bezier(0.20, 0.80, 0.30, 1) !important;
+}
+body.cf-block-thumbnails ytd-thumbnail:hover img,
+body.cf-block-thumbnails yt-image:hover img,
+body.cf-block-thumbnails .yt-thumbnail-view-model:hover img {
+  opacity: 0.55 !important;
+}
+/* Give the parent a neutral, slightly-textured placeholder when image is hidden */
+body.cf-block-thumbnails ytd-thumbnail,
+body.cf-block-thumbnails .yt-thumbnail-view-model,
+body.cf-block-thumbnails ytd-playlist-thumbnail {
+  background: linear-gradient(135deg, #2a2e36 0%, #1c2028 100%) !important;
+}
+
+/* --- SUBSCRIPTION ALGORITHM ---------------------------------------- */
+body.cf-block-subs-algo ytd-browse[page-subtype="subscriptions"] ytd-shelf-renderer,
+body.cf-block-subs-algo ytd-browse[page-subtype="subscriptions"] ytd-rich-shelf-renderer,
+body.cf-block-subs-algo ytd-browse[page-subtype="subscriptions"] ytd-rich-section-renderer {
+  display: none !important;
+}
+
+/* --- LIVE CHAT ----------------------------------------------------- */
+body.cf-block-live-chat ytd-live-chat-frame,
+body.cf-block-live-chat #chat-container,
+body.cf-block-live-chat #chat.ytd-watch-flexy {
+  display: none !important;
+}
+
+/* --- YOUTUBE MUSIC (music.youtube.com) ------------------------------
+ * YT Music has its own custom-element tree (ytmusic-*). We reuse the
+ * same body-class flags so the user's existing toggles automatically
+ * apply on YT Music with zero extra configuration.
+ */
+/* Home / explore feed on YT Music */
+body.cf-block-home-feed ytmusic-tabbed-search-results-renderer ytmusic-shelf-renderer,
+body.cf-block-home-feed ytmusic-shelf-renderer.style-scope.ytmusic-section-list-renderer,
+body.cf-block-home-feed ytmusic-carousel-shelf-renderer,
+body.cf-block-home-feed ytmusic-immersive-header-renderer,
+body.cf-block-home-feed ytmusic-section-list-renderer[page-type="MUSIC_PAGE_TYPE_HOME"] {
+  display: none !important;
+}
+/* Right-side related queue / "Up next" — analogous to watch-sidebar */
+body.cf-block-watch-sidebar ytmusic-player-page #related,
+body.cf-block-watch-sidebar ytmusic-player-page ytmusic-player-queue,
+body.cf-block-watch-sidebar ytmusic-player-page tp-yt-paper-tab[aria-label="Related"] {
+  display: none !important;
+}
+/* Hide YT Music's Explore / Charts entries — analogous to "explore" blocker */
+body.cf-block-explore ytmusic-guide-entry-renderer:has(a[title="Explore"]),
+body.cf-block-explore ytmusic-guide-entry-renderer:has(yt-formatted-string[title="Explore"]),
+body.cf-block-explore ytmusic-guide-entry-renderer:has(a[href*="/explore"]) {
+  display: none !important;
+}
+/* Thumbnails on YT Music */
+body.cf-block-thumbnails ytmusic-thumbnail-renderer img,
+body.cf-block-thumbnails yt-img-shadow img {
+  opacity: 0 !important;
+  transition: opacity 220ms cubic-bezier(0.20, 0.80, 0.30, 1) !important;
+}
+body.cf-block-thumbnails ytmusic-thumbnail-renderer:hover img,
+body.cf-block-thumbnails yt-img-shadow:hover img {
+  opacity: 0.55 !important;
+}
+
+/* --- EXPLORE / TRENDING -------------------------------------------- */
+body.cf-block-explore ytd-guide-section-renderer:has(#guide-section-title yt-formatted-string[title="Explore"]),
+body.cf-block-explore ytd-guide-entry-renderer:has(a[title="Trending"]),
+body.cf-block-explore ytd-guide-entry-renderer:has(a[title="Music"]),
+body.cf-block-explore ytd-guide-entry-renderer:has(a[title="Gaming"]),
+body.cf-block-explore ytd-guide-entry-renderer:has(a[title="News"]),
+body.cf-block-explore ytd-guide-entry-renderer:has(a[title="Sports"]),
+body.cf-block-explore ytd-guide-entry-renderer:has(a[title="Learning"]),
+body.cf-block-explore ytd-guide-entry-renderer:has(a[title="Fashion & Beauty"]),
+body.cf-block-explore ytd-mini-guide-entry-renderer:has(a[title="Trending"]) {
+  display: none !important;
+}

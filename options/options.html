@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CleanFeed — Options</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <div class="cf-page">
+    <header class="cf-page-head">
+      <img src="../icons/icon-48.png" width="32" height="32" alt="" />
+      <div>
+        <h1>CleanFeed Options</h1>
+        <p class="cf-page-sub">Advanced settings. <strong>Pro features marked</strong> require an unlock. Also works on YouTube Music.</p>
+      </div>
+      <span class="cf-tier" id="cf-tier-badge">FREE</span>
+    </header>
+
+    <!-- Today / week time tracker (FREE) -->
+    <section class="cf-panel cf-time-panel">
+      <h2>Time on YouTube</h2>
+      <p class="cf-help">Counts only when a YouTube tab is focused and visible — not background.</p>
+      <div class="cf-time-grid">
+        <div class="cf-time-cell">
+          <span class="cf-time-value" id="cf-time-today">0m</span>
+          <span class="cf-time-label">Today</span>
+        </div>
+        <div class="cf-time-cell">
+          <span class="cf-time-value" id="cf-time-week">0m</span>
+          <span class="cf-time-label">This week</span>
+        </div>
+        <div class="cf-time-cell">
+          <span class="cf-time-value" id="cf-time-avg">0m</span>
+          <span class="cf-time-label">7-day avg</span>
+        </div>
+      </div>
+      <div class="cf-row-actions">
+        <button id="cf-reset-time" class="cf-btn cf-btn-warn" type="button">Reset time history</button>
+      </div>
+    </section>
+
+    <!-- Focus Lock (PRO) -->
+    <section class="cf-panel" id="cf-focus-panel">
+      <h2>Focus Lock <span class="cf-tag-pro">PRO</span></h2>
+      <p class="cf-help">
+        Set a 4-digit PIN. When active, every blocker is force-enabled and the popup toggles are
+        disabled. Need to deactivate early? Hold the unlock button for 60 seconds — the friction
+        keeps impulsive unlocks at bay but the bypass is always there for real emergencies.
+      </p>
+      <div id="cf-focus-pin-setup" class="cf-focus-section">
+        <p class="cf-help" id="cf-pin-state">No PIN set yet.</p>
+        <div class="cf-pin-row">
+          <input id="cf-pin-input"  type="password" inputmode="numeric" maxlength="4" placeholder="4-digit PIN" autocomplete="new-password" />
+          <input id="cf-pin-input2" type="password" inputmode="numeric" maxlength="4" placeholder="Confirm PIN" autocomplete="new-password" />
+          <button id="cf-pin-save" class="cf-btn cf-btn-primary" type="button">Set PIN</button>
+        </div>
+        <p id="cf-pin-error" class="cf-status cf-status-warn" aria-live="polite"></p>
+      </div>
+
+      <div id="cf-focus-controls" class="cf-focus-section">
+        <h3 class="cf-h3">Start a Focus session</h3>
+        <div class="cf-duration-row">
+          <button class="cf-duration" data-duration="30">30&nbsp;min</button>
+          <button class="cf-duration" data-duration="60">1&nbsp;hour</button>
+          <button class="cf-duration" data-duration="120">2&nbsp;hours</button>
+          <button class="cf-duration" data-duration="-1">Until I unlock</button>
+        </div>
+        <div class="cf-pin-row">
+          <input id="cf-start-pin" type="password" inputmode="numeric" maxlength="4" placeholder="Enter PIN to start" autocomplete="off" />
+          <button id="cf-start-lock" class="cf-btn cf-btn-primary" type="button" disabled>Start Focus Lock</button>
+        </div>
+        <p id="cf-start-error" class="cf-status cf-status-warn" aria-live="polite"></p>
+      </div>
+
+      <div id="cf-focus-active" class="cf-focus-active" hidden>
+        <p class="cf-help">A Focus Lock is currently active. End it from the popup using the hold-to-unlock button.</p>
+      </div>
+    </section>
+
+    <section class="cf-panel">
+      <h2>Channel whitelist <span class="cf-tag-pro">PRO</span></h2>
+      <p class="cf-help">Blockers are <strong>disabled</strong> on watch pages from these channels — useful for channels you actively want to follow.</p>
+      <div class="cf-whitelist-input">
+        <input type="text" id="cf-whitelist-new" placeholder="Channel name, e.g. Veritasium" autocomplete="off" />
+        <button id="cf-whitelist-add" class="cf-btn cf-btn-primary" type="button">Add</button>
+      </div>
+      <ul id="cf-whitelist" class="cf-whitelist"></ul>
+    </section>
+
+    <section class="cf-panel">
+      <h2>Blocked channels <span class="cf-tag-pro">PRO</span></h2>
+      <p class="cf-help">
+        Right-click a video on YouTube → <em>Block this channel with CleanFeed</em>. Videos from
+        blocked channels are hidden wherever they appear.
+      </p>
+      <ul id="cf-blocked-list" class="cf-whitelist"></ul>
+    </section>
+
+    <section class="cf-panel">
+      <h2>Custom CSS <span class="cf-tag-pro">PRO</span></h2>
+      <p class="cf-help">Power-user escape hatch. Any CSS you write here is injected on every YouTube page. Use carefully — bad selectors can break the site.</p>
+      <textarea id="cf-css" rows="8" placeholder="/* Example: also hide the channel banner */&#10;ytd-c4-tabbed-header-renderer { display: none !important; }"></textarea>
+      <div class="cf-row-actions">
+        <button id="cf-css-save" class="cf-btn cf-btn-primary" type="button">Save CSS</button>
+        <span id="cf-css-status" class="cf-status" aria-live="polite"></span>
+      </div>
+    </section>
+
+    <section class="cf-panel">
+      <h2>Reset</h2>
+      <p class="cf-help">Wipe all CleanFeed settings and stats. Doesn&rsquo;t affect your Pro license.</p>
+      <button id="cf-reset-all" class="cf-btn cf-btn-warn" type="button">Reset all settings</button>
+    </section>
+
+    <footer class="cf-page-foot">
+      <span>CleanFeed <span id="cf-version">v1.0.0</span></span>
+      <span><a href="https://extensionpay.com/extension/cleanfeed2342" target="_blank" rel="noopener noreferrer">Manage subscription</a></span>
+    </footer>
+  </div>
+  <script src="options.js"></script>
+</body>
+</html>
