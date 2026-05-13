@@ -11,6 +11,15 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.2.4 — 2026-05-13
+- Fixed branded login page — was calling ExtPay API directly without
+  auth, causing 404. Now routes through background SW using official
+  SDK. The "I already paid" button now opens ExtensionPay's hosted
+  email-collection page directly via `extpay.openLoginPage()`; the
+  branded `login/login.html` is no longer on the main flow (the
+  official SDK exposes no `login(email)` method, so a custom form
+  would have nothing to call).
+
 ### v1.2.3 — 2026-05-13
 - Fixed Focus Lock banner showing on a fresh install. The `.cf-focus-banner`
   CSS rule had `display: grid`, which beat the user-agent

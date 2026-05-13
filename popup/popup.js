@@ -463,7 +463,11 @@ function openPayment() {
   window.close();
 }
 function openLogin() {
-  // Opens our branded /login/login.html in a new tab — NOT the (404) ExtPay login URL.
+  // v1.2.4: routes straight through the official ExtPay SDK's
+  // openLoginPage() (handled in background.js), which opens ExtPay's
+  // hosted email-collection page. Skips our branded login.html — the
+  // SDK has no extpay.login(email) we could call from a custom form,
+  // so anything we built locally would just bounce the user here anyway.
   chrome.runtime.sendMessage({ type: "cf:open-login" }).catch(() => {});
   window.close();
 }

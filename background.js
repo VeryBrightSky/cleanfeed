@@ -231,15 +231,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     sendResponse({ ok: true });
     return true;
   }
-  // "I already paid" — opens our branded login page (login/login.html).
-  if (msg.type === "cf:open-login") {
-    chrome.tabs.create({ url: chrome.runtime.getURL("login/login.html") });
-    sendResponse({ ok: true });
-    return true;
-  }
-  // Custom login page's "Send magic link" button — punts to ExtPay's hosted
-  // portal where the magic link is actually emailed.
-  if (msg.type === "cf:open-extpay-login" || msg.type === "cf:open-login-page") {
+  // "I already paid" — call ExtPay's hosted login flow directly via the
+  // official SDK. (v1.2.4: dropped the branded login.html middleman; the
+  // SDK doesn't expose extpay.login(email), so per spec's fallback we
+  // hand off the email-collection UI to ExtPay's hosted page where the
+  // magic link is actually generated and emailed.)
+  if (
+    msg.type === "cf:open-login" ||
+    msg.type === "cf:open-extpay-login" ||
+    msg.type === "cf:open-login-page"
+  ) {
     extpay.openLoginPage();
     sendResponse({ ok: true });
     return true;
