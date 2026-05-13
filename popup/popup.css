@@ -560,3 +560,13 @@ body.cf-paused-state .cf-pause-btn .cf-play-icon  { display: inline-block; }
   margin-top: var(--s-2);
   font-size: 12.5px;
 }
+/* v1.3.5: center the primary CTA inside the upsell modal. The .cf-btn
+ * base class has `flex:1` which is inert outside flex parents, so the
+ * button was rendering as content-width and left-aligned. Make it span
+ * the full card width so it sits visually centered between the modal's
+ * left/right padding — same pattern as .cf-modal-login below. */
+.cf-modal-card .cf-btn.cf-btn-primary {
+  display: block;
+  width: 100%;
+  margin: 0 auto;
+}

@@ -11,6 +11,9 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.3.5 — 2026-05-13
+- Centered the "Upgrade — $4.99" button in the Pro upsell modal.
+
 ### v1.3.4 — 2026-05-13
 - Fixed "404 API key required" error when clicking Upgrade or
   I already paid. The previous fix opened ExtPay's URL in a tab
