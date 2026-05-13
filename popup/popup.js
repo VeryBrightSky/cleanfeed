@@ -56,7 +56,17 @@ const STATE = {
   onboardingComplete: true,
   usageCount: 0,
   reviewPromptShown: false,
+  // v1.4.1
+  perPageEnabled: false,
+  perPageSettings: { homepage: {}, watch: {}, subscriptions: {} },
+  activeTab: "everywhere",   // "everywhere" | "homepage" | "watch" | "subscriptions"
 };
+const PAGE_TABS = [
+  { key: "everywhere",     label: "Everywhere" },
+  { key: "homepage",       label: "Homepage" },
+  { key: "watch",          label: "Watch page" },
+  { key: "subscriptions",  label: "Subscriptions" },
+];
 
 let pauseTickHandle = 0;
 let focusTickHandle = 0;
@@ -94,7 +104,8 @@ function loadState() {
     chrome.storage.local.get(
       ["settings", "paid", "whitelistedChannels", "customCSS", "sessionStats",
        "pausedUntil", "focusLock", "timeTracking",
-       "onboardingComplete", "usageCount", "reviewPromptShown"],
+       "onboardingComplete", "usageCount", "reviewPromptShown",
+       "perPageEnabled", "perPageSettings"],
       (data) => {
         STATE.paid = !!data.paid;
         STATE.settings = data.settings || {};
@@ -107,6 +118,8 @@ function loadState() {
         STATE.onboardingComplete = !!data.onboardingComplete;
         STATE.usageCount = Number(data.usageCount) || 0;
         STATE.reviewPromptShown = !!data.reviewPromptShown;
+        STATE.perPageEnabled = !!data.perPageEnabled;
+        STATE.perPageSettings = data.perPageSettings || { homepage: {}, watch: {}, subscriptions: {} };
         resolve();
       }
     );
@@ -428,9 +441,34 @@ function renderBlockers() {
   const container = $("cf-blockers");
   while (container.firstChild) container.removeChild(container.firstChild);
 
+  // v1.4.1 — Per-page rules tab bar. Only render when the user has
+  // opted in via options AND is Pro. Edge case: Free user with
+  // perPageEnabled accidentally set to true → show Everywhere tab
+  // only + a locked-feature banner that opens the upsell on tap.
+  const perPageOn = STATE.perPageEnabled === true;
+  if (perPageOn) {
+    renderTabBar(container);
+    if (!STATE.paid) {
+      // free user — collapse to Everywhere tab and show upsell hint
+      STATE.activeTab = "everywhere";
+      const lock = el("div", { class: "cf-perpage-locked" },
+        el("span", null, "Per-page rules is a Pro feature — "),
+        el("button", {
+          type: "button",
+          class: "cf-link cf-perpage-upgrade",
+          onclick: () => openUpsellModal(),
+        }, "Upgrade"),
+      );
+      container.appendChild(lock);
+    }
+  } else {
+    STATE.activeTab = "everywhere";
+  }
+
   const paused = isPaused();
   const focusActive = isFocusLockActive();
   const activeFree = countActiveFreeBlockers();
+  const onEverywhere = STATE.activeTab === "everywhere";
 
   for (const b of BLOCKERS) {
     const locked = b.tier === "pro" && !STATE.paid;
@@ -452,26 +490,31 @@ function renderBlockers() {
     text.appendChild(el("div", { class: "cf-row-desc" }, b.desc));
     row.appendChild(text);
 
-    const sw = el("label", {
-      class: "cf-switch",
-      title: locked
-        ? "Upgrade to Pro to enable"
-        : (paused ? "Paused — switches still configure your defaults" : ""),
-    });
-    // While Focus Lock is active for a paid user, all blockers are
-    // force-on and the switches are disabled (the lock owns them).
-    const forcedOn = focusActive && STATE.paid;
-    const input = el("input", {
-      type: "checkbox",
-      id: "tg-" + b.id,
-      checked: forcedOn ? true : checked,
-      disabled: locked || wouldExceedFreeLimit || forcedOn,
-    });
-    input.addEventListener("change", () => onToggle(b, input));
-    const slider = el("span", { class: "cf-slider" });
-    sw.appendChild(input);
-    sw.appendChild(slider);
-    row.appendChild(sw);
+    if (onEverywhere) {
+      // Standard on/off toggle (the existing v1.4.0 behaviour).
+      const sw = el("label", {
+        class: "cf-switch",
+        title: locked
+          ? "Upgrade to Pro to enable"
+          : (paused ? "Paused — switches still configure your defaults" : ""),
+      });
+      const forcedOn = focusActive && STATE.paid;
+      const input = el("input", {
+        type: "checkbox",
+        id: "tg-" + b.id,
+        checked: forcedOn ? true : checked,
+        disabled: locked || wouldExceedFreeLimit || forcedOn,
+      });
+      input.addEventListener("change", () => onToggle(b, input));
+      const slider = el("span", { class: "cf-slider" });
+      sw.appendChild(input);
+      sw.appendChild(slider);
+      row.appendChild(sw);
+    } else {
+      // Per-page tab: 3-state segmented control (on / off / inherit)
+      const seg = renderPerPageSegment(b);
+      row.appendChild(seg);
+    }
 
     if (locked) {
       row.addEventListener("click", (e) => {
@@ -481,6 +524,71 @@ function renderBlockers() {
     }
     container.appendChild(row);
   }
+}
+
+// ---- v1.4.1 per-page tab bar + 3-state segments ----
+function renderTabBar(container) {
+  const bar = el("div", { class: "cf-tab-bar", role: "tablist" });
+  for (const t of PAGE_TABS) {
+    const btn = el("button", {
+      type: "button",
+      role: "tab",
+      class: "cf-tab" + (STATE.activeTab === t.key ? " is-active" : ""),
+      "aria-selected": STATE.activeTab === t.key ? "true" : "false",
+    }, t.label);
+    btn.addEventListener("click", () => {
+      STATE.activeTab = t.key;
+      renderBlockers();
+    });
+    bar.appendChild(btn);
+  }
+  container.appendChild(bar);
+}
+
+function _readPerPageValue(pageKey, blockerId) {
+  const page = STATE.perPageSettings[pageKey] || {};
+  const v = page[blockerId];
+  return v === "on" || v === "off" ? v : "inherit";
+}
+
+async function _writePerPageValue(pageKey, blockerId, value) {
+  const all = Object.assign({ homepage: {}, watch: {}, subscriptions: {} }, STATE.perPageSettings || {});
+  const page = Object.assign({}, all[pageKey] || {});
+  if (value === "inherit") {
+    delete page[blockerId];
+  } else {
+    page[blockerId] = value;
+  }
+  all[pageKey] = page;
+  STATE.perPageSettings = all;
+  await chrome.storage.local.set({ perPageSettings: all });
+  pushSettingsToTabs();
+}
+
+function renderPerPageSegment(b) {
+  const wrap = el("div", { class: "cf-seg" });
+  const cur = _readPerPageValue(STATE.activeTab, b.id);
+  const opts = [
+    { v: "on",      label: "On" },
+    { v: "off",     label: "Off" },
+    { v: "inherit", label: "Inherit" },
+  ];
+  const proLocked = b.tier === "pro" && !STATE.paid;
+  for (const o of opts) {
+    const btn = el("button", {
+      type: "button",
+      class: "cf-seg-btn" + (cur === o.v ? " is-active" : ""),
+      "aria-pressed": cur === o.v ? "true" : "false",
+      disabled: proLocked,
+    }, o.label);
+    btn.addEventListener("click", async () => {
+      if (proLocked) { openUpsellModal(); return; }
+      await _writePerPageValue(STATE.activeTab, b.id, o.v);
+      renderBlockers();
+    });
+    wrap.appendChild(btn);
+  }
+  return wrap;
 }
 
 // ---- interactions -------------------------------------------------------
@@ -651,6 +759,14 @@ async function init() {
     if (changes.timeTracking) {
       STATE.timeTracking = changes.timeTracking.newValue || {};
       renderTimeMini();
+    }
+    if (changes.perPageEnabled) {
+      STATE.perPageEnabled = !!changes.perPageEnabled.newValue;
+      renderBlockers();
+    }
+    if (changes.perPageSettings) {
+      STATE.perPageSettings = changes.perPageSettings.newValue || { homepage: {}, watch: {}, subscriptions: {} };
+      renderBlockers();
     }
   });
 }

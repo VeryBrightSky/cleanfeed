@@ -11,6 +11,13 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.4.1 — 2026-05-13
+- Completed per-page rules with full tabbed popup UI. Pro users can
+  now configure different blocker settings per YouTube page
+  (Homepage / Watch / Subscriptions) with on / off / inherit
+  controls per blocker. The storage engine shipped in v1.4.0; this
+  release adds the visual interface.
+
 ### v1.4.0 — 2026-05-13
 - Keyword blocking (Pro) — hide any video whose title contains your
   blocked words
