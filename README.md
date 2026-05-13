@@ -11,6 +11,9 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.2.2 — 2026-05-13
+- Fixed Focus Lock emergency bypass button and countdown timer display.
+
 ### v1.2.1 — 2026-05-12
 - **Fixed: CORS error blocking ExtPay API.** The previous custom client
   hit endpoints (`/api/v1/<id>/users/...`) that ExtensionPay no longer

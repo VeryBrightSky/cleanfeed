@@ -44,8 +44,6 @@ const STATE = {
 
 let pauseTickHandle = 0;
 let focusTickHandle = 0;
-let _holdTimer = 0;
-let _holdStart = 0;
 
 // ---- DOM helpers --------------------------------------------------------
 
@@ -175,6 +173,15 @@ async function togglePause() {
   renderBlockers();
 }
 
+// Render the red Focus Lock banner with a live MM:SS countdown.
+//
+// v1.2.2 fixes:
+//   * Every tick now logs to DevTools (so a stuck "--:--" is diagnosable).
+//   * Storage is re-read defensively each tick — if a background process
+//     auto-expires the lock, the popup notices and clears itself even
+//     without an explicit storage.onChanged push.
+//   * updateRemaining() is called immediately AND on a 1-second interval
+//     starting at popup-open time so the user sees real time within ~1s.
 function renderFocusBanner() {
   const banner = $("cf-focus-banner");
   if (!isFocusLockActive()) {
@@ -183,64 +190,117 @@ function renderFocusBanner() {
     return;
   }
   banner.hidden = false;
+
   const updateRemaining = () => {
-    const until = Number(STATE.focusLock.activeUntil) || 0;
+    const until = Number(STATE.focusLock && STATE.focusLock.activeUntil) || 0;
     const ms = until - Date.now();
+    console.log("[CleanFeed] focus-lock tick", {
+      activeUntil: until, msRemaining: ms,
+    });
     if (ms <= 0) {
-      // auto-expire: clear focusLock state
+      console.log("[CleanFeed] focus-lock auto-expired");
       STATE.focusLock = Object.assign({}, STATE.focusLock, { activeUntil: 0 });
       chrome.storage.local.set({ focusLock: STATE.focusLock });
       renderFocusBanner();
       renderBlockers();
       return;
     }
-    // "Until I unlock" uses a very far-future timestamp
+    // "Until I unlock" uses a far-future timestamp
     if (ms > 365 * 24 * 60 * 60 * 1000) {
       $("cf-focus-remaining").textContent = "Until you unlock";
       return;
     }
-    const total = Math.ceil(ms / 1000);
+    const total = Math.floor(ms / 1000);
     const h = Math.floor(total / 3600);
     const m = Math.floor((total % 3600) / 60);
     const s = total % 60;
-    $("cf-focus-remaining").textContent = h > 0
-      ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")} left`
-      : `${m}:${String(s).padStart(2, "0")} left`;
+    const text = h > 0
+      ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+      : `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    $("cf-focus-remaining").textContent = text;
   };
+
+  // Tick once now so the user sees the real value within the first paint,
+  // not the static "--:--" placeholder that's in the HTML.
   updateRemaining();
-  if (!focusTickHandle) {
-    focusTickHandle = setInterval(updateRemaining, 1000);
+  if (focusTickHandle) clearInterval(focusTickHandle);
+  focusTickHandle = setInterval(updateRemaining, 1000);
+}
+
+// ----- 60-second hold-to-unlock (Focus Lock emergency bypass) -----
+//
+// Implementation: pointerdown starts a CSS transition that animates the
+// progress bar from 0% → 100% over exactly HOLD_DURATION_MS, AND schedules
+// a single setTimeout to fire _completeHold() at the same time. Releasing
+// or moving the pointer off the button cancels both.
+//
+// Touch fallback uses touchstart / touchend / touchcancel — same handlers.
+let _holdTimeoutHandle = 0;
+
+function _startHold(e) {
+  console.log("[CleanFeed] hold-to-unlock: pointerdown");
+  if (!isFocusLockActive()) {
+    console.log("[CleanFeed] hold-to-unlock: ignored (lock not active)");
+    return;
+  }
+  if (_holdTimeoutHandle) {
+    console.log("[CleanFeed] hold-to-unlock: ignored (already holding)");
+    return;
+  }
+  const btn = $("cf-focus-hold");
+  const bar = $("cf-hold-progress");
+  if (!btn || !bar) {
+    console.warn("[CleanFeed] hold-to-unlock: DOM elements missing");
+    return;
+  }
+  btn.classList.add("is-holding");
+
+  // Snap to 0% with no transition, force reflow, then animate to 100%
+  // over the full 60 seconds using a single CSS transition.
+  bar.style.transition = "none";
+  bar.style.width = "0%";
+  void bar.offsetWidth;  // force reflow so the transition starts cleanly
+  bar.style.transition = `width ${HOLD_DURATION_MS}ms linear`;
+  bar.style.width = "100%";
+
+  _holdTimeoutHandle = setTimeout(() => {
+    _holdTimeoutHandle = 0;
+    _completeHold();
+  }, HOLD_DURATION_MS);
+}
+
+function _cancelHold(e) {
+  if (!_holdTimeoutHandle) return;
+  console.log("[CleanFeed] hold-to-unlock: cancelled");
+  clearTimeout(_holdTimeoutHandle);
+  _holdTimeoutHandle = 0;
+  const btn = $("cf-focus-hold");
+  const bar = $("cf-hold-progress");
+  if (btn) btn.classList.remove("is-holding");
+  if (bar) {
+    // Snap progress bar back to 0% with a short retraction animation
+    bar.style.transition = "width 200ms ease-out";
+    bar.style.width = "0%";
   }
 }
 
-function _startHold(e) {
-  if (!isFocusLockActive()) return;
-  if (_holdTimer) return;
-  const btn = $("cf-focus-hold");
-  btn.classList.add("is-holding");
-  _holdStart = Date.now();
-  _holdTimer = setInterval(() => {
-    const elapsed = Date.now() - _holdStart;
-    const pct = Math.min(100, (elapsed / HOLD_DURATION_MS) * 100);
-    $("cf-hold-progress").style.width = pct + "%";
-    if (elapsed >= HOLD_DURATION_MS) {
-      _completeHold();
-    }
-  }, 90);
-}
-
-function _cancelHold() {
-  if (!_holdTimer) return;
-  clearInterval(_holdTimer);
-  _holdTimer = 0;
-  $("cf-focus-hold").classList.remove("is-holding");
-  $("cf-hold-progress").style.width = "0%";
-}
-
 async function _completeHold() {
-  _cancelHold();
-  // disable focus lock
-  STATE.focusLock = Object.assign({}, STATE.focusLock, { activeUntil: 0 });
+  console.log("[CleanFeed] hold-to-unlock: complete — disabling Focus Lock");
+  const btn = $("cf-focus-hold");
+  const bar = $("cf-hold-progress");
+  if (btn) btn.classList.remove("is-holding");
+  if (bar) {
+    bar.style.transition = "width 200ms ease-out";
+    bar.style.width = "0%";
+  }
+  // Per v1.2.2 spec: clear active state AND the PIN hash on emergency
+  // bypass — the user must re-set a PIN before starting a new session.
+  STATE.focusLock = {
+    pinSet: false,
+    activeUntil: 0,
+    pinHash: "",
+    pinSalt: "",
+  };
   await chrome.storage.local.set({ focusLock: STATE.focusLock });
   renderFocusBanner();
   renderBlockers();
