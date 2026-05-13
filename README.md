@@ -11,6 +11,14 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.3.2 — 2026-05-13
+- Defensive fallback for ExtPay popup window failures. On rare
+  multi-monitor / high-DPI setups, Chrome can reject the small popup
+  window ExtPay tries to open ("Invalid value for bounds"), which
+  previously caused the Upgrade and Log-in buttons to silently do
+  nothing. They now fall back to opening ExtPay's hosted page in a
+  regular tab. Same flow, same payment, never silently fails.
+
 ### v1.3.1 — 2026-05-13
 - Removed the `window.addEventListener("unload", ...)` from the content
   script. YouTube ships a Permissions-Policy that disallows `unload`

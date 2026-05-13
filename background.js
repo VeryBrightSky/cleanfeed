@@ -226,9 +226,30 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // popup/options/content — avoids the CORS error the old custom
   // SDK hit when called from extension pages).
   if (msg.type === "cf:open-payment" || msg.type === "cf:open-payment-page") {
-    // 'pro' targets our single one-time plan nickname.
-    try { extpay.openPaymentPage("pro"); } catch (_) { extpay.openPaymentPage(); }
-    sendResponse({ ok: true });
+    // v1.3.2: wrap the SDK's async open_payment_page in try/catch and
+    // fall back to a regular browser tab if Chrome rejects the small
+    // popup window (e.g. high-DPI / multi-monitor: "Invalid value for
+    // bounds"). The SDK call is async, so the wrapper must be async too;
+    // a synchronous try/catch around the call alone wouldn't catch a
+    // rejection.
+    (async () => {
+      try {
+        await extpay.openPaymentPage("pro");
+        sendResponse({ ok: true });
+      } catch (err) {
+        console.warn("[CleanFeed] ExtPay payment popup failed, falling back to tab:", err);
+        try {
+          await chrome.tabs.create({
+            url: "https://extensionpay.com/extension/cleanfeed2342?back=choose-plan",
+            active: true,
+          });
+          sendResponse({ ok: true, fallback: "tab" });
+        } catch (tabErr) {
+          console.error("[CleanFeed] Tab fallback also failed:", tabErr);
+          sendResponse({ ok: false, error: String(tabErr) });
+        }
+      }
+    })();
     return true;
   }
   // "I already paid" — call ExtPay's hosted login flow directly via the
@@ -241,8 +262,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     msg.type === "cf:open-extpay-login" ||
     msg.type === "cf:open-login-page"
   ) {
-    extpay.openLoginPage();
-    sendResponse({ ok: true });
+    // v1.3.2: same defensive wrap as the payment path above.
+    (async () => {
+      try {
+        await extpay.openLoginPage();
+        sendResponse({ ok: true });
+      } catch (err) {
+        console.warn("[CleanFeed] ExtPay login popup failed, falling back to tab:", err);
+        try {
+          await chrome.tabs.create({
+            url: "https://extensionpay.com/extension/cleanfeed2342/reactivate?back=choose-plan",
+            active: true,
+          });
+          sendResponse({ ok: true, fallback: "tab" });
+        } catch (tabErr) {
+          console.error("[CleanFeed] Tab fallback also failed:", tabErr);
+          sendResponse({ ok: false, error: String(tabErr) });
+        }
+      }
+    })();
     return true;
   }
   // Spec'd handler — return the full ExtPay user record.
