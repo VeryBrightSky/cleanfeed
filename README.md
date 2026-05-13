@@ -11,6 +11,16 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.4.2 — 2026-05-13
+- Upgrade and login buttons now show "Opening…" immediately on
+  click — no more 1-3 second frozen button appearance.
+- Pre-fetches ExtPay api_key on popup open so the tab opens
+  instantly when user clicks Upgrade.
+- Fixed upsell modal copy: "10 blockers" → "14 blockers + keyword
+  blocking, Pomodoro Focus Lock, per-page rules".
+- Fixed `usageCount` integer coercion (now `parseInt(..., 10) || 0`)
+  to prevent the review prompt appearing at the wrong time.
+
 ### v1.4.1 — 2026-05-13
 - Completed per-page rules with full tabbed popup UI. Pro users can
   now configure different blocker settings per YouTube page

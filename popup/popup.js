@@ -116,7 +116,10 @@ function loadState() {
         STATE.focusLock = data.focusLock || { pinSet: false, activeUntil: 0 };
         STATE.timeTracking = data.timeTracking || {};
         STATE.onboardingComplete = !!data.onboardingComplete;
-        STATE.usageCount = Number(data.usageCount) || 0;
+        // v1.4.2 — explicit integer coercion. Number(undefined) is NaN
+        // which then "|| 0" yielded 0 anyway, but parseInt is the more
+        // defensive expression and matches the spec verbatim.
+        STATE.usageCount = parseInt(data.usageCount, 10) || 0;
         STATE.reviewPromptShown = !!data.reviewPromptShown;
         STATE.perPageEnabled = !!data.perPageEnabled;
         STATE.perPageSettings = data.perPageSettings || { homepage: {}, watch: {}, subscriptions: {} };
@@ -612,19 +615,57 @@ async function onToggle(blocker, inputEl) {
   renderBlockers();
 }
 
-function openPayment() {
-  chrome.runtime.sendMessage({ type: "cf:open-payment" }).catch(() => {});
-  // close popup so user can see the payment tab
-  window.close();
+// v1.4.2 — small generic "busy state" helper so any upgrade/login click
+// shows "Opening…" immediately and is re-enabled (or auto-restored
+// after a 6 s safety timeout) if the message round-trip fails. The
+// popup will close itself when the new tab steals focus, so the
+// happy-path restore code only matters for failure cases.
+function _busyClick(e, text, msgType) {
+  const btn = (e && e.currentTarget) || (e && e.target);
+  const origText = btn ? btn.textContent : "";
+  const origDisabled = btn ? btn.disabled : false;
+  if (btn) {
+    btn.textContent = text;
+    btn.disabled = true;
+  }
+  let restored = false;
+  const restore = () => {
+    if (restored || !btn) return;
+    restored = true;
+    btn.textContent = origText;
+    btn.disabled = origDisabled;
+  };
+  // safety net — re-enable in 6 s in case the bg never responds
+  const t = setTimeout(restore, 6000);
+  try {
+    chrome.runtime.sendMessage({ type: msgType }, (resp) => {
+      clearTimeout(t);
+      // chrome.runtime.lastError is set when the SW dropped the message —
+      // we still want the button restored in that case so the user can retry.
+      if (chrome.runtime.lastError || !resp || resp.ok === false) {
+        restore();
+        return;
+      }
+      // Success — the background SW has already opened the tab.
+      // Close the popup so the user sees it. (Popup auto-closes when
+      // focus leaves anyway, but window.close() makes it explicit.)
+      try { window.close(); } catch (_) { restore(); }
+    });
+  } catch (err) {
+    clearTimeout(t);
+    restore();
+  }
 }
-function openLogin() {
-  // v1.2.4: routes straight through the official ExtPay SDK's
-  // openLoginPage() (handled in background.js), which opens ExtPay's
-  // hosted email-collection page. Skips our branded login.html — the
-  // SDK has no extpay.login(email) we could call from a custom form,
-  // so anything we built locally would just bounce the user here anyway.
-  chrome.runtime.sendMessage({ type: "cf:open-login" }).catch(() => {});
-  window.close();
+
+function openPayment(e) {
+  _busyClick(e, "Opening…", "cf:open-payment");
+}
+function openLogin(e) {
+  // Routes through background.js → extpay.openLoginPage() URL. The
+  // background handler ensures the api_key exists in storage before
+  // building the URL (v1.3.4), and we pre-fetch on popup open (v1.4.2)
+  // so this is usually instant.
+  _busyClick(e, "Connecting…", "cf:open-login");
 }
 
 function resetStats() {
@@ -673,9 +714,19 @@ async function init() {
 
   await loadState();
 
-  // v1.4.0 F3 — bump usage counter for review-prompt gating
-  STATE.usageCount = (STATE.usageCount || 0) + 1;
-  chrome.storage.local.set({ usageCount: STATE.usageCount });
+  // v1.4.0 F3 — bump usage counter for review-prompt gating.
+  // v1.4.2 — remember the pre-increment count so we can suppress the
+  // banner on the first-ever popup open even if some other code path
+  // pre-seeded usageCount to a high number.
+  const prevUsage = STATE.usageCount;
+  const newUsage = (parseInt(prevUsage, 10) || 0) + 1;
+  STATE.usageCount = newUsage;
+  chrome.storage.local.set({ usageCount: newUsage });
+  // v1.4.2 — pre-fetch the ExtPay api_key in the background so the
+  // Upgrade / I-already-paid tabs open instantly when the user clicks.
+  // Fire-and-forget; never await this.
+  try { chrome.runtime.sendMessage({ type: "cf:prefetch-apikey" }, () => { void chrome.runtime.lastError; }); }
+  catch (_) {}
 
   // v1.4.0 F2 — show onboarding view instead of toggle grid if first install
   if (!STATE.onboardingComplete) {
@@ -882,7 +933,10 @@ function renderReviewPrompt() {
   // remove any existing
   const old = document.getElementById("cf-review-banner");
   if (old) old.remove();
-  if (STATE.reviewPromptShown || STATE.usageCount < REVIEW_THRESHOLD) return;
+  if (STATE.reviewPromptShown) return;
+  // v1.4.2 — coerce both sides to integers so we never compare NaN.
+  const count = parseInt(STATE.usageCount, 10) || 0;
+  if (count < REVIEW_THRESHOLD) return;
   const banner = document.createElement("section");
   banner.id = "cf-review-banner";
   banner.className = "cf-review-banner";

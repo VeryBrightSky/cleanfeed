@@ -29,7 +29,7 @@ Built for:
 — People trying to use YouTube intentionally instead of compulsively
 
 Free tier: pick any 2 blockers, forever. Daily time tracker included.
-Pro tier: $4.99 one-time — unlocks all 10 blockers, plus Focus Lock
+Pro tier: $4.99 one-time — unlocks all 14 blockers, plus Focus Lock
 (set a 4-digit PIN, lock every blocker on for 30 min – 2 h – or until
 you choose; 60-second hold-to-disable as the safety valve for real
 emergencies), channel whitelist + right-click blocklist, custom CSS,

@@ -484,6 +484,27 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return await _createExtpayApiKey();
   }
 
+  // v1.4.2 — warm the ExtPay api_key while the popup is open so the
+  // moment the user clicks Upgrade / I-already-paid the tab opens
+  // instantly. Fire-and-forget from popup.js; we still respond so the
+  // sender knows whether it was cached or freshly fetched.
+  if (msg.type === "cf:prefetch-apikey") {
+    (async () => {
+      try {
+        const existing = await _readExtpayApiKey();
+        if (existing) {
+          sendResponse({ ok: true, cached: true });
+          return;
+        }
+        const created = await _createExtpayApiKey();
+        sendResponse({ ok: !!created, cached: false });
+      } catch (err) {
+        sendResponse({ ok: false, error: String(err) });
+      }
+    })();
+    return true;
+  }
+
   if (msg.type === "cf:open-payment" || msg.type === "cf:open-payment-page") {
     (async () => {
       const apiKey = await _ensureExtpayApiKey();
