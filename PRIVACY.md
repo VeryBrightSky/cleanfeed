@@ -11,10 +11,10 @@ upgrade — and even that uses an anonymous, locally-generated identifier.
 
 ## 1. Who we are
 
-CleanFeed is built by **{{DEVELOPER_NAME}}**, an independent developer.
+CleanFeed is built by **Vito Lomonaco**, an independent developer.
 
 If anything in this policy is unclear or you'd like to delete data we hold,
-please email **{{SUPPORT_EMAIL}}**.
+please email **vitowebpro@gmail.com**.
 
 ## 2. Data we store locally on your device
 
@@ -123,7 +123,7 @@ We do **not** request `<all_urls>`, `tabs`, `history`, `webRequest`,
 CleanFeed is not directed to children under 13, and we do not knowingly
 collect personal information from anyone under 13. If you believe a
 child has provided information through CleanFeed, contact us at
-**{{SUPPORT_EMAIL}}** and we will work with you to delete it.
+**vitowebpro@gmail.com** and we will work with you to delete it.
 
 ## 10. Changes to this policy
 
@@ -134,7 +134,7 @@ document is hosted.
 
 ## 11. Contact
 
-Questions or concerns? Email **{{SUPPORT_EMAIL}}**.
+Questions or concerns? Email **vitowebpro@gmail.com**.
 
 ---
 
@@ -144,9 +144,9 @@ including the Limited Use requirements.
 
 <!--
 TO PUBLISH:
-1. Replace {{DEVELOPER_NAME}} with your name or business name
-2. Replace {{SUPPORT_EMAIL}} with your support contact email
-3. Confirm {{EFFECTIVE_DATE}} matches today
+1. Replace Vito Lomonaco with your name or business name
+2. Replace vitowebpro@gmail.com with your support contact email
+3. Confirm 2026-05-13 matches today
 4. Host this file publicly (GitHub raw URL works perfectly)
 5. Add the URL to your Chrome Web Store listing
 -->
