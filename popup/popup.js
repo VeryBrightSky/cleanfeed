@@ -886,7 +886,7 @@ function renderReviewPrompt() {
   const banner = document.createElement("section");
   banner.id = "cf-review-banner";
   banner.className = "cf-review-banner";
-  banner.innerHTML = "";
+  // (no innerHTML assignment — element is freshly created so already empty)
   const txt = document.createElement("span");
   txt.textContent = "Enjoying CleanFeed? A quick review on the Chrome Web Store would really help.";
   const row = document.createElement("div");
