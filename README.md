@@ -11,6 +11,14 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.3.4 — 2026-05-13
+- Fixed "404 API key required" error when clicking Upgrade or
+  I already paid. The previous fix opened ExtPay's URL in a tab
+  but skipped the SDK's lazy api_key generation. Now we read the
+  key from storage, create one ourselves via ExtPay's `/api/new-key`
+  endpoint if missing, then build the URL with it before opening
+  the tab. `lib/extpay.js` untouched.
+
 ### v1.3.3 — 2026-05-13
 - Replaced ExtPay's popup-window flow with direct tab opening for
   both Upgrade and "I already paid" actions. The popup approach

@@ -225,44 +225,102 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // ---- ExtPay routing (every API call goes through here, never from
   // popup/options/content — avoids the CORS error the old custom
   // SDK hit when called from extension pages).
-  // v1.3.3: bypass extpay.openPaymentPage / openLoginPage entirely.
+  // v1.3.4: ensure ExtPay's api_key exists in storage BEFORE opening
+  // the tab. v1.3.3 correctly avoided the SDK's bounds-error popup by
+  // building the URL ourselves and tab-opening it, but it also bypassed
+  // the only code path that ever creates the api_key (which lives only
+  // inside the SDK's open_payment_page / open_login_page — getUser
+  // does not create it on a missing key, confirmed at
+  // lib/extpay.js:1355-1362).
   //
-  // The SDK's open_login_page (lib/extpay.js:1479) opens a small 500x800
-  // popup via chrome.windows.create with explicit left/top/width/height
-  // bounds. On high-DPI / multi-monitor setups Chrome rejects those
-  // bounds ("Invalid value for bounds. Bounds must be at least 50%
-  // within visible screen space") AFTER our await on openLoginPage()
-  // already resolved — the SDK fires-and-forgets the windows.create
-  // promise, so the rejection surfaces as an unhandled global error
-  // that no await/try-catch around the SDK call can intercept.
-  //
-  // The fix is to never call those SDK methods. We build the exact same
-  // URLs they would have built and open them via chrome.tabs.create,
-  // which has no bounds math and no failure mode of this kind. Same
-  // hosted ExtensionPay flow, same checkout, same magic-link login —
-  // just always a regular tab.
+  // We replicate the SDK's create_key() logic inline: POST to
+  // /api/new-key, get a JSON string back, write it to BOTH storage
+  // areas the SDK reads from. lib/extpay.js itself is untouched.
+
+  // SDK's set() helper writes sync first and falls back to local
+  // (lib/extpay.js:1266-1273). We do the same so the SDK reads back
+  // its own key on subsequent calls.
+  async function _writeExtpayApiKey(apiKey) {
+    try {
+      await chrome.storage.sync.set({ extensionpay_api_key: apiKey });
+    } catch (_) {
+      try { await chrome.storage.local.set({ extensionpay_api_key: apiKey }); } catch (_) {}
+    }
+  }
 
   async function _readExtpayApiKey() {
+    // SDK reads sync first, falls back to local. Mirror that order.
     try {
-      const data = await chrome.storage.local.get(["extensionpay_api_key"]);
-      return data && data.extensionpay_api_key ? String(data.extensionpay_api_key) : "";
-    } catch (_) { return ""; }
+      const s = await chrome.storage.sync.get(["extensionpay_api_key"]);
+      if (s && s.extensionpay_api_key) return String(s.extensionpay_api_key);
+    } catch (_) { /* sync unavailable on temp Firefox addons etc. */ }
+    try {
+      const l = await chrome.storage.local.get(["extensionpay_api_key"]);
+      if (l && l.extensionpay_api_key) return String(l.extensionpay_api_key);
+    } catch (_) {}
+    return "";
+  }
+
+  // Replica of create_key() in lib/extpay.js:1307-1340. Same POST,
+  // same body, same storage write. Returns "" on failure (caller
+  // handles the no-key URL fallback).
+  async function _createExtpayApiKey() {
+    try {
+      // Detect dev vs store install the same way the SDK does. Without
+      // the `management` permission, chrome.management is undefined,
+      // so we fall back to inspecting the manifest's update_url field.
+      const isDev = !(("update_url") in (chrome.runtime.getManifest() || {}));
+      const body = isDev ? { development: true } : {};
+      const resp = await fetch(
+        "https://extensionpay.com/extension/" + encodeURIComponent(EXTPAY_ID) + "/api/new-key",
+        {
+          method: "POST",
+          headers: {
+            "Accept": "application/json",
+            "Content-type": "application/json",
+          },
+          body: JSON.stringify(body),
+          credentials: "omit",
+          cache: "no-store",
+        }
+      );
+      if (!resp.ok) {
+        console.warn("[CleanFeed] /api/new-key returned HTTP " + resp.status);
+        return "";
+      }
+      const apiKey = await resp.json();
+      const key = typeof apiKey === "string" ? apiKey : String(apiKey || "");
+      if (key) await _writeExtpayApiKey(key);
+      return key;
+    } catch (e) {
+      console.warn("[CleanFeed] Could not POST /api/new-key:", e);
+      return "";
+    }
+  }
+
+  // Read existing key; create one if missing. Returns "" only when
+  // both read AND create failed (offline, etc.).
+  async function _ensureExtpayApiKey() {
+    let key = await _readExtpayApiKey();
+    if (key) return key;
+    // Side-call getUser first so any future SDK init also sees the key
+    try { await extpay.getUser(); } catch (_) { /* network issue — keep going */ }
+    key = await _readExtpayApiKey();
+    if (key) return key;
+    return await _createExtpayApiKey();
   }
 
   if (msg.type === "cf:open-payment" || msg.type === "cf:open-payment-page") {
     (async () => {
+      const apiKey = await _ensureExtpayApiKey();
+      // Matches SDK's open_payment_page("pro"):
+      //   ${EXTENSION_URL}/choose-plan/${plan_nickname}?api_key=...
+      const url = apiKey
+        ? `https://extensionpay.com/extension/cleanfeed2342/choose-plan/pro?api_key=${encodeURIComponent(apiKey)}`
+        : `https://extensionpay.com/extension/cleanfeed2342?back=choose-plan`;
       try {
-        const apiKey = await _readExtpayApiKey();
-        // Matches SDK's open_payment_page("pro"):
-        //   ${EXTENSION_URL}/choose-plan/${plan_nickname}?api_key=...
-        // If we haven't created an api_key yet, fall back to the public
-        // portal entry — ExtensionPay's hosted page handles the missing
-        // key by registering one on the fly.
-        const url = apiKey
-          ? `https://extensionpay.com/extension/cleanfeed2342/choose-plan/pro?api_key=${encodeURIComponent(apiKey)}`
-          : `https://extensionpay.com/extension/cleanfeed2342?back=choose-plan`;
         await chrome.tabs.create({ url, active: true });
-        sendResponse({ ok: true });
+        sendResponse({ ok: true, hasApiKey: !!apiKey });
       } catch (err) {
         console.error("[CleanFeed] Failed to open payment tab:", err);
         sendResponse({ ok: false, error: String(err) });
@@ -277,15 +335,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     msg.type === "cf:open-login-page"
   ) {
     (async () => {
+      const apiKey = await _ensureExtpayApiKey();
+      // Matches SDK's open_login_page:
+      //   ${EXTENSION_URL}/reactivate?api_key=...&back=choose-plan&v2
+      const url = apiKey
+        ? `https://extensionpay.com/extension/cleanfeed2342/reactivate?api_key=${encodeURIComponent(apiKey)}&back=choose-plan&v2`
+        : `https://extensionpay.com/extension/cleanfeed2342/reactivate?back=choose-plan`;
       try {
-        const apiKey = await _readExtpayApiKey();
-        // Matches SDK's open_login_page:
-        //   ${EXTENSION_URL}/reactivate?api_key=...&back=choose-plan&v2
-        const url = apiKey
-          ? `https://extensionpay.com/extension/cleanfeed2342/reactivate?api_key=${encodeURIComponent(apiKey)}&back=choose-plan&v2`
-          : `https://extensionpay.com/extension/cleanfeed2342/reactivate?back=choose-plan`;
         await chrome.tabs.create({ url, active: true });
-        sendResponse({ ok: true });
+        sendResponse({ ok: true, hasApiKey: !!apiKey });
       } catch (err) {
         console.error("[CleanFeed] Failed to open login tab:", err);
         sendResponse({ ok: false, error: String(err) });
