@@ -225,60 +225,70 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // ---- ExtPay routing (every API call goes through here, never from
   // popup/options/content — avoids the CORS error the old custom
   // SDK hit when called from extension pages).
+  // v1.3.3: bypass extpay.openPaymentPage / openLoginPage entirely.
+  //
+  // The SDK's open_login_page (lib/extpay.js:1479) opens a small 500x800
+  // popup via chrome.windows.create with explicit left/top/width/height
+  // bounds. On high-DPI / multi-monitor setups Chrome rejects those
+  // bounds ("Invalid value for bounds. Bounds must be at least 50%
+  // within visible screen space") AFTER our await on openLoginPage()
+  // already resolved — the SDK fires-and-forgets the windows.create
+  // promise, so the rejection surfaces as an unhandled global error
+  // that no await/try-catch around the SDK call can intercept.
+  //
+  // The fix is to never call those SDK methods. We build the exact same
+  // URLs they would have built and open them via chrome.tabs.create,
+  // which has no bounds math and no failure mode of this kind. Same
+  // hosted ExtensionPay flow, same checkout, same magic-link login —
+  // just always a regular tab.
+
+  async function _readExtpayApiKey() {
+    try {
+      const data = await chrome.storage.local.get(["extensionpay_api_key"]);
+      return data && data.extensionpay_api_key ? String(data.extensionpay_api_key) : "";
+    } catch (_) { return ""; }
+  }
+
   if (msg.type === "cf:open-payment" || msg.type === "cf:open-payment-page") {
-    // v1.3.2: wrap the SDK's async open_payment_page in try/catch and
-    // fall back to a regular browser tab if Chrome rejects the small
-    // popup window (e.g. high-DPI / multi-monitor: "Invalid value for
-    // bounds"). The SDK call is async, so the wrapper must be async too;
-    // a synchronous try/catch around the call alone wouldn't catch a
-    // rejection.
     (async () => {
       try {
-        await extpay.openPaymentPage("pro");
+        const apiKey = await _readExtpayApiKey();
+        // Matches SDK's open_payment_page("pro"):
+        //   ${EXTENSION_URL}/choose-plan/${plan_nickname}?api_key=...
+        // If we haven't created an api_key yet, fall back to the public
+        // portal entry — ExtensionPay's hosted page handles the missing
+        // key by registering one on the fly.
+        const url = apiKey
+          ? `https://extensionpay.com/extension/cleanfeed2342/choose-plan/pro?api_key=${encodeURIComponent(apiKey)}`
+          : `https://extensionpay.com/extension/cleanfeed2342?back=choose-plan`;
+        await chrome.tabs.create({ url, active: true });
         sendResponse({ ok: true });
       } catch (err) {
-        console.warn("[CleanFeed] ExtPay payment popup failed, falling back to tab:", err);
-        try {
-          await chrome.tabs.create({
-            url: "https://extensionpay.com/extension/cleanfeed2342?back=choose-plan",
-            active: true,
-          });
-          sendResponse({ ok: true, fallback: "tab" });
-        } catch (tabErr) {
-          console.error("[CleanFeed] Tab fallback also failed:", tabErr);
-          sendResponse({ ok: false, error: String(tabErr) });
-        }
+        console.error("[CleanFeed] Failed to open payment tab:", err);
+        sendResponse({ ok: false, error: String(err) });
       }
     })();
     return true;
   }
-  // "I already paid" — call ExtPay's hosted login flow directly via the
-  // official SDK. (v1.2.4: dropped the branded login.html middleman; the
-  // SDK doesn't expose extpay.login(email), so per spec's fallback we
-  // hand off the email-collection UI to ExtPay's hosted page where the
-  // magic link is actually generated and emailed.)
+
   if (
     msg.type === "cf:open-login" ||
     msg.type === "cf:open-extpay-login" ||
     msg.type === "cf:open-login-page"
   ) {
-    // v1.3.2: same defensive wrap as the payment path above.
     (async () => {
       try {
-        await extpay.openLoginPage();
+        const apiKey = await _readExtpayApiKey();
+        // Matches SDK's open_login_page:
+        //   ${EXTENSION_URL}/reactivate?api_key=...&back=choose-plan&v2
+        const url = apiKey
+          ? `https://extensionpay.com/extension/cleanfeed2342/reactivate?api_key=${encodeURIComponent(apiKey)}&back=choose-plan&v2`
+          : `https://extensionpay.com/extension/cleanfeed2342/reactivate?back=choose-plan`;
+        await chrome.tabs.create({ url, active: true });
         sendResponse({ ok: true });
       } catch (err) {
-        console.warn("[CleanFeed] ExtPay login popup failed, falling back to tab:", err);
-        try {
-          await chrome.tabs.create({
-            url: "https://extensionpay.com/extension/cleanfeed2342/reactivate?back=choose-plan",
-            active: true,
-          });
-          sendResponse({ ok: true, fallback: "tab" });
-        } catch (tabErr) {
-          console.error("[CleanFeed] Tab fallback also failed:", tabErr);
-          sendResponse({ ok: false, error: String(tabErr) });
-        }
+        console.error("[CleanFeed] Failed to open login tab:", err);
+        sendResponse({ ok: false, error: String(err) });
       }
     })();
     return true;

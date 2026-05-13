@@ -11,6 +11,14 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.3.3 — 2026-05-13
+- Replaced ExtPay's popup-window flow with direct tab opening for
+  both Upgrade and "I already paid" actions. The popup approach
+  was throwing "Invalid value for bounds" on multi-monitor /
+  high-DPI setups and silently breaking the upgrade conversion.
+  Opens in a normal new tab now — same checkout, same login,
+  zero bounds math. `lib/extpay.js` untouched.
+
 ### v1.3.2 — 2026-05-13
 - Defensive fallback for ExtPay popup window failures. On rare
   multi-monitor / high-DPI setups, Chrome can reject the small popup
