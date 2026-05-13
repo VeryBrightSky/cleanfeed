@@ -146,6 +146,97 @@
       color: var(--text-faint);
     }
 
+    /* ---- waitlist forms (hero + bottom) ---- */
+    .waitlist {
+      margin: 28px auto 0;
+      max-width: 480px;
+      display: grid;
+      gap: 8px;
+    }
+    .waitlist-label {
+      font-size: 12.5px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+    .waitlist-form {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .waitlist-form input[type="email"] {
+      flex: 1 1 240px;
+      min-width: 0;
+      padding: 13px 14px;
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      color: var(--text);
+      font: inherit;
+      font-size: 14.5px;
+      transition: border-color 150ms var(--ease), box-shadow 150ms var(--ease);
+    }
+    .waitlist-form input[type="email"]:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(60, 200, 200, 0.25);
+    }
+    .waitlist-form input[type="email"][aria-invalid="true"] {
+      border-color: #ff7a8a;
+      box-shadow: 0 0 0 3px rgba(255, 122, 138, 0.18);
+    }
+    .waitlist-form button {
+      flex: 0 0 auto;
+      padding: 13px 22px;
+      border: none;
+      border-radius: var(--r-md);
+      background: var(--grad-accent);
+      color: #0b1828;
+      font: inherit;
+      font-weight: 600;
+      font-size: 14.5px;
+      cursor: pointer;
+      box-shadow: 0 6px 18px rgba(60, 200, 200, 0.28);
+      transition: filter 120ms var(--ease), transform 100ms var(--ease);
+    }
+    .waitlist-form button:hover { filter: brightness(1.06); transform: translateY(-1px); }
+    .waitlist-form button:active { transform: translateY(0); }
+    .waitlist-form button[disabled] { opacity: 0.62; cursor: progress; transform: none; }
+    .waitlist-msg {
+      font-size: 13.5px;
+      color: var(--text-dim);
+      padding: 4px 2px;
+      line-height: 1.4;
+    }
+    .waitlist-msg.success { color: var(--accent); }
+    .waitlist-msg.error { color: #ff7a8a; }
+
+    /* ---- bottom waitlist section ---- */
+    .signup {
+      max-width: 720px;
+      margin: 24px auto 80px;
+      padding: 36px 28px 32px;
+      background: linear-gradient(160deg, rgba(60, 200, 200, 0.10), var(--bg-elev) 75%);
+      border: 1px solid rgba(60, 200, 200, 0.32);
+      border-radius: var(--r-xl);
+      box-shadow: var(--shadow-md);
+      text-align: center;
+    }
+    .signup h2 {
+      margin: 0 0 8px;
+      font-size: 26px;
+      letter-spacing: -0.3px;
+    }
+    .signup p {
+      margin: 0 auto 20px;
+      max-width: 480px;
+      color: var(--text-dim);
+      font-size: 15px;
+    }
+    .signup .waitlist {
+      margin-top: 0;
+    }
+
     /* ---- screenshot mockup ---- */
     .mockup {
       max-width: 880px;
@@ -393,6 +484,25 @@
     </div>
     <p class="hero-note">Free tier · No account required · No telemetry</p>
 
+    <div class="waitlist">
+      <span class="waitlist-label">Launching soon on the Chrome Web Store</span>
+      <form id="cf-waitlist-form-hero" class="waitlist-form"
+            action="https://formspree.io/f/mojrbbdb" method="POST"
+            data-source="hero">
+        <input
+          type="email"
+          name="email"
+          required
+          placeholder="your@email.com"
+          autocomplete="email"
+          spellcheck="false"
+          aria-label="Email address"
+        />
+        <button type="submit">Notify me</button>
+      </form>
+      <p class="waitlist-msg" id="cf-waitlist-msg-hero" role="status" aria-live="polite"></p>
+    </div>
+
     <div class="mockup" aria-hidden="true">
       <div class="mockup-inner">
         <div class="mockup-feed"></div>
@@ -482,6 +592,28 @@
     </div>
   </section>
 
+  <section class="signup" id="signup">
+    <h2>Want to know when it goes live?</h2>
+    <p>One email when CleanFeed gets approved. No newsletter, no spam, no follow-ups.</p>
+    <div class="waitlist">
+      <form id="cf-waitlist-form-bottom" class="waitlist-form"
+            action="https://formspree.io/f/mojrbbdb" method="POST"
+            data-source="bottom">
+        <input
+          type="email"
+          name="email"
+          required
+          placeholder="your@email.com"
+          autocomplete="email"
+          spellcheck="false"
+          aria-label="Email address"
+        />
+        <button type="submit">Add me to the list</button>
+      </form>
+      <p class="waitlist-msg" id="cf-waitlist-msg-bottom" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+
   <p class="build-note">Open source · MIT licensed · No analytics anywhere · No data leaves your browser</p>
 
   <footer>
@@ -498,6 +630,69 @@
   <script>
     // Tiny year stamp — no analytics, no nothing.
     document.getElementById("year").textContent = new Date().getFullYear();
+
+    // Waitlist forms — AJAX-submit to Formspree so the user stays on the
+    // page. The <form action> attribute still points at Formspree, so if
+    // JS fails or is disabled the form still works (no-JS fallback).
+    (function () {
+      var SUCCESS = "You're in. I'll email you the moment Chrome approves the extension.";
+      var ERROR   = "Something broke — try again, or just email me directly at vitowebpro@gmail.com";
+      var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+      function wire(formId, msgId) {
+        var form = document.getElementById(formId);
+        var msg  = document.getElementById(msgId);
+        if (!form || !msg) return;
+        var input  = form.querySelector('input[name="email"]');
+        var button = form.querySelector('button[type="submit"]');
+
+        input.addEventListener("input", function () {
+          input.removeAttribute("aria-invalid");
+          msg.className = "waitlist-msg";
+          msg.textContent = "";
+        });
+
+        form.addEventListener("submit", async function (e) {
+          e.preventDefault();
+          var email = (input.value || "").trim();
+          if (!EMAIL_RE.test(email)) {
+            input.setAttribute("aria-invalid", "true");
+            msg.className = "waitlist-msg error";
+            msg.textContent = "Please enter a valid email address.";
+            input.focus();
+            return;
+          }
+          button.disabled = true;
+          var originalText = button.textContent;
+          button.textContent = "Sending…";
+          try {
+            var resp = await fetch(form.action, {
+              method: "POST",
+              headers: { "Accept": "application/json" },
+              body: new FormData(form),
+            });
+            if (resp.ok) {
+              form.reset();
+              msg.className = "waitlist-msg success";
+              msg.textContent = SUCCESS;
+              // Hide the inputs once submitted so the user can't double-send
+              form.style.display = "none";
+            } else {
+              msg.className = "waitlist-msg error";
+              msg.textContent = ERROR;
+            }
+          } catch (_) {
+            msg.className = "waitlist-msg error";
+            msg.textContent = ERROR;
+          } finally {
+            button.disabled = false;
+            button.textContent = originalText;
+          }
+        });
+      }
+      wire("cf-waitlist-form-hero",   "cf-waitlist-msg-hero");
+      wire("cf-waitlist-form-bottom", "cf-waitlist-msg-bottom");
+    })();
   </script>
 </body>
 </html>
