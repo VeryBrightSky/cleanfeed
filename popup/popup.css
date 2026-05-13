@@ -560,6 +560,78 @@ body.cf-paused-state .cf-pause-btn .cf-play-icon  { display: inline-block; }
   margin-top: var(--s-2);
   font-size: 12.5px;
 }
+
+/* ----- v1.4.0 F2: onboarding screen ----- */
+.cf-onboarding {
+  padding: var(--s-4);
+  display: grid;
+  gap: var(--s-3);
+  animation: cf-fade 200ms var(--ease) both;
+}
+.cf-onboarding h2 {
+  margin: 0 0 var(--s-2);
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+}
+.cf-onb-card {
+  position: relative;
+  text-align: left;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 12px var(--s-3);
+  cursor: pointer;
+  font: inherit;
+  color: var(--text);
+  transition: background 150ms var(--ease), border-color 150ms var(--ease), transform 100ms var(--ease);
+}
+.cf-onb-card:hover { background: var(--bg-elev-2); border-color: var(--accent); transform: translateY(-1px); }
+.cf-onb-card strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.cf-onb-card span {
+  display: block;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.cf-onb-card.is-popular { border-color: var(--accent); }
+.cf-onb-tag {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  font-style: normal;
+  font-weight: 700;
+  background: var(--grad-accent);
+  color: #0b1828;
+  padding: 2px 6px;
+  border-radius: var(--r-xs);
+}
+.cf-onb-skip {
+  text-align: center;
+  padding: 8px;
+  margin-top: 2px;
+}
+
+/* ----- v1.4.0 F3: review banner ----- */
+.cf-review-banner {
+  padding: var(--s-3) var(--s-4);
+  background: var(--bg-elev-2);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  gap: var(--s-2);
+  font-size: 12.5px;
+  color: var(--text-dim);
+  animation: cf-fade 200ms var(--ease) both;
+}
+.cf-review-row { display: flex; gap: var(--s-2); }
+.cf-review-row .cf-btn { flex: 1; }
 /* v1.3.5: center the primary CTA inside the upsell modal. The .cf-btn
  * base class has `flex:1` which is inert outside flex parents, so the
  * button was rendering as content-width and left-aligned. Make it span

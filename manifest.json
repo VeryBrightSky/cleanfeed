@@ -1,13 +1,15 @@
 {
   "manifest_version": 3,
   "name": "CleanFeed — focus on YouTube",
-  "version": "1.3.5",
-  "description": "Hide YouTube's homepage feed, Shorts, recommendations, comments. Focus Lock, time tracker, 10 toggles, $4.99 one-time.",
+  "version": "1.4.0",
+  "description": "Hide YouTube's distractions. 14 blockers, keyword blocking, Pomodoro Focus Lock, per-page rules. $4.99 one-time.",
   "author": "CleanFeed",
   "homepage_url": "https://cleanfeed.app",
   "permissions": [
     "storage",
-    "contextMenus"
+    "contextMenus",
+    "alarms",
+    "notifications"
   ],
   "host_permissions": [
     "*://*.youtube.com/*",

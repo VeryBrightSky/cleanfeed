@@ -135,6 +135,29 @@ body.cf-block-subs-algo ytd-browse[page-subtype="subscriptions"] ytd-rich-sectio
   display: none !important;
 }
 
+/* --- v1.4.0 NEW BLOCKERS ------------------------------------------- */
+body.cf-block-playables ytd-rich-shelf-renderer:has(#title yt-formatted-string[title="Playables"]),
+body.cf-block-playables ytd-rich-shelf-renderer:has(#title yt-formatted-string[title="Mini-games"]),
+body.cf-block-playables ytd-playable-shelf-renderer {
+  display: none !important;
+}
+body.cf-block-merch-shelf ytd-merch-shelf-renderer,
+body.cf-block-merch-shelf yt-merch-shelf-renderer {
+  display: none !important;
+}
+body.cf-block-breaking-news ytd-rich-section-renderer:has(yt-formatted-string[title="Breaking news"]),
+body.cf-block-breaking-news ytd-rich-section-renderer:has(yt-formatted-string[title="News"]),
+body.cf-block-breaking-news ytd-rich-shelf-renderer:has(yt-formatted-string[title="Breaking news"]) {
+  display: none !important;
+}
+body.cf-block-mixes-playlists ytd-radio-renderer,
+body.cf-block-mixes-playlists ytd-compact-radio-renderer {
+  display: none !important;
+}
+
+/* Keyword-hidden video cards (F1) — JS adds data-cf-keyword="1" */
+[data-cf-keyword="1"] { display: none !important; }
+
 /* --- LIVE CHAT ----------------------------------------------------- */
 body.cf-block-live-chat ytd-live-chat-frame,
 body.cf-block-live-chat #chat-container,

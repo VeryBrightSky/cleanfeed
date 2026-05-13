@@ -30,6 +30,9 @@
     blockedChannels: [],   // [{handle, name}] — videos from these channels are hidden
     focusLock: { activeUntil: 0, pinSet: false }, // PIN hash never sent to content
     lastRightClicked: null,
+    hiddenKeywords: [],    // F1 — lowercase substrings
+    perPageEnabled: false, // F6 — true = use per-page overrides
+    perPageSettings: { homepage: {}, watch: {}, subscriptions: {} },
   };
 
   // ----- chrome bridge --------------------------------------------------
@@ -38,7 +41,8 @@
     return new Promise((resolve) => {
       chrome.storage.local.get(
         ["settings", "paid", "whitelistedChannels", "customCSS", "stats",
-         "pausedUntil", "blockedChannels", "focusLock"],
+         "pausedUntil", "blockedChannels", "focusLock",
+         "hiddenKeywords", "perPageEnabled", "perPageSettings"],
         (data) => {
           // default — only home-feed + shorts are on by default for new users
           const defaults = {};
@@ -52,6 +56,9 @@
           STATE.pausedUntil = Number(data.pausedUntil) || 0;
           STATE.blockedChannels = Array.isArray(data.blockedChannels) ? data.blockedChannels : [];
           STATE.focusLock = data.focusLock || { activeUntil: 0, pinSet: false };
+          STATE.hiddenKeywords = Array.isArray(data.hiddenKeywords) ? data.hiddenKeywords : [];
+          STATE.perPageEnabled = !!data.perPageEnabled;
+          STATE.perPageSettings = data.perPageSettings || { homepage: {}, watch: {}, subscriptions: {} };
           // session stats reset on page nav by default — caller decides
           resolve();
         }
@@ -80,6 +87,31 @@
     return blocker.tier === "pro" && !STATE.paid;
   }
 
+  // v1.4.0 F6 — detect which YT page we're on for per-page rules.
+  // Defaults to "" (no override) for unrecognized pages.
+  function _currentPageKey() {
+    const p = location.pathname;
+    if (p === "/" || p === "") return "homepage";
+    if (p === "/watch") return "watch";
+    if (p.startsWith("/feed/subscriptions")) return "subscriptions";
+    return "";
+  }
+
+  // For each blocker, return its effective on/off given per-page overrides
+  // (only when STATE.perPageEnabled). Override value "inherit" or undefined
+  // falls back to STATE.settings.
+  function _effectiveSettingFor(id) {
+    if (!STATE.perPageEnabled || !STATE.paid) return !!STATE.settings[id];
+    const page = _currentPageKey();
+    if (!page) return !!STATE.settings[id];
+    const override = STATE.perPageSettings &&
+      STATE.perPageSettings[page] &&
+      STATE.perPageSettings[page][id];
+    if (override === "on")  return true;
+    if (override === "off") return false;
+    return !!STATE.settings[id];   // inherit / undefined
+  }
+
   // Enforce free-tier limit: even if storage says many are enabled, we only
   // honour up to the first N (in BLOCKERS order). Pro blockers are always
   // locked off when not paid.
@@ -92,8 +124,8 @@
       return BLOCKERS.slice();   // all of them
     }
     if (STATE.paid) {
-      // Pro: respect user's choices verbatim
-      return BLOCKERS.filter((b) => STATE.settings[b.id]);
+      // Pro: respect user's choices (with per-page overrides)
+      return BLOCKERS.filter((b) => _effectiveSettingFor(b.id));
     }
     // Free: filter to free-tier blockers only, capped at N
     const free = BLOCKERS.filter(
@@ -172,8 +204,48 @@
     // hide video cards whose channel is in the user's blocklist (Pro feature)
     applyChannelBlocks();
 
+    // v1.4.0 F1 — hide video cards whose title contains any blocked keyword
+    applyKeywordBlocks();
+
     // count visible elements that would be hidden — for stats
     countBlockedElements(active);
+  }
+
+  // F1 — keyword block sweep. No-op if hiddenKeywords is empty (zero CPU).
+  // Substring match, case-insensitive. Match against video title link text.
+  function applyKeywordBlocks() {
+    if (!STATE.paid || !STATE.hiddenKeywords || !STATE.hiddenKeywords.length) {
+      // also un-hide anything we hid previously if the user just cleared
+      // their keyword list
+      document.querySelectorAll('[data-cf-keyword="1"]').forEach((el) => {
+        el.removeAttribute("data-cf-keyword");
+      });
+      return;
+    }
+    const cards = document.querySelectorAll(
+      "ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer," +
+      " ytd-compact-video-renderer, ytd-rich-grid-media, ytd-playlist-renderer"
+    );
+    const kws = STATE.hiddenKeywords;
+    cards.forEach((card) => {
+      // Find the title — YT video cards use #video-title or yt-formatted-string#video-title-link
+      const tEl = card.querySelector("#video-title, a#video-title-link, yt-formatted-string#video-title");
+      if (!tEl) return;
+      const title = (tEl.getAttribute("title") || tEl.textContent || "").toLowerCase();
+      if (!title) return;
+      let hide = false;
+      for (var i = 0; i < kws.length; i++) {
+        if (kws[i] && title.indexOf(kws[i]) !== -1) { hide = true; break; }
+      }
+      if (hide) {
+        if (card.dataset.cfKeyword !== "1") {
+          card.dataset.cfKeyword = "1";
+          STATE.counts.total++;
+        }
+      } else if (card.dataset.cfKeyword === "1") {
+        delete card.dataset.cfKeyword;
+      }
+    });
   }
 
   // ----- channel blocking (context-menu feature) -----------------------
@@ -546,6 +618,18 @@
       }
       if (changes.focusLock) {
         STATE.focusLock = changes.focusLock.newValue || { activeUntil: 0, pinSet: false };
+        applyBlockers();
+      }
+      if (changes.hiddenKeywords) {
+        STATE.hiddenKeywords = Array.isArray(changes.hiddenKeywords.newValue) ? changes.hiddenKeywords.newValue : [];
+        applyBlockers();
+      }
+      if (changes.perPageEnabled) {
+        STATE.perPageEnabled = !!changes.perPageEnabled.newValue;
+        applyBlockers();
+      }
+      if (changes.perPageSettings) {
+        STATE.perPageSettings = changes.perPageSettings.newValue || { homepage: {}, watch: {}, subscriptions: {} };
         applyBlockers();
       }
     });

@@ -27,9 +27,22 @@ const BLOCKERS = [
   { id: "autoplay",      label: "Autoplay",                 desc: "Auto-disables the autoplay toggle on every watch page", tier: "pro" },
   { id: "thumbnails",    label: "Hide thumbnails",          desc: "Replaces video thumbnails with neutral placeholders. Hover to peek.", tier: "pro" },
   { id: "subs-algo",     label: "Hide subscription algorithm", desc: "On /feed/subscriptions, hides 'For you' shelves",   tier: "pro" },
+  // v1.4.0 — F5
+  { id: "playables",     label: "Playables games panel",    desc: "Hides the games shelf YouTube shows in some regions", tier: "pro" },
+  { id: "merch-shelf",   label: "Merch shelf",              desc: "Hides merchandise shelves under videos",            tier: "free" },
+  { id: "breaking-news", label: "Breaking news",            desc: "Hides the breaking-news shelf at the top of home",  tier: "free" },
+  { id: "mixes-playlists", label: "Mixes & playlists",     desc: "Hides 'Mix' radios and algorithmic playlist suggestions", tier: "pro" },
 ];
 const FREE_LIMIT = 2;
 const HOLD_DURATION_MS = 60 * 1000;
+const PRESETS = {
+  "just-shorts": ["shorts"],
+  "focused":     ["shorts", "home-feed", "end-screen", "autoplay"],
+  "minimal":     ["shorts", "home-feed", "watch-sidebar", "end-screen", "comments", "explore", "autoplay", "thumbnails"],
+};
+const REVIEW_THRESHOLD = 5;
+// Replace REPLACE_WITH_FINAL_ID once CWS listing is live with the real extension ID.
+const REVIEW_URL = "https://chromewebstore.google.com/detail/REPLACE_WITH_FINAL_ID/reviews";
 
 const STATE = {
   paid: false,
@@ -38,8 +51,11 @@ const STATE = {
   customCSS: "",
   stats: { total: 0, perBlocker: {} },
   pausedUntil: 0,
-  focusLock: { pinSet: false, activeUntil: 0 },
+  focusLock: { pinSet: false, activeUntil: 0, mode: "standard", pomodoroState: null },
   timeTracking: {},
+  onboardingComplete: true,
+  usageCount: 0,
+  reviewPromptShown: false,
 };
 
 let pauseTickHandle = 0;
@@ -77,7 +93,8 @@ function loadState() {
   return new Promise((resolve) => {
     chrome.storage.local.get(
       ["settings", "paid", "whitelistedChannels", "customCSS", "sessionStats",
-       "pausedUntil", "focusLock", "timeTracking"],
+       "pausedUntil", "focusLock", "timeTracking",
+       "onboardingComplete", "usageCount", "reviewPromptShown"],
       (data) => {
         STATE.paid = !!data.paid;
         STATE.settings = data.settings || {};
@@ -87,6 +104,9 @@ function loadState() {
         STATE.pausedUntil = Number(data.pausedUntil) || 0;
         STATE.focusLock = data.focusLock || { pinSet: false, activeUntil: 0 };
         STATE.timeTracking = data.timeTracking || {};
+        STATE.onboardingComplete = !!data.onboardingComplete;
+        STATE.usageCount = Number(data.usageCount) || 0;
+        STATE.reviewPromptShown = !!data.reviewPromptShown;
         resolve();
       }
     );
@@ -200,7 +220,10 @@ async function togglePause() {
 //     starting at popup-open time so the user sees real time within ~1s.
 function renderFocusBanner() {
   const banner = $("cf-focus-banner");
-  if (!isFocusLockActive()) {
+  const pomo = STATE.focusLock && STATE.focusLock.pomodoroState;
+  const standardActive = isFocusLockActive() && !pomo;
+  const pomoActive = !!pomo && Number(pomo.until) > Date.now();
+  if (!standardActive && !pomoActive) {
     banner.hidden = true;
     if (focusTickHandle) { clearInterval(focusTickHandle); focusTickHandle = 0; }
     return;
@@ -208,6 +231,23 @@ function renderFocusBanner() {
   banner.hidden = false;
 
   const updateRemaining = () => {
+    // v1.4.0 — Pomodoro takes precedence over standard countdown
+    if (pomoActive) {
+      const st = STATE.focusLock.pomodoroState;
+      const ms = Number(st.until) - Date.now();
+      if (ms <= 0) {
+        // background's alarm will swap phase shortly; show a placeholder
+        $("cf-focus-remaining").textContent = "transitioning…";
+        return;
+      }
+      const total = Math.floor(ms / 1000);
+      const m = Math.floor(total / 60);
+      const s = total % 60;
+      const phaseLabel = st.phase === "focus" ? "FOCUS" : "BREAK";
+      $("cf-focus-remaining").textContent =
+        `${phaseLabel} ${m}:${String(s).padStart(2, "0")} · Cycle ${st.cycle} of ${st.total}`;
+      return;
+    }
     const until = Number(STATE.focusLock && STATE.focusLock.activeUntil) || 0;
     const ms = until - Date.now();
     console.log("[CleanFeed] focus-lock tick", {
@@ -524,6 +564,17 @@ async function init() {
   } catch (_) {}
 
   await loadState();
+
+  // v1.4.0 F3 — bump usage counter for review-prompt gating
+  STATE.usageCount = (STATE.usageCount || 0) + 1;
+  chrome.storage.local.set({ usageCount: STATE.usageCount });
+
+  // v1.4.0 F2 — show onboarding view instead of toggle grid if first install
+  if (!STATE.onboardingComplete) {
+    renderOnboarding();
+    return;
+  }
+
   renderTierBadge();
   renderStats();
   renderUpgrade();
@@ -531,6 +582,7 @@ async function init() {
   renderTimeMini();
   renderPause();
   renderBlockers();
+  renderReviewPrompt();
 
   // Refresh paid status from background; re-render the parts that depend on it.
   await refreshPaidStatus();
@@ -601,6 +653,162 @@ async function init() {
       renderTimeMini();
     }
   });
+}
+
+// ---------- v1.4.0 F2 — onboarding view ----------
+function renderOnboarding() {
+  const root = document.body;
+  // hide everything except header (and footer maybe)
+  document.querySelectorAll(
+    ".cf-stats, .cf-time-mini, .cf-pause-bar, .cf-blockers, .cf-upgrade, .cf-focus-banner"
+  ).forEach((el) => { el.style.display = "none"; });
+
+  // Build onboarding container if not already present
+  let host = document.getElementById("cf-onboarding");
+  if (host) host.remove();
+  host = document.createElement("section");
+  host.id = "cf-onboarding";
+  host.className = "cf-onboarding";
+
+  const h = document.createElement("h2");
+  h.textContent = "How distraction-free do you want YouTube?";
+  host.appendChild(h);
+
+  const card = (key, title, subtitle, popular) => {
+    const c = document.createElement("button");
+    c.type = "button";
+    c.className = "cf-onb-card" + (popular ? " is-popular" : "");
+    c.dataset.preset = key;
+    const t = document.createElement("strong");
+    t.textContent = title;
+    const s = document.createElement("span");
+    s.textContent = subtitle;
+    c.appendChild(t);
+    c.appendChild(s);
+    if (popular) {
+      const tag = document.createElement("em");
+      tag.textContent = "MOST POPULAR";
+      tag.className = "cf-onb-tag";
+      c.appendChild(tag);
+    }
+    c.addEventListener("click", () => onPresetChosen(key));
+    return c;
+  };
+  host.appendChild(card("just-shorts", "Just no Shorts", "I still want the homepage and recommendations.", false));
+  host.appendChild(card("focused",     "Focused",        "Hide the worst rabbit holes. Keep search and watch pages clean enough to use.", true));
+  host.appendChild(card("minimal",     "Minimal",        "Almost nothing. Pure watching.", false));
+
+  const skip = document.createElement("button");
+  skip.type = "button";
+  skip.className = "cf-link cf-onb-skip";
+  skip.textContent = "Skip — let me configure manually";
+  skip.addEventListener("click", () => onPresetChosen(null));
+  host.appendChild(skip);
+
+  // Insert just after the header
+  const header = document.querySelector(".cf-header");
+  if (header && header.parentNode) {
+    header.parentNode.insertBefore(host, header.nextSibling);
+  } else {
+    document.body.appendChild(host);
+  }
+}
+
+async function onPresetChosen(presetKey) {
+  let nextSettings = Object.assign({}, STATE.settings);
+  // Reset all blockers to false first
+  for (const b of BLOCKERS) nextSettings[b.id] = false;
+  let upsellNeeded = false;
+  if (presetKey) {
+    const ids = PRESETS[presetKey] || [];
+    if (STATE.paid) {
+      for (const id of ids) nextSettings[id] = true;
+    } else {
+      // Free users: cap at 2 free-tier blockers in the preset order
+      let on = 0;
+      for (const id of ids) {
+        const def = BLOCKERS.find((b) => b.id === id);
+        if (def && def.tier === "free" && on < FREE_LIMIT) {
+          nextSettings[id] = true; on++;
+        } else if (def && def.tier !== "free") {
+          upsellNeeded = true;
+        }
+      }
+      if (ids.length > on) upsellNeeded = upsellNeeded || (on < ids.length);
+    }
+  }
+  STATE.settings = nextSettings;
+  await chrome.storage.local.set({
+    settings: nextSettings,
+    onboardingComplete: true,
+    onboardingChoice: presetKey || "skip",
+  });
+  STATE.onboardingComplete = true;
+  // Clean up onboarding UI, then bring back the regular popup view
+  const ob = document.getElementById("cf-onboarding");
+  if (ob) ob.remove();
+  document.querySelectorAll(
+    ".cf-stats, .cf-time-mini, .cf-pause-bar, .cf-blockers, .cf-upgrade"
+  ).forEach((el) => { el.style.display = ""; });
+  renderTierBadge();
+  renderStats();
+  renderUpgrade();
+  renderFocusBanner();
+  renderTimeMini();
+  renderPause();
+  renderBlockers();
+  pushSettingsToTabs();
+  if (upsellNeeded) openUpsellModal();
+}
+
+// ---------- v1.4.0 F3 — review prompt banner ----------
+function renderReviewPrompt() {
+  // remove any existing
+  const old = document.getElementById("cf-review-banner");
+  if (old) old.remove();
+  if (STATE.reviewPromptShown || STATE.usageCount < REVIEW_THRESHOLD) return;
+  const banner = document.createElement("section");
+  banner.id = "cf-review-banner";
+  banner.className = "cf-review-banner";
+  banner.innerHTML = "";
+  const txt = document.createElement("span");
+  txt.textContent = "Enjoying CleanFeed? A quick review on the Chrome Web Store would really help.";
+  const row = document.createElement("div");
+  row.className = "cf-review-row";
+  const review = document.createElement("button");
+  review.type = "button";
+  review.className = "cf-btn cf-btn-primary";
+  review.textContent = "Leave a review";
+  review.addEventListener("click", async () => {
+    await markReviewShown();
+    chrome.tabs.create({ url: REVIEW_URL });
+    window.close();
+  });
+  const later = document.createElement("button");
+  later.type = "button";
+  later.className = "cf-btn cf-btn-ghost";
+  later.textContent = "Maybe later";
+  later.addEventListener("click", async () => {
+    await markReviewShown();
+    banner.remove();
+  });
+  row.appendChild(review);
+  row.appendChild(later);
+  banner.appendChild(txt);
+  banner.appendChild(row);
+  // append above footer
+  const foot = document.querySelector(".cf-footer");
+  if (foot && foot.parentNode) foot.parentNode.insertBefore(banner, foot);
+  else document.body.appendChild(banner);
+
+  // Mark as shown when popup closes — even without explicit click —
+  // so we don't pester the user every popup open afterward.
+  window.addEventListener("pagehide", markReviewShown, { once: true });
+}
+async function markReviewShown() {
+  if (STATE.reviewPromptShown) return;
+  STATE.reviewPromptShown = true;
+  try { await chrome.storage.local.set({ reviewPromptShown: true }); } catch (_) {}
 }
 
 document.addEventListener("DOMContentLoaded", init);

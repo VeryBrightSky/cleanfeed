@@ -188,6 +188,54 @@
         'ytd-browse[page-subtype="subscriptions"] ytd-rich-section-renderer',
       ],
     },
+    // v1.4.0 — four new blockers (F5)
+    {
+      id: "playables",
+      label: "Playables games panel",
+      description: "Hides the games shelf YouTube shows in some regions",
+      tier: "pro",
+      pages: ["anywhere"],
+      selectors: [
+        // ytd-rich-shelf-renderer with header text "Playables"
+        'ytd-rich-shelf-renderer:has(#title yt-formatted-string[title="Playables"])',
+        'ytd-rich-shelf-renderer:has(#title yt-formatted-string[title="Mini-games"])',
+        "ytd-playable-shelf-renderer",
+      ],
+    },
+    {
+      id: "merch-shelf",
+      label: "Merch shelf",
+      description: "Hides the merchandise shelves under videos",
+      tier: "free",
+      pages: ["watch"],
+      selectors: [
+        "ytd-merch-shelf-renderer",
+        "yt-merch-shelf-renderer",
+      ],
+    },
+    {
+      id: "breaking-news",
+      label: "Breaking news",
+      description: "Hides the breaking-news shelf at the top of the homepage",
+      tier: "free",
+      pages: ["home"],
+      selectors: [
+        'ytd-rich-section-renderer:has(yt-formatted-string[title="Breaking news"])',
+        'ytd-rich-section-renderer:has(yt-formatted-string[title="News"])',
+        'ytd-rich-shelf-renderer:has(yt-formatted-string[title="Breaking news"])',
+      ],
+    },
+    {
+      id: "mixes-playlists",
+      label: "Mixes & algorithmic playlists",
+      description: "Hides 'Mix' radios and algorithmic playlist suggestions",
+      tier: "pro",
+      pages: ["anywhere"],
+      selectors: [
+        "ytd-radio-renderer",
+        "ytd-compact-radio-renderer",
+      ],
+    },
   ];
 
   // Free tier allows up to N blockers active simultaneously.

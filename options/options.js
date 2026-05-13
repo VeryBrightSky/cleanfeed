@@ -12,9 +12,12 @@ const STATE = {
   whitelistedChannels: [],
   customCSS: "",
   blockedChannels: [],
-  focusLock: { pinSet: false, activeUntil: 0, pinHash: "", pinSalt: "" },
+  focusLock: { pinSet: false, activeUntil: 0, pinHash: "", pinSalt: "", mode: "standard", pomodoro: { focusMin: 25, breakMin: 5, cycles: 4 }, pomodoroState: null },
   timeTracking: {},
   selectedDurationMin: 0,  // 0 = none, -1 = until manually unlocked
+  // v1.4.0
+  hiddenKeywords: [],
+  perPageEnabled: false,
 };
 
 function $(id) { return document.getElementById(id); }
@@ -45,17 +48,20 @@ async function load() {
   return new Promise((resolve) => {
     chrome.storage.local.get(
       ["paid", "whitelistedChannels", "customCSS",
-       "blockedChannels", "focusLock", "timeTracking"],
+       "blockedChannels", "focusLock", "timeTracking",
+       "hiddenKeywords", "perPageEnabled"],
       (data) => {
         STATE.paid = !!data.paid;
         STATE.whitelistedChannels = data.whitelistedChannels || [];
         STATE.customCSS = data.customCSS || "";
         STATE.blockedChannels = Array.isArray(data.blockedChannels) ? data.blockedChannels : [];
         STATE.focusLock = Object.assign(
-          { pinSet: false, activeUntil: 0, pinHash: "", pinSalt: "" },
+          { pinSet: false, activeUntil: 0, pinHash: "", pinSalt: "", mode: "standard", pomodoro: { focusMin: 25, breakMin: 5, cycles: 4 }, pomodoroState: null },
           data.focusLock || {}
         );
         STATE.timeTracking = data.timeTracking || {};
+        STATE.hiddenKeywords = Array.isArray(data.hiddenKeywords) ? data.hiddenKeywords : [];
+        STATE.perPageEnabled = !!data.perPageEnabled;
         resolve();
       }
     );
@@ -353,6 +359,124 @@ async function resetAll() {
 
 // ---- bootstrap ----------------------------------------------------------
 
+// ---- v1.4.0 F1 — keyword block list -------------------------------------
+
+function renderKeywords() {
+  const ta = $("cf-keywords");
+  if (!ta) return;
+  ta.value = (STATE.hiddenKeywords || []).join("\n");
+  ta.disabled = !STATE.paid;
+  const btn = $("cf-keywords-save");
+  if (btn) btn.disabled = !STATE.paid;
+}
+
+async function saveKeywords() {
+  if (!STATE.paid) return;
+  const raw = ($("cf-keywords").value || "").split(/\r?\n/);
+  const seen = new Set();
+  const cleaned = [];
+  for (const line of raw) {
+    const t = line.trim().toLowerCase();
+    if (!t) continue;
+    if (seen.has(t)) continue;
+    seen.add(t);
+    cleaned.push(t);
+    if (cleaned.length >= 200) break;
+  }
+  STATE.hiddenKeywords = cleaned;
+  await chrome.storage.local.set({ hiddenKeywords: cleaned });
+  const s = $("cf-keywords-status");
+  if (s) {
+    s.textContent = `Saved ${cleaned.length} keyword${cleaned.length === 1 ? "" : "s"}.`;
+    setTimeout(() => { s.textContent = ""; }, 2000);
+  }
+}
+
+// ---- v1.4.0 F4 — Pomodoro UI --------------------------------------------
+
+function renderPomodoro() {
+  const cfg = (STATE.focusLock && STATE.focusLock.pomodoro) || { focusMin: 25, breakMin: 5, cycles: 4 };
+  const f = $("cf-pomo-focus");  if (f) f.value = cfg.focusMin;
+  const b = $("cf-pomo-break");  if (b) b.value = cfg.breakMin;
+  const c = $("cf-pomo-cycles"); if (c) c.value = cfg.cycles;
+  const pinReady = !!(STATE.focusLock && STATE.focusLock.pinSet);
+  const active = !!(STATE.focusLock && STATE.focusLock.pomodoroState);
+  const start = $("cf-pomo-start"); const cancel = $("cf-pomo-cancel");
+  if (start)  start.disabled = !STATE.paid || !pinReady || active;
+  if (cancel) cancel.hidden = !active;
+  const status = $("cf-pomo-status");
+  if (status) {
+    if (!STATE.paid) {
+      status.textContent = "Pro feature — upgrade to use Pomodoro Focus Lock.";
+    } else if (!pinReady) {
+      status.textContent = "Set a 4-digit PIN above first.";
+    } else if (active) {
+      const st = STATE.focusLock.pomodoroState;
+      status.textContent = `Session active — ${st.phase.toUpperCase()} phase, cycle ${st.cycle} of ${st.total}.`;
+    } else {
+      status.textContent = "";
+    }
+  }
+  // gate inputs too
+  const inputs = ["cf-pomo-focus", "cf-pomo-break", "cf-pomo-cycles", "cf-pomo-pin"];
+  for (const id of inputs) {
+    const el = $(id);
+    if (el) el.disabled = !STATE.paid || active;
+  }
+}
+
+async function startPomodoro() {
+  if (!STATE.paid) return;
+  $("cf-pomo-error").textContent = "";
+  if (!(STATE.focusLock && STATE.focusLock.pinSet)) {
+    $("cf-pomo-error").textContent = "Set a PIN above first.";
+    return;
+  }
+  const enteredPin = ($("cf-pomo-pin").value || "").trim();
+  if (!/^\d{4}$/.test(enteredPin)) {
+    $("cf-pomo-error").textContent = "Enter your 4-digit PIN.";
+    return;
+  }
+  const calc = await hashPin(enteredPin, STATE.focusLock.pinSalt);
+  if (calc !== STATE.focusLock.pinHash) {
+    $("cf-pomo-error").textContent = "Wrong PIN.";
+    return;
+  }
+  const cfg = {
+    focusMin: Number($("cf-pomo-focus").value) || 25,
+    breakMin: Number($("cf-pomo-break").value) || 5,
+    cycles:   Number($("cf-pomo-cycles").value) || 4,
+  };
+  chrome.runtime.sendMessage({ type: "cf:pomodoro-start", config: cfg }, (resp) => {
+    if (chrome.runtime.lastError || !resp || !resp.ok) {
+      $("cf-pomo-error").textContent = "Could not start session.";
+    }
+  });
+  $("cf-pomo-pin").value = "";
+}
+
+function cancelPomodoro() {
+  chrome.runtime.sendMessage({ type: "cf:pomodoro-cancel" }, () => {
+    void chrome.runtime.lastError; // ignore
+  });
+}
+
+// ---- v1.4.0 F6 — per-page enable toggle ---------------------------------
+
+function renderPerPage() {
+  const cb = $("cf-perpage-enable");
+  if (!cb) return;
+  cb.checked = !!STATE.perPageEnabled;
+  cb.disabled = !STATE.paid;
+}
+
+async function onPerPageToggle() {
+  if (!STATE.paid) return;
+  STATE.perPageEnabled = !!$("cf-perpage-enable").checked;
+  await chrome.storage.local.set({ perPageEnabled: STATE.perPageEnabled });
+  pushChanges();
+}
+
 async function init() {
   try {
     $("cf-version").textContent = "v" + chrome.runtime.getManifest().version;
@@ -364,6 +488,10 @@ async function init() {
   renderCustomCSS();
   renderTimeTracker();
   renderFocusLock();
+  // v1.4.0
+  renderKeywords();
+  renderPomodoro();
+  renderPerPage();
 
   $("cf-whitelist-add").addEventListener("click", addChannel);
   $("cf-whitelist-new").addEventListener("keydown", (e) => {
@@ -377,18 +505,25 @@ async function init() {
   document.querySelectorAll(".cf-duration").forEach((b) => {
     b.addEventListener("click", () => selectDuration(b));
   });
+  // v1.4.0 wiring
+  $("cf-keywords-save").addEventListener("click", saveKeywords);
+  $("cf-pomo-start").addEventListener("click", startPomodoro);
+  $("cf-pomo-cancel").addEventListener("click", cancelPomodoro);
+  $("cf-perpage-enable").addEventListener("change", onPerPageToggle);
 
   // re-render every minute so time-tracker stays fresh
   setInterval(() => renderTimeTracker(), 60 * 1000);
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;
-    if (changes.paid) { STATE.paid = !!changes.paid.newValue; renderTier(); renderWhitelist(); renderBlockedList(); renderFocusLock(); }
+    if (changes.paid) { STATE.paid = !!changes.paid.newValue; renderTier(); renderWhitelist(); renderBlockedList(); renderFocusLock(); renderKeywords(); renderPomodoro(); renderPerPage(); }
     if (changes.whitelistedChannels) { STATE.whitelistedChannels = changes.whitelistedChannels.newValue || []; renderWhitelist(); }
     if (changes.customCSS) { STATE.customCSS = changes.customCSS.newValue || ""; renderCustomCSS(); }
     if (changes.blockedChannels) { STATE.blockedChannels = changes.blockedChannels.newValue || []; renderBlockedList(); }
-    if (changes.focusLock) { STATE.focusLock = changes.focusLock.newValue || STATE.focusLock; renderFocusLock(); }
+    if (changes.focusLock) { STATE.focusLock = changes.focusLock.newValue || STATE.focusLock; renderFocusLock(); renderPomodoro(); }
     if (changes.timeTracking) { STATE.timeTracking = changes.timeTracking.newValue || {}; renderTimeTracker(); }
+    if (changes.hiddenKeywords) { STATE.hiddenKeywords = changes.hiddenKeywords.newValue || []; renderKeywords(); }
+    if (changes.perPageEnabled) { STATE.perPageEnabled = !!changes.perPageEnabled.newValue; renderPerPage(); }
   });
 }
 

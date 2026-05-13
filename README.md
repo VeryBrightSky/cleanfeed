@@ -11,6 +11,20 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.4.0 — 2026-05-13
+- Keyword blocking (Pro) — hide any video whose title contains your
+  blocked words
+- Onboarding presets — pick "Just no Shorts", "Focused", or "Minimal"
+  on first install
+- 4 new blockers: Playables, merch shelf, breaking news, mixes &
+  algorithmic playlists (14 total now)
+- Pomodoro Focus Lock mode (Pro) — cycle through focus / break
+  periods with locked blockers during focus
+- Per-page rules (Pro) — opt-in storage-driven overrides so different
+  pages can have different blocker configurations (tabbed popup UI
+  is queued for v1.5.0; the content-script engine is live now)
+- Review prompt after 5 popup uses (one-time, dismissible)
+
 ### v1.3.5 — 2026-05-13
 - Centered the "Upgrade — $4.99" button in the Pro upsell modal.
 

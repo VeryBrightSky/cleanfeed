@@ -47,6 +47,11 @@ chrome.runtime.onInstalled.addListener(async (details) => {
         "autoplay": false,
         "thumbnails": false,
         "subs-algo": false,
+        // v1.4.0 — four new blockers, all default OFF
+        "playables": false,
+        "merch-shelf": false,
+        "breaking-news": false,
+        "mixes-playlists": false,
       },
       paid: false,
       whitelistedChannels: [],
@@ -54,8 +59,21 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       sessionStats: { total: 0, perBlocker: {} },
       pausedUntil: 0,
       blockedChannels: [],
-      focusLock: { pinSet: false, activeUntil: 0, pinHash: "", pinSalt: "" },
+      focusLock: {
+        pinSet: false, activeUntil: 0, pinHash: "", pinSalt: "",
+        mode: "standard",           // "standard" | "pomodoro"
+        pomodoro: { focusMin: 25, breakMin: 5, cycles: 4 },
+        pomodoroState: null,        // {phase:"focus"|"break", cycle:N, until:ts, total:N}
+      },
       timeTracking: {},
+      // v1.4.0
+      hiddenKeywords: [],           // F1 — Pro keyword blocklist
+      onboardingComplete: false,    // F2 — first-install presets
+      onboardingChoice: null,
+      usageCount: 0,                // F3 — popup-open counter
+      reviewPromptShown: false,     // F3 — one-time review banner gate
+      perPageEnabled: false,        // F6 — opt-in per-page rules
+      perPageSettings: { homepage: {}, watch: {}, subscriptions: {} },
     };
     await chrome.storage.local.set(defaults);
     // mirror a copy to chrome.storage.sync for backup/migration
@@ -63,12 +81,124 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       settings: defaults.settings,
       whitelistedChannels: [],
     }).catch(() => {});
+  } else if (details.reason === "update") {
+    // v1.4.0 migration. Existing users keep their settings; we only
+    // ADD the new keys with safe defaults. Onboarding is auto-marked
+    // complete for anyone who already has settings (per spec).
+    await _migrateForV140();
   }
   // check license on every browser launch (and on update)
   try {
     const user = await extpay.getUser();
     await chrome.storage.local.set({ paid: !!user.paid });
   } catch (_) { /* offline — keep cached flag */ }
+  updateBadge();
+});
+
+// -------- v1.4.0 migration ----------------------------------------------
+//
+// Add new storage keys with safe defaults if missing. Never overwrite
+// existing user values. Onboarding is marked complete for anyone whose
+// settings object already has at least one truthy blocker.
+async function _migrateForV140() {
+  const NEW_BLOCKER_DEFAULTS = {
+    "playables": false,
+    "merch-shelf": false,
+    "breaking-news": false,
+    "mixes-playlists": false,
+  };
+  const data = await chrome.storage.local.get(null);
+  const patch = {};
+  // settings: merge new blocker keys without clobbering existing values
+  const s = Object.assign({}, NEW_BLOCKER_DEFAULTS, data.settings || {});
+  patch.settings = s;
+  // onboarding — auto-complete for upgraded existing users
+  if (typeof data.onboardingComplete === "undefined") {
+    const hasUserSettings = data.settings &&
+      Object.values(data.settings).some((v) => v === true);
+    patch.onboardingComplete = !!hasUserSettings;
+  }
+  if (typeof data.hiddenKeywords === "undefined") patch.hiddenKeywords = [];
+  if (typeof data.usageCount === "undefined") patch.usageCount = 0;
+  if (typeof data.reviewPromptShown === "undefined") patch.reviewPromptShown = false;
+  if (typeof data.perPageEnabled === "undefined") patch.perPageEnabled = false;
+  if (typeof data.perPageSettings === "undefined") {
+    patch.perPageSettings = { homepage: {}, watch: {}, subscriptions: {} };
+  }
+  // focusLock — preserve existing object, just ensure mode/pomodoro fields exist
+  const fl = data.focusLock || {};
+  if (typeof fl.mode === "undefined") fl.mode = "standard";
+  if (typeof fl.pomodoro === "undefined") fl.pomodoro = { focusMin: 25, breakMin: 5, cycles: 4 };
+  if (typeof fl.pomodoroState === "undefined") fl.pomodoroState = null;
+  patch.focusLock = fl;
+  await chrome.storage.local.set(patch);
+}
+
+// -------- Pomodoro alarm handler (F4) -----------------------------------
+//
+// Phase 1: focus — blockers force-on (handled by content.js via focusLock
+//   activeUntil & mode === "pomodoro"). At alarm fire, switch to break.
+// Phase 2: break — blockers off; user browses freely. At alarm fire,
+//   if cycles remain → next focus; else clear state, fire completion.
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name !== "cf-pomodoro") return;
+  const data = await chrome.storage.local.get(["focusLock"]);
+  const fl = data.focusLock || {};
+  const state = fl.pomodoroState;
+  if (!state) return;
+  const cfg = fl.pomodoro || { focusMin: 25, breakMin: 5, cycles: 4 };
+
+  if (state.phase === "focus") {
+    // -> break
+    const breakUntil = Date.now() + Math.max(1, cfg.breakMin) * 60 * 1000;
+    fl.pomodoroState = { phase: "break", cycle: state.cycle, total: state.total, until: breakUntil };
+    fl.activeUntil = 0;     // unlock blockers during break
+    await chrome.storage.local.set({ focusLock: fl });
+    chrome.alarms.create("cf-pomodoro", { when: breakUntil });
+    try {
+      chrome.notifications.create({
+        type: "basic",
+        iconUrl: chrome.runtime.getURL("icons/icon-128.png"),
+        title: "Focus complete — break time",
+        message: `Cycle ${state.cycle} of ${state.total} done. ${cfg.breakMin} min break.`,
+      });
+    } catch (_) {}
+  } else if (state.phase === "break") {
+    if (state.cycle >= state.total) {
+      // Final cycle done — clear everything
+      fl.pomodoroState = null;
+      fl.activeUntil = 0;
+      await chrome.storage.local.set({
+        focusLock: fl,
+        lastPomodoroComplete: Date.now(),
+      });
+      try { chrome.alarms.clear("cf-pomodoro"); } catch (_) {}
+      try {
+        chrome.notifications.create({
+          type: "basic",
+          iconUrl: chrome.runtime.getURL("icons/icon-128.png"),
+          title: "Pomodoro complete",
+          message: `${state.total} cycles done. Nice work.`,
+        });
+      } catch (_) {}
+    } else {
+      // next focus
+      const focusMs = Math.max(1, cfg.focusMin) * 60 * 1000;
+      const until = Date.now() + focusMs;
+      fl.pomodoroState = { phase: "focus", cycle: state.cycle + 1, total: state.total, until };
+      fl.activeUntil = until;
+      await chrome.storage.local.set({ focusLock: fl });
+      chrome.alarms.create("cf-pomodoro", { when: until });
+      try {
+        chrome.notifications.create({
+          type: "basic",
+          iconUrl: chrome.runtime.getURL("icons/icon-128.png"),
+          title: "Break over — back to focus",
+          message: `Cycle ${state.cycle + 1} of ${state.total}. ${cfg.focusMin} min focus.`,
+        });
+      } catch (_) {}
+    }
+  }
   updateBadge();
 });
 
@@ -201,6 +331,50 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "cf:track-time") {
     _recordTime(Number(msg.ms) || 0);
     sendResponse({ ok: true });
+    return true;
+  }
+
+  // F4 — start a Pomodoro session. Requires Pro + a valid PIN already
+  // set; we trust the caller (options page) to have checked both.
+  if (msg.type === "cf:pomodoro-start") {
+    (async () => {
+      const data = await chrome.storage.local.get(["focusLock"]);
+      const fl = data.focusLock || {};
+      const cfg = Object.assign(
+        { focusMin: 25, breakMin: 5, cycles: 4 },
+        fl.pomodoro || {},
+        msg.config || {}
+      );
+      cfg.focusMin = Math.max(15, Math.min(60, Math.round(cfg.focusMin)));
+      cfg.breakMin = Math.max(3,  Math.min(15, Math.round(cfg.breakMin)));
+      cfg.cycles   = Math.max(1,  Math.min(8,  Math.round(cfg.cycles)));
+      const focusMs = cfg.focusMin * 60 * 1000;
+      const until = Date.now() + focusMs;
+      fl.mode = "pomodoro";
+      fl.pomodoro = cfg;
+      fl.pomodoroState = { phase: "focus", cycle: 1, total: cfg.cycles, until };
+      fl.activeUntil = until;
+      await chrome.storage.local.set({ focusLock: fl });
+      try { chrome.alarms.clear("cf-pomodoro"); } catch (_) {}
+      chrome.alarms.create("cf-pomodoro", { when: until });
+      sendResponse({ ok: true, until });
+      updateBadge();
+    })();
+    return true;
+  }
+
+  // F4 — graceful cancel (clear alarm, reset Pomodoro state, leave PIN).
+  if (msg.type === "cf:pomodoro-cancel") {
+    (async () => {
+      try { chrome.alarms.clear("cf-pomodoro"); } catch (_) {}
+      const data = await chrome.storage.local.get(["focusLock"]);
+      const fl = data.focusLock || {};
+      fl.pomodoroState = null;
+      fl.activeUntil = 0;
+      await chrome.storage.local.set({ focusLock: fl });
+      sendResponse({ ok: true });
+      updateBadge();
+    })();
     return true;
   }
 

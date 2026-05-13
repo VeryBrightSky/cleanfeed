@@ -78,6 +78,57 @@
       </div>
     </section>
 
+    <!-- v1.4.0 — F1: Keyword blocking -->
+    <section class="cf-panel">
+      <h2>Hidden keywords <span class="cf-tag-pro">PRO</span></h2>
+      <p class="cf-help">
+        Any video whose title contains one of these words gets hidden — homepage,
+        sidebar, search, subscriptions, channel pages. One keyword per line.
+        Case-insensitive substring match. Max 200 entries.
+      </p>
+      <textarea id="cf-keywords" rows="6" placeholder="reaction&#10;drama&#10;clickbait"></textarea>
+      <div class="cf-row-actions">
+        <button id="cf-keywords-save" class="cf-btn cf-btn-primary" type="button">Save keywords</button>
+        <span id="cf-keywords-status" class="cf-status" aria-live="polite"></span>
+      </div>
+    </section>
+
+    <!-- v1.4.0 — F4: Pomodoro mode inside Focus Lock -->
+    <section class="cf-panel" id="cf-pomo-panel">
+      <h2>Pomodoro Focus Lock <span class="cf-tag-pro">PRO</span></h2>
+      <p class="cf-help">
+        Cycle through focus (lock all blockers ON) and break (blockers OFF) periods.
+        Standard Focus Lock above still works as before — Pomodoro is a separate mode.
+        Requires the PIN you set above to start a session.
+      </p>
+      <div class="cf-pomo-row">
+        <label>Focus <input id="cf-pomo-focus"  type="number" min="15" max="60" value="25" /> min</label>
+        <label>Break <input id="cf-pomo-break"  type="number" min="3"  max="15" value="5"  /> min</label>
+        <label>Cycles <input id="cf-pomo-cycles" type="number" min="1" max="8"  value="4"  /></label>
+      </div>
+      <div class="cf-pin-row">
+        <input id="cf-pomo-pin" type="password" inputmode="numeric" maxlength="4" placeholder="Enter PIN to start" autocomplete="off" />
+        <button id="cf-pomo-start"  class="cf-btn cf-btn-primary" type="button" disabled>Start Pomodoro</button>
+        <button id="cf-pomo-cancel" class="cf-btn cf-btn-warn"    type="button" hidden>Cancel session</button>
+      </div>
+      <p id="cf-pomo-error"  class="cf-status cf-status-warn" aria-live="polite"></p>
+      <p id="cf-pomo-status" class="cf-status" aria-live="polite"></p>
+    </section>
+
+    <!-- v1.4.0 — F6: Per-page rules opt-in -->
+    <section class="cf-panel">
+      <h2>Per-page rules <span class="cf-tag-pro">PRO</span></h2>
+      <p class="cf-help">
+        Apply different blocker settings on homepage, watch pages, and the subscriptions
+        feed instead of one global setting. The content script already supports the
+        override storage — full tabbed UI ships in the next release.
+      </p>
+      <label class="cf-checkbox-row">
+        <input id="cf-perpage-enable" type="checkbox" />
+        <span>Enable per-page rules</span>
+      </label>
+    </section>
+
     <section class="cf-panel">
       <h2>Channel whitelist <span class="cf-tag-pro">PRO</span></h2>
       <p class="cf-help">Blockers are <strong>disabled</strong> on watch pages from these channels — useful for channels you actively want to follow.</p>
