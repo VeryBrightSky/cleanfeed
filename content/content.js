@@ -610,7 +610,10 @@
     }
     watchSPANavigation();
     // Cleanup on unload — guards against memory leaks across SPA churn
-    window.addEventListener("unload", stopObserver, { once: true });
+    // YouTube ships a Permissions-Policy that disallows `unload` events
+    // ("Permissions policy violation: unload is not allowed in this
+    // document"). `pagehide` covers tab close, navigation, and
+    // bfcache eviction — same cleanup window, no policy warning.
     window.addEventListener("pagehide", stopObserver, { once: true });
   }
 

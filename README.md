@@ -11,6 +11,13 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.3.1 — 2026-05-13
+- Removed the `window.addEventListener("unload", ...)` from the content
+  script. YouTube ships a Permissions-Policy that disallows `unload`
+  events, which was producing a benign-but-noisy console warning. The
+  `pagehide` listener right below it already handles observer cleanup
+  for tab close, navigation, and bfcache eviction.
+
 ### v1.3.0 — 2026-05-13
 - **Pre-launch QA pass.** Comprehensive audit + cleanup for Chrome Web Store submission:
   - Removed unused `activeTab` permission — we never invoke it (everything goes through `host_permissions` + `chrome.tabs.query`). Smaller permission ask = friendlier install prompt + lower rejection risk.
