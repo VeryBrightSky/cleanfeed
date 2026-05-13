@@ -135,6 +135,11 @@ body.cf-fade-in {
   gap: var(--s-2);
   animation: cf-fade 200ms var(--ease) both;
 }
+/* The author rule above has `display: grid`, which beats the user-agent
+ * stylesheet's `[hidden] { display: none }` (same specificity). Without
+ * this override the banner would render even when its `hidden` attribute
+ * is set. Same pattern as .cf-modal[hidden] below. (v1.2.3 fix.) */
+.cf-focus-banner[hidden] { display: none !important; }
 .cf-focus-banner-head {
   display: flex;
   align-items: center;

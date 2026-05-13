@@ -94,7 +94,16 @@ function loadState() {
 }
 
 function isFocusLockActive() {
-  return STATE.focusLock && Number(STATE.focusLock.activeUntil) > Date.now();
+  // Active iff there is a focusLock object AND it has a non-zero
+  // activeUntil that is still in the future. v1.2.3: spelled out
+  // explicitly because the `focusLock` object itself is always truthy
+  // — `activeUntil` is the only field that signals "active".
+  const lock = STATE.focusLock;
+  return !!(
+    lock &&
+    lock.activeUntil &&
+    Number(lock.activeUntil) > Date.now()
+  );
 }
 
 function _todayKey() {

@@ -11,6 +11,16 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.2.3 — 2026-05-13
+- Fixed Focus Lock banner showing on a fresh install. The `.cf-focus-banner`
+  CSS rule had `display: grid`, which beat the user-agent
+  `[hidden] { display: none }` at equal specificity, so toggling the
+  `hidden` attribute did nothing visually. Added an explicit
+  `.cf-focus-banner[hidden] { display: none !important; }` rule (same
+  pattern already used by `.cf-modal[hidden]`). Also tightened the
+  `isFocusLockActive()` check so it explicitly tests `activeUntil` is
+  a non-zero, future timestamp.
+
 ### v1.2.2 — 2026-05-13
 - Fixed Focus Lock emergency bypass button and countdown timer display.
 
