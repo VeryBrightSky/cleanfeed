@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "CleanFeed — focus on YouTube",
-  "version": "1.4.2",
-  "description": "Hide YouTube's distractions. 14 blockers, keyword blocking, Pomodoro Focus Lock, per-page rules. $4.99 one-time.",
+  "name": "CleanFeed — Hide YouTube Distractions | 14 Blockers, Focus Lock, Pomodoro",
+  "version": "1.4.3",
+  "description": "Hide YouTube's homepage feed, Shorts, recommendations, comments. 14 toggleable blockers + Pomodoro Focus Lock.",
   "author": "CleanFeed",
   "homepage_url": "https://cleanfeed.app",
   "permissions": [

@@ -410,6 +410,13 @@ function _recordTime(ms) {
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || typeof msg !== "object") return;
 
+  // v1.4.3 — popup pings this synchronously the moment it opens to keep the
+  // MV3 service worker awake during render. Just acknowledge — no side effects.
+  if (msg.type === "cf:wake") {
+    sendResponse({ ok: true });
+    return true;
+  }
+
   // Time tracker tick from content.js
   if (msg.type === "cf:track-time") {
     _recordTime(Number(msg.ms) || 0);

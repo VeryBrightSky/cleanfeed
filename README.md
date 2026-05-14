@@ -11,6 +11,22 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.4.3 — 2026-05-14
+- **Fixed cold-start popup unresponsiveness.** On a fresh install (and
+  intermittently after the MV3 service worker slept) the popup was
+  visible but inert for the first couple of seconds — all click
+  handlers were attached *after* `await chrome.storage.local.get(...)`
+  inside `init()`. Users had to close and reopen the popup before
+  buttons started working. Fixed by splitting init into a synchronous
+  `bootstrap()` that attaches every handler before any await, plus a
+  `cf:wake` ping that keeps the SW alive during popup render. A thin
+  teal progress line appears at the top edge if storage takes >150 ms.
+- **Manifest name + description updated for Chrome Web Store SEO.**
+  Name now leads with "Hide YouTube Distractions" and lists the
+  headline features. Description rewritten to surface "homepage feed,
+  Shorts, recommendations, comments" — the queries new users actually
+  type. Still under the 132-char short-description limit.
+
 ### v1.4.2 — 2026-05-13
 - **Pre-mints ExtPay api_key on install + on browser startup**, not
   just on popup open. This kills the 2-10 second freeze the very

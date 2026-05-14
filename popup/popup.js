@@ -60,6 +60,10 @@ const STATE = {
   perPageEnabled: false,
   perPageSettings: { homepage: {}, watch: {}, subscriptions: {} },
   activeTab: "everywhere",   // "everywhere" | "homepage" | "watch" | "subscriptions"
+  // v1.4.3 — flips true once loadState() resolves. STATE-dependent handlers
+  // (togglePause, _startHold) guard on this so a click before storage loads
+  // is a safe no-op instead of acting on the empty initial STATE.
+  loaded: false,
 };
 const PAGE_TABS = [
   { key: "everywhere",     label: "Everywhere" },
@@ -214,6 +218,10 @@ function formatRemaining(ms) {
 }
 
 async function togglePause() {
+  // v1.4.3 — handler is attached synchronously now; STATE.pausedUntil is 0
+  // (the default) until loadState() resolves. A click before then would
+  // happily start a 1-hour pause based on stale state. Ignore until loaded.
+  if (!STATE.loaded) return;
   if (isPaused()) {
     STATE.pausedUntil = 0;
   } else {
@@ -310,6 +318,10 @@ function renderFocusBanner() {
 let _holdTimeoutHandle = 0;
 
 function _startHold(e) {
+  // v1.4.3 — handler attaches synchronously on DOMContentLoaded so it works
+  // on cold popup open. STATE.focusLock is empty until loadState() resolves;
+  // ignore early clicks rather than acting on stale defaults.
+  if (!STATE.loaded) return;
   console.log("[CleanFeed] hold-to-unlock: pointerdown");
   if (!isFocusLockActive()) {
     console.log("[CleanFeed] hold-to-unlock: ignored (lock not active)");
@@ -713,13 +725,101 @@ function onModalKey(e) {
 }
 
 // ---- bootstrap ----------------------------------------------------------
+//
+// v1.4.3 — the bug we're fixing here: in v1.4.2 every click handler was
+// attached AFTER `await loadState()` inside init(). On the FIRST popup
+// open after install (and intermittently after the MV3 SW slept for ~30 s)
+// chrome.storage.local.get could take long enough that users tried to
+// click toggles / Upgrade before the listeners were live. The UI was
+// visible but inert. Reopening "fixed it" because by then the SW was warm.
+//
+// Fix: a synchronous `bootstrap()` runs on DOMContentLoaded. It (a) pings
+// the SW awake, (b) attaches EVERY click handler immediately, (c) shows a
+// thin progress line if storage is slow, then (d) kicks off the async
+// init() to load state and render. STATE-dependent handlers gate on
+// STATE.loaded so a too-early click is a no-op, not a wrong action.
 
-async function init() {
-  // Show version from manifest
+function _showLoadingLine() {
+  if (document.getElementById("cf-loading-line")) return;
+  const bar = document.createElement("div");
+  bar.id = "cf-loading-line";
+  bar.className = "cf-loading-line";
+  document.body.appendChild(bar);
+}
+
+function _hideLoadingLine() {
+  const bar = document.getElementById("cf-loading-line");
+  if (bar) bar.remove();
+  document.body.classList.remove("cf-popup-loading");
+}
+
+// v1.4.3 — attach EVERY top-level click handler synchronously, before any
+// await. Handlers that depend on STATE check STATE.loaded internally and
+// are no-ops until loadState() resolves.
+function _attachStaticHandlers() {
+  // Fixed buttons — none of these depend on STATE except togglePause/_startHold,
+  // which guard internally.
+  $("cf-upgrade").addEventListener("click", openUpsellModal);
+  $("cf-login").addEventListener("click", openLogin);
+  $("cf-reset-stats").addEventListener("click", resetStats);
+  $("cf-open-options").addEventListener("click", () => chrome.runtime.openOptionsPage());
+  $("cf-open-onboarding").addEventListener("click", () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL("onboarding/welcome.html") });
+  });
+  $("cf-pause-btn").addEventListener("click", togglePause);
+
+  // Hold-to-disable Focus Lock — pointerdown starts, leave/up cancels.
+  const holdBtn = $("cf-focus-hold");
+  holdBtn.addEventListener("pointerdown", _startHold);
+  holdBtn.addEventListener("pointerup", _cancelHold);
+  holdBtn.addEventListener("pointerleave", _cancelHold);
+  holdBtn.addEventListener("pointercancel", _cancelHold);
+  holdBtn.addEventListener("touchstart", _startHold, { passive: true });
+  holdBtn.addEventListener("touchend", _cancelHold);
+  holdBtn.addEventListener("touchcancel", _cancelHold);
+
+  // Modal buttons
+  $("cf-modal-upgrade").addEventListener("click", openPayment);
+  $("cf-modal-login").addEventListener("click", openLogin);
+  document.querySelectorAll("[data-cf-close-modal]").forEach((el) => {
+    el.addEventListener("click", closeUpsellModal);
+  });
+}
+
+function bootstrap() {
+  // (1) Warm the service worker the instant the popup opens. Fire-and-forget
+  // — background.js has a synchronous handler for `cf:wake` that responds
+  // immediately, keeping the SW alive during popup render.
+  try {
+    chrome.runtime.sendMessage({ type: "cf:wake" }, () => {
+      void chrome.runtime.lastError;
+    });
+  } catch (_) {}
+
+  // (2) Show version synchronously — getManifest is cheap and never throws.
   try {
     $("cf-version").textContent = "v" + chrome.runtime.getManifest().version;
   } catch (_) {}
 
+  // (3) Attach EVERY click handler before any await. From here on the popup
+  // is interactive even if storage hasn't resolved yet.
+  _attachStaticHandlers();
+
+  // (4) If storage is slow, show a thin progress line + dim the toggle area.
+  const loadingTimer = setTimeout(() => {
+    document.body.classList.add("cf-popup-loading");
+    _showLoadingLine();
+  }, 150);
+
+  // (5) Kick off the async work that was originally init().
+  init().finally(() => {
+    clearTimeout(loadingTimer);
+    _hideLoadingLine();
+    STATE.loaded = true;
+  });
+}
+
+async function init() {
   await loadState();
 
   // v1.4.0 F3 — bump usage counter for review-prompt gating.
@@ -757,35 +857,8 @@ async function init() {
   renderUpgrade();
   renderBlockers();
 
-  // Fixed buttons
-  $("cf-upgrade").addEventListener("click", openUpsellModal);
-  $("cf-login").addEventListener("click", openLogin);
-  $("cf-reset-stats").addEventListener("click", resetStats);
-  $("cf-open-options").addEventListener("click", () => chrome.runtime.openOptionsPage());
-  $("cf-open-onboarding").addEventListener("click", () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL("onboarding/welcome.html") });
-  });
-
-  $("cf-pause-btn").addEventListener("click", togglePause);
-
-  // Hold-to-disable Focus Lock — pointerdown starts, leave/up cancels.
-  const holdBtn = $("cf-focus-hold");
-  holdBtn.addEventListener("pointerdown", _startHold);
-  holdBtn.addEventListener("pointerup", _cancelHold);
-  holdBtn.addEventListener("pointerleave", _cancelHold);
-  holdBtn.addEventListener("pointercancel", _cancelHold);
-  // touch fallback (some Chrome versions don't trigger pointer events for touch)
-  holdBtn.addEventListener("touchstart", _startHold, { passive: true });
-  holdBtn.addEventListener("touchend", _cancelHold);
-  holdBtn.addEventListener("touchcancel", _cancelHold);
-
-  // Modal buttons
-  $("cf-modal-upgrade").addEventListener("click", openPayment);
-  $("cf-modal-login").addEventListener("click", openLogin);
-  // Close on backdrop or explicit close
-  document.querySelectorAll("[data-cf-close-modal]").forEach((el) => {
-    el.addEventListener("click", closeUpsellModal);
-  });
+  // v1.4.3 — click handlers were attached synchronously in bootstrap()
+  // before any await, so they work on cold popup open. See _attachStaticHandlers.
 
   // Live update on storage change
   chrome.storage.onChanged.addListener((changes, area) => {
@@ -989,4 +1062,4 @@ async function markReviewShown() {
   try { await chrome.storage.local.set({ reviewPromptShown: true }); } catch (_) {}
 }
 
-document.addEventListener("DOMContentLoaded", init);
+document.addEventListener("DOMContentLoaded", bootstrap);

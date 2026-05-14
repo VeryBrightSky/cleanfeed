@@ -733,3 +733,38 @@ button.is-busy {
   width: 100%;
   margin: 0 auto;
 }
+
+/* v1.4.3 — cold-start fix.
+   Loading line appears at the top edge of the popup if chrome.storage.local
+   takes longer than 150ms to resolve (cold SW, slow IO). The bar pulses
+   subtly using the existing --accent / --accent-glow tokens. */
+.cf-loading-line {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--accent) 40%,
+    var(--accent-2) 60%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: cf-loading-slide 1.2s linear infinite;
+  z-index: 999;
+  pointer-events: none;
+}
+@keyframes cf-loading-slide {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+/* Subtle hint that the toggle area isn't acting on storage yet.
+   We don't disable interaction — toggle handlers re-render on render(),
+   so the eventual loadState resolution will reconcile any pre-load click. */
+body.cf-popup-loading .cf-blockers {
+  opacity: 0.72;
+  transition: opacity 200ms var(--ease);
+}
+body:not(.cf-popup-loading) .cf-blockers {
+  transition: opacity 200ms var(--ease);
+}
