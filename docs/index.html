@@ -476,33 +476,17 @@
       Pomodoro Focus Lock, and a daily time tracker.
     </p>
     <div class="ctas">
-      <a href="#" class="btn btn-primary" id="cwsBtn">
-        Install from Chrome Web Store
+      <a href="https://chromewebstore.google.com/detail/cleanfeed---focus-on-yout/mghmfmjlaelbkellppfneocliomiclnn" class="btn btn-primary" id="cwsBtn">
+        Add to Chrome — Free
       </a>
       <a href="https://github.com/VeryBrightSky/cleanfeed" class="btn">
         View source on GitHub
       </a>
     </div>
-    <p class="hero-note">Free tier · No account required · No telemetry</p>
-
-    <div class="waitlist">
-      <span class="waitlist-label">Launching soon on the Chrome Web Store</span>
-      <form id="cf-waitlist-form-hero" class="waitlist-form"
-            action="https://formspree.io/f/mojrbbdb" method="POST"
-            data-source="hero">
-        <input
-          type="email"
-          name="email"
-          required
-          placeholder="your@email.com"
-          autocomplete="email"
-          spellcheck="false"
-          aria-label="Email address"
-        />
-        <button type="submit">Notify me</button>
-      </form>
-      <p class="waitlist-msg" id="cf-waitlist-msg-hero" role="status" aria-live="polite"></p>
-    </div>
+    <p class="hero-note">
+      <a href="https://chromewebstore.google.com/detail/cleanfeed---focus-on-yout/mghmfmjlaelbkellppfneocliomiclnn" class="cws-sub">View on Chrome Web Store</a>
+      · Free tier · No account required · No telemetry
+    </p>
 
     <div class="mockup" aria-hidden="true">
       <div class="mockup-inner">
@@ -638,8 +622,8 @@
   </section>
 
   <section class="signup" id="signup">
-    <h2>Want to know when it goes live?</h2>
-    <p>One email when CleanFeed gets approved. No newsletter, no spam, no follow-ups.</p>
+    <h2>Stay in the loop</h2>
+    <p>CleanFeed is on Chrome. Sign up to be notified when we release for Firefox, Edge, and Safari, and for major updates.</p>
     <div class="waitlist">
       <form id="cf-waitlist-form-bottom" class="waitlist-form"
             action="https://formspree.io/f/mojrbbdb" method="POST"
@@ -653,7 +637,7 @@
           spellcheck="false"
           aria-label="Email address"
         />
-        <button type="submit">Add me to the list</button>
+        <button type="submit">Notify me</button>
       </form>
       <p class="waitlist-msg" id="cf-waitlist-msg-bottom" role="status" aria-live="polite"></p>
     </div>
@@ -682,7 +666,7 @@
     // page. The <form action> attribute still points at Formspree, so if
     // JS fails or is disabled the form still works (no-JS fallback).
     (function () {
-      var SUCCESS = "You're in. I'll email you the moment Chrome approves the extension.";
+      var SUCCESS = "You're in. I'll email you when we release for Firefox / Edge / Safari, and for major updates.";
       var ERROR   = "Something broke — try again, or just email me directly at vitowebpro@gmail.com";
       var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -737,7 +721,8 @@
           }
         });
       }
-      wire("cf-waitlist-form-hero",   "cf-waitlist-msg-hero");
+      // Hero waitlist removed once we went live on the Chrome Web Store —
+      // wire() early-returns when the form is absent so this is just bookkeeping.
       wire("cf-waitlist-form-bottom", "cf-waitlist-msg-bottom");
     })();
   </script>
