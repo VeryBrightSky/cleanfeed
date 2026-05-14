@@ -615,11 +615,14 @@ async function onToggle(blocker, inputEl) {
   renderBlockers();
 }
 
-// v1.4.2 — small generic "busy state" helper so any upgrade/login click
-// shows "Opening…" immediately and is re-enabled (or auto-restored
-// after a 6 s safety timeout) if the message round-trip fails. The
-// popup will close itself when the new tab steals focus, so the
-// happy-path restore code only matters for failure cases.
+// v1.4.2 — small generic "busy state" helper for upgrade / login clicks.
+//
+// Immediate feedback (button text + .is-busy class + disabled) so the
+// click doesn't feel frozen. At 5 s we swap the text to
+// "Still working… check your browser tabs" so the user knows where to
+// look if the new tab opens behind the popup. At 8 s we restore the
+// button as a safety net in case the background SW never responds —
+// they can retry.
 function _busyClick(e, text, msgType) {
   const btn = (e && e.currentTarget) || (e && e.target);
   const origText = btn ? btn.textContent : "";
@@ -627,6 +630,7 @@ function _busyClick(e, text, msgType) {
   if (btn) {
     btn.textContent = text;
     btn.disabled = true;
+    btn.classList.add("is-busy");
   }
   let restored = false;
   const restore = () => {
@@ -634,25 +638,29 @@ function _busyClick(e, text, msgType) {
     restored = true;
     btn.textContent = origText;
     btn.disabled = origDisabled;
+    btn.classList.remove("is-busy");
   };
-  // safety net — re-enable in 6 s in case the bg never responds
-  const t = setTimeout(restore, 6000);
+  // 5 s — change the label so the user knows something's still happening
+  // and where to look (a new tab somewhere).
+  const tMid = setTimeout(() => {
+    if (btn && !restored) btn.textContent = "Still working… check your browser tabs";
+  }, 5000);
+  // 8 s — safety restore so the user can retry on a true failure
+  const tSafety = setTimeout(restore, 8000);
   try {
     chrome.runtime.sendMessage({ type: msgType }, (resp) => {
-      clearTimeout(t);
-      // chrome.runtime.lastError is set when the SW dropped the message —
-      // we still want the button restored in that case so the user can retry.
+      clearTimeout(tMid);
+      clearTimeout(tSafety);
       if (chrome.runtime.lastError || !resp || resp.ok === false) {
         restore();
         return;
       }
       // Success — the background SW has already opened the tab.
-      // Close the popup so the user sees it. (Popup auto-closes when
-      // focus leaves anyway, but window.close() makes it explicit.)
       try { window.close(); } catch (_) { restore(); }
     });
   } catch (err) {
-    clearTimeout(t);
+    clearTimeout(tMid);
+    clearTimeout(tSafety);
     restore();
   }
 }

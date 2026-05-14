@@ -12,10 +12,15 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 ## Changelog
 
 ### v1.4.2 — 2026-05-13
-- Upgrade and login buttons now show "Opening…" immediately on
-  click — no more 1-3 second frozen button appearance.
-- Pre-fetches ExtPay api_key on popup open so the tab opens
-  instantly when user clicks Upgrade.
+- **Pre-mints ExtPay api_key on install + on browser startup**, not
+  just on popup open. This kills the 2-10 second freeze the very
+  first time a brand-new user clicks "Upgrade — $4.99" before they've
+  ever opened the popup.
+- Upgrade and login buttons now show "Opening…" immediately on click,
+  apply a subtle `.is-busy` pulse, and at 5 seconds swap to
+  "Still working… check your browser tabs" so the user knows where
+  to look. 8-second safety restore on failure so they can retry.
+- Pre-fetches ExtPay api_key on popup open as a second-chance warm-up.
 - Fixed upsell modal copy: "10 blockers" → "14 blockers + keyword
   blocking, Pomodoro Focus Lock, per-page rules".
 - Fixed `usageCount` integer coercion (now `parseInt(..., 10) || 0`)

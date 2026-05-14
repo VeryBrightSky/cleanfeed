@@ -16,6 +16,89 @@ const EXTPAY_ID = "cleanfeed2342";
 const extpay = ExtPay(EXTPAY_ID);
 extpay.startBackground();
 
+// ----- ExtPay api_key helpers (hoisted to module scope in v1.4.2 so
+// that chrome.runtime.onInstalled and chrome.runtime.onStartup can call
+// them before any popup ever opens). The implementations mirror the
+// SDK's own create_key/get_key (lib/extpay.js:1307-1349) — sync first,
+// fall back to local. Earlier these lived inside the onMessage closure;
+// the inline message handlers still reference them by the same names. -----
+async function _writeExtpayApiKey(apiKey) {
+  try {
+    await chrome.storage.sync.set({ extensionpay_api_key: apiKey });
+  } catch (_) {
+    try { await chrome.storage.local.set({ extensionpay_api_key: apiKey }); } catch (_) {}
+  }
+}
+async function _readExtpayApiKey() {
+  try {
+    const s = await chrome.storage.sync.get(["extensionpay_api_key"]);
+    if (s && s.extensionpay_api_key) return String(s.extensionpay_api_key);
+  } catch (_) {}
+  try {
+    const l = await chrome.storage.local.get(["extensionpay_api_key"]);
+    if (l && l.extensionpay_api_key) return String(l.extensionpay_api_key);
+  } catch (_) {}
+  return "";
+}
+async function _createExtpayApiKey() {
+  try {
+    const isDev = !(("update_url") in (chrome.runtime.getManifest() || {}));
+    const body = isDev ? { development: true } : {};
+    const resp = await fetch(
+      "https://extensionpay.com/extension/" + encodeURIComponent(EXTPAY_ID) + "/api/new-key",
+      {
+        method: "POST",
+        headers: { "Accept": "application/json", "Content-type": "application/json" },
+        body: JSON.stringify(body),
+        credentials: "omit",
+        cache: "no-store",
+      }
+    );
+    if (!resp.ok) { console.warn("[CleanFeed] /api/new-key HTTP " + resp.status); return ""; }
+    const apiKey = await resp.json();
+    const key = typeof apiKey === "string" ? apiKey : String(apiKey || "");
+    if (key) await _writeExtpayApiKey(key);
+    return key;
+  } catch (e) {
+    console.warn("[CleanFeed] /api/new-key failed:", e);
+    return "";
+  }
+}
+async function _ensureExtpayApiKey() {
+  let key = await _readExtpayApiKey();
+  if (key) return key;
+  try { await extpay.getUser(); } catch (_) {}
+  key = await _readExtpayApiKey();
+  if (key) return key;
+  return await _createExtpayApiKey();
+}
+
+// v1.4.2 — eagerly mint the ExtPay api_key the moment the extension
+// is installed or Chrome starts up, so the first time the user clicks
+// "Upgrade — $4.99" the URL already has ?api_key=… in it. Silent on
+// failure; the popup's on-demand prefetch + on-click _ensureExtpayApiKey
+// still cover any case where this didn't get a chance to run.
+async function _eagerlyMintApiKey(reason) {
+  try {
+    const existing = await _readExtpayApiKey();
+    if (existing) {
+      console.log("[CleanFeed] api_key already present at " + reason + " — no fetch needed");
+      return;
+    }
+    console.log("[CleanFeed] minting api_key at " + reason);
+    const fresh = await _createExtpayApiKey();
+    if (fresh) console.log("[CleanFeed] api_key minted at " + reason);
+  } catch (e) {
+    console.warn("[CleanFeed] eager api_key mint failed:", e);
+  }
+}
+chrome.runtime.onInstalled.addListener((details) => {
+  _eagerlyMintApiKey("install/update (" + details.reason + ")");
+});
+chrome.runtime.onStartup.addListener(() => {
+  _eagerlyMintApiKey("startup");
+});
+
 // Mirror paid status to local storage for fast synchronous reads.
 extpay.onPaid.addListener(async (user) => {
   await chrome.storage.local.set({
@@ -411,78 +494,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // /api/new-key, get a JSON string back, write it to BOTH storage
   // areas the SDK reads from. lib/extpay.js itself is untouched.
 
-  // SDK's set() helper writes sync first and falls back to local
-  // (lib/extpay.js:1266-1273). We do the same so the SDK reads back
-  // its own key on subsequent calls.
-  async function _writeExtpayApiKey(apiKey) {
-    try {
-      await chrome.storage.sync.set({ extensionpay_api_key: apiKey });
-    } catch (_) {
-      try { await chrome.storage.local.set({ extensionpay_api_key: apiKey }); } catch (_) {}
-    }
-  }
-
-  async function _readExtpayApiKey() {
-    // SDK reads sync first, falls back to local. Mirror that order.
-    try {
-      const s = await chrome.storage.sync.get(["extensionpay_api_key"]);
-      if (s && s.extensionpay_api_key) return String(s.extensionpay_api_key);
-    } catch (_) { /* sync unavailable on temp Firefox addons etc. */ }
-    try {
-      const l = await chrome.storage.local.get(["extensionpay_api_key"]);
-      if (l && l.extensionpay_api_key) return String(l.extensionpay_api_key);
-    } catch (_) {}
-    return "";
-  }
-
-  // Replica of create_key() in lib/extpay.js:1307-1340. Same POST,
-  // same body, same storage write. Returns "" on failure (caller
-  // handles the no-key URL fallback).
-  async function _createExtpayApiKey() {
-    try {
-      // Detect dev vs store install the same way the SDK does. Without
-      // the `management` permission, chrome.management is undefined,
-      // so we fall back to inspecting the manifest's update_url field.
-      const isDev = !(("update_url") in (chrome.runtime.getManifest() || {}));
-      const body = isDev ? { development: true } : {};
-      const resp = await fetch(
-        "https://extensionpay.com/extension/" + encodeURIComponent(EXTPAY_ID) + "/api/new-key",
-        {
-          method: "POST",
-          headers: {
-            "Accept": "application/json",
-            "Content-type": "application/json",
-          },
-          body: JSON.stringify(body),
-          credentials: "omit",
-          cache: "no-store",
-        }
-      );
-      if (!resp.ok) {
-        console.warn("[CleanFeed] /api/new-key returned HTTP " + resp.status);
-        return "";
-      }
-      const apiKey = await resp.json();
-      const key = typeof apiKey === "string" ? apiKey : String(apiKey || "");
-      if (key) await _writeExtpayApiKey(key);
-      return key;
-    } catch (e) {
-      console.warn("[CleanFeed] Could not POST /api/new-key:", e);
-      return "";
-    }
-  }
-
-  // Read existing key; create one if missing. Returns "" only when
-  // both read AND create failed (offline, etc.).
-  async function _ensureExtpayApiKey() {
-    let key = await _readExtpayApiKey();
-    if (key) return key;
-    // Side-call getUser first so any future SDK init also sees the key
-    try { await extpay.getUser(); } catch (_) { /* network issue — keep going */ }
-    key = await _readExtpayApiKey();
-    if (key) return key;
-    return await _createExtpayApiKey();
-  }
+  // v1.4.2 — api_key helpers hoisted to module scope (see top of file).
+  // The handlers below still reference them by the same names.
 
   // v1.4.2 — warm the ExtPay api_key while the popup is open so the
   // moment the user clicks Upgrade / I-already-paid the tab opens

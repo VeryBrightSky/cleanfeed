@@ -432,6 +432,18 @@ body.cf-paused-state .cf-pause-btn .cf-play-icon  { display: inline-block; }
 .cf-btn-ghost { background: transparent; }
 .cf-btn-lg { padding: 12px var(--s-4); font-size: 14px; }
 
+/* v1.4.2 — gentle "loading" pulse for any button while a background
+ * request is in flight. Uses only existing tokens — no new design. */
+.cf-btn.is-busy,
+button.is-busy {
+  cursor: progress;
+  animation: cf-busy-pulse 1.4s var(--ease) infinite;
+}
+@keyframes cf-busy-pulse {
+  0%, 100% { opacity: 0.72; }
+  50%      { opacity: 0.45; }
+}
+
 /* ----- FOOTER ----- */
 .cf-footer {
   display: flex;
