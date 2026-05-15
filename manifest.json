@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "CleanFeed — Hide YouTube Distractions | 14 Blockers, Focus Lock, Pomodoro",
-  "version": "1.4.3",
-  "description": "Hide YouTube's homepage feed, Shorts, recommendations, comments. 14 toggleable blockers + Pomodoro Focus Lock.",
+  "default_locale": "en",
+  "name": "__MSG_extName__",
+  "version": "1.4.4",
+  "description": "__MSG_extDescription__",
   "author": "CleanFeed",
   "homepage_url": "https://cleanfeed.app",
   "permissions": [

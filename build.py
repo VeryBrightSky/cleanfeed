@@ -21,6 +21,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # Files / directories to include verbatim in the zip
 INCLUDE_PATHS = [
     "manifest.json",
+    "_locales",
     "background.js",
     "content",
     "popup",

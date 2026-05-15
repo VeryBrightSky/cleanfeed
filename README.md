@@ -11,6 +11,9 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.4.4 — 2026-05-15
+- Chrome Web Store localization — listing now available in English, Spanish, Portuguese (BR), Hindi, French, German, Indonesian, Japanese.
+
 ### v1.4.3 — 2026-05-14
 - **Fixed cold-start popup unresponsiveness.** On a fresh install (and
   intermittently after the MV3 service worker slept) the popup was
