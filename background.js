@@ -113,11 +113,13 @@ extpay.onPaid.addListener(async (user) => {
 
 chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === "install") {
-    // open onboarding in a new tab
-    chrome.tabs.create({
-      url: chrome.runtime.getURL("onboarding/welcome.html"),
-    });
-    // seed default settings: only home-feed + shorts on (free-tier defaults)
+    // v1.4.6 — SEED STORAGE FIRST, then set a readiness flag, THEN open
+    // the onboarding tab and do any network work. Earlier versions called
+    // chrome.tabs.create BEFORE awaiting the defaults write, leaving a
+    // window where the popup (if opened immediately) read empty storage,
+    // rendered the onboarding view, and the user's preset-pick was then
+    // overwritten by this listener's later full-defaults write — forcing
+    // the user to close and reopen the popup several times.
     const defaults = {
       settings: {
         "home-feed": true,
@@ -159,16 +161,29 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       perPageSettings: { homepage: {}, watch: {}, subscriptions: {} },
     };
     await chrome.storage.local.set(defaults);
+    // Set the readiness flag in a SEPARATE write so popup/content can
+    // observe a single, unambiguous "storage is seeded" transition via
+    // chrome.storage.onChanged. The popup waits on this flag instead of
+    // racing the seed write.
+    await chrome.storage.local.set({ cf_initialized: true });
     // mirror a copy to chrome.storage.sync for backup/migration
     chrome.storage.sync.set({
       settings: defaults.settings,
       whitelistedChannels: [],
     }).catch(() => {});
+    // Now safe to open the onboarding tab — even if the user clicks the
+    // toolbar icon at the same instant, the popup will see cf_initialized.
+    chrome.tabs.create({
+      url: chrome.runtime.getURL("onboarding/welcome.html"),
+    });
   } else if (details.reason === "update") {
     // v1.4.0 migration. Existing users keep their settings; we only
     // ADD the new keys with safe defaults. Onboarding is auto-marked
     // complete for anyone who already has settings (per spec).
     await _migrateForV140();
+    // v1.4.6 — mark existing-user storage as initialized too so the
+    // popup's readiness check passes without waiting.
+    await chrome.storage.local.set({ cf_initialized: true });
   }
   // check license on every browser launch (and on update)
   try {

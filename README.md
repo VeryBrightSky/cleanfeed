@@ -11,6 +11,28 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.4.6 — 2026-05-16
+- **Fixed first-install service worker readiness race.** On a brand-new
+  install, the popup could open and read `chrome.storage.local` before
+  background.js's `onInstalled` handler finished seeding defaults.
+  Reading empty storage rendered the onboarding view, and the user's
+  preset pick was then overwritten by `onInstalled`'s later full-defaults
+  write (`onboardingComplete: false` clobbered the user's `true`). The
+  popup looked laggy and the user had to close + reopen it 2-3 times
+  before it worked. v1.4.3 fixed click-handler attachment latency but
+  did not address this separate storage write/read race.
+  - `background.js` `onInstalled` now seeds defaults BEFORE opening the
+    onboarding tab, awaits the write, then writes a single
+    `cf_initialized: true` flag in a separate set.
+  - `popup.js` `init()` now `await`s `waitForInitialized()` (a
+    short-circuit + `storage.onChanged` wait + 3s safety timeout) before
+    `loadState()`. The existing 150ms loading line stays visible during
+    the wait.
+  - `popup.js` `storage.onChanged` now also handles `onboardingComplete`
+    so any future clobber self-recovers without close/reopen.
+  - v1.4.3's synchronous handler attachment, `cf:wake` ping, and
+    module-top listener registration are preserved untouched.
+
 ### v1.4.4 — 2026-05-15
 - Chrome Web Store localization — listing now available in English, Spanish, Portuguese (BR), Hindi, French, German, Indonesian, Japanese.
 

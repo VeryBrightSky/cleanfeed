@@ -103,6 +103,60 @@ function el(tag, attrs, ...children) {
 
 // ---- storage ------------------------------------------------------------
 
+// v1.4.6 — On a brand-new install the popup can open BEFORE background's
+// onInstalled handler has finished seeding defaults. Reading empty storage
+// caused the popup to render the onboarding view, then onInstalled's later
+// `set(defaults)` would clobber the user's preset choice and the popup
+// looked broken until ~3 reopens. We now block on a `cf_initialized` flag
+// (set in a separate write at the end of seeding) before loadState, with a
+// short timeout fallback so a missing/old-storage edge case can't wedge us.
+function _isInitialized(data) {
+  if (data && data.cf_initialized === true) return true;
+  // Existing users from pre-v1.4.6 won't have cf_initialized yet, but their
+  // settings object exists. Treat populated settings as initialized too.
+  if (data && data.settings && typeof data.settings === "object" &&
+      Object.keys(data.settings).length > 0) {
+    return true;
+  }
+  return false;
+}
+
+function waitForInitialized() {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      try { chrome.storage.onChanged.removeListener(onChange); } catch (_) {}
+      clearTimeout(safety);
+      resolve();
+    };
+    function onChange(changes, area) {
+      if (area !== "local") return;
+      if (changes.cf_initialized && changes.cf_initialized.newValue === true) {
+        finish();
+        return;
+      }
+      // Defensive: if the seed write lands as a `settings` change first,
+      // that's enough to proceed too.
+      if (changes.settings && changes.settings.newValue &&
+          typeof changes.settings.newValue === "object" &&
+          Object.keys(changes.settings.newValue).length > 0) {
+        finish();
+      }
+    }
+    chrome.storage.onChanged.addListener(onChange);
+    // First check — may already be initialized between bootstrap and here.
+    chrome.storage.local.get(["cf_initialized", "settings"], (data) => {
+      if (_isInitialized(data)) finish();
+    });
+    // Safety timeout — render with whatever we have rather than hang.
+    // 3s is well past a healthy onInstalled seed (~10-50ms) but short
+    // enough that the user isn't staring at the loading line forever.
+    const safety = setTimeout(finish, 3000);
+  });
+}
+
 function loadState() {
   return new Promise((resolve) => {
     chrome.storage.local.get(
@@ -820,6 +874,12 @@ function bootstrap() {
 }
 
 async function init() {
+  // v1.4.6 — wait for background's onInstalled defaults seed to land
+  // before reading. On a healthy fresh install this resolves in ~10-50ms;
+  // on existing-user installs it returns immediately because populated
+  // `settings` short-circuits the check. The 150ms loadingTimer in
+  // bootstrap() shows the user a thin progress line if we have to wait.
+  await waitForInitialized();
   await loadState();
 
   // v1.4.0 F3 — bump usage counter for review-prompt gating.
@@ -899,6 +959,27 @@ async function init() {
     if (changes.perPageSettings) {
       STATE.perPageSettings = changes.perPageSettings.newValue || { homepage: {}, watch: {}, subscriptions: {} };
       renderBlockers();
+    }
+    // v1.4.6 — if onboardingComplete is force-toggled in storage (e.g. an
+    // in-flight onInstalled write momentarily clobbers a freshly-picked
+    // preset), self-recover without forcing the user to close/reopen.
+    if (changes.onboardingComplete) {
+      const newVal = !!changes.onboardingComplete.newValue;
+      if (newVal && !STATE.onboardingComplete) {
+        STATE.onboardingComplete = true;
+        const ob = document.getElementById("cf-onboarding");
+        if (ob) ob.remove();
+        document.querySelectorAll(
+          ".cf-stats, .cf-time-mini, .cf-pause-bar, .cf-blockers, .cf-upgrade"
+        ).forEach((el) => { el.style.display = ""; });
+        renderTierBadge();
+        renderStats();
+        renderUpgrade();
+        renderFocusBanner();
+        renderTimeMini();
+        renderPause();
+        renderBlockers();
+      }
     }
   });
 }
