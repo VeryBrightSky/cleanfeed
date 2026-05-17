@@ -11,6 +11,10 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.4.7 — 2026-05-17
+- **Fixed stale feature count in README.** "10 independent blockers" → "14 independent blockers"; enumerated list extended with the 4 v1.4.0 additions (Playables, Merch shelf, Breaking news, Mixes & playlists).
+- **Fixed "Leave a review" button URL.** `popup.js` `REVIEW_URL` was still the `REPLACE_WITH_FINAL_ID` placeholder; replaced with the canonical Chrome Web Store reviews URL for `mghmfmjlaelbkellppfneocliomiclnn`.
+
 ### v1.4.6 — 2026-05-16
 - **Fixed first-install service worker readiness race.** On a brand-new
   install, the popup could open and read `chrome.storage.local` before
@@ -213,7 +217,7 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Features
 
-- **10 independent blockers**, each toggleable on/off:
+- **14 independent blockers**, each toggleable on/off:
   1. Homepage recommendation grid
   2. Shorts shelves (homepage, search, left-nav entry)
   3. Sidebar recommendations on watch pages
@@ -224,6 +228,10 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
   8. Autoplay (auto-disables YouTube's autoplay toggle)
   9. Hide thumbnails (replaces every thumbnail with a placeholder)
   10. Hide subscription algorithm shelves
+  11. Playables games panel
+  12. Merch shelf
+  13. Breaking news shelf
+  14. Mixes & playlists
 - **Focus Lock (Pro)** — PIN-protected lock that force-enables every blocker
   for a chosen duration. 60-second hold-to-disable safety valve.
 - **Daily time tracker (free)** — see today / this week / 7-day average.

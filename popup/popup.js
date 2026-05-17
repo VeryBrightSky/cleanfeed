@@ -41,8 +41,7 @@ const PRESETS = {
   "minimal":     ["shorts", "home-feed", "watch-sidebar", "end-screen", "comments", "explore", "autoplay", "thumbnails"],
 };
 const REVIEW_THRESHOLD = 5;
-// Replace REPLACE_WITH_FINAL_ID once CWS listing is live with the real extension ID.
-const REVIEW_URL = "https://chromewebstore.google.com/detail/REPLACE_WITH_FINAL_ID/reviews";
+const REVIEW_URL = "https://chromewebstore.google.com/detail/mghmfmjlaelbkellppfneocliomiclnn/reviews";
 
 const STATE = {
   paid: false,
