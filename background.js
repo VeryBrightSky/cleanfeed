@@ -306,7 +306,10 @@ async function updateBadge() {
   const data = await chrome.storage.local.get(["settings", "paid", "pausedUntil", "focusLock"]);
   const settings = data.settings || {};
   const paid = !!data.paid;
-  const pausedUntil = Number(data.pausedUntil) || 0;
+  // v1.4.9 — clamp pausedUntil to (now + 1hr + 5min slack). A corrupted
+  // far-future timestamp must not pin the badge into the paused glyph.
+  let pausedUntil = Number(data.pausedUntil) || 0;
+  if (pausedUntil > Date.now() + 60 * 60 * 1000 + 5 * 60 * 1000) pausedUntil = 0;
   const focusLock = data.focusLock || {};
   const focusActive = Number(focusLock.activeUntil || 0) > Date.now();
 
@@ -611,6 +614,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           paid: msg.paid,
           whitelistedChannels: msg.whitelistedChannels,
           customCSS: msg.customCSS,
+          // v1.4.9 — forward pausedUntil. Content scripts previously had to
+          // wait for chrome.storage.onChanged to learn pause state, which
+          // under rapid pause-click bursts could arrive out-of-order with
+          // the message broadcast. Forwarding inline keeps content STATE
+          // and storage in lock-step on every push.
+          pausedUntil: typeof msg.pausedUntil === "number" ? msg.pausedUntil : undefined,
         }).catch(() => { /* tab may be closing */ });
       }
       sendResponse({ ok: true, tabs: tabs.length });

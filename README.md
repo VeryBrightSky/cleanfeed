@@ -11,6 +11,12 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.4.9 — 2026-05-17
+- **Fixed "Pause for 1 hour" button state corruption on rapid clicks.** Spam-clicking pause used to fire N overlapping async handlers racing on `STATE.pausedUntil` + `chrome.storage.local`, with the popup's own `storage.onChanged` listener clobbering STATE between successive read-modify-write windows. Symptom: after a few rapid clicks the extension would stop hiding videos AND the blocker toggles would stop responding, with no self-recovery. Fix: added an in-flight lock + visible button-disable in `togglePause()` (`popup/popup.js`) that coalesces a click-burst into a single transition; subsequent clicks during the in-flight window are no-ops.
+- **Defensive `sanePausedUntil()` clamp** in popup, content script, and background badge updater. Any `pausedUntil` > `now + 1hr + 5min` is treated as corrupted and reset to 0 — fail-OPEN here means fail-CLOSED for the user, so a bad timestamp can never pin the extension paused forever.
+- **Background relay now forwards `pausedUntil`** in `cf:settings-changed`. Previously content scripts only learned pause changes via `chrome.storage.onChanged`, which under rapid clicks could arrive out-of-order with the message broadcast. Inline-forwarding keeps content STATE and storage in lock-step.
+- **New test:** `tests/pause-rapid-click.js` simulates 10 + 25-click bursts and asserts coalesced state (15/15 pass). Migration dry-run remains 30/30; first-install race remains 13/13.
+
 ### v1.4.8 — 2026-05-17
 - **SEO-optimized store-facing metadata.** English name + description now lead with the primary search phrase "Block YouTube Shorts" (name 69/75 chars, description 130/132 chars).
 - **Localized listings** (`_locales/`): Spanish, French, Portuguese (BR), and German names + descriptions rewritten to lead with the local-language equivalent of "Block YouTube Shorts", all within the 75/132 char limits. Japanese, Hindi, and Indonesian deliberately left at their v1.4.4 strings pending human-translator review — flagged for follow-up.

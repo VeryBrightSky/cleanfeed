@@ -13,6 +13,18 @@
 (function () {
   "use strict";
 
+  // v1.4.9 — defensively clamp pausedUntil reads to (now + 1hr + 5min).
+  // Anything bigger is treated as 0. Fail-OPEN here means fail-CLOSED for
+  // the user: a corrupted timestamp can never pin the extension paused.
+  const PAUSE_MAX_DURATION_MS = 60 * 60 * 1000;
+  const PAUSE_MAX_SLACK_MS = 5 * 60 * 1000;
+  function sanePausedUntil(raw) {
+    const n = Number(raw) || 0;
+    if (n <= 0) return 0;
+    if (n > Date.now() + PAUSE_MAX_DURATION_MS + PAUSE_MAX_SLACK_MS) return 0;
+    return n;
+  }
+
   const BLOCKERS = window.__cleanfeed_blockers || [];
   const STATE = {
     settings: {},          // {<blocker-id>: bool, ...}
@@ -53,7 +65,7 @@
           STATE.paid = !!data.paid;
           STATE.whitelistedChannels = data.whitelistedChannels || [];
           STATE.customCSS = data.customCSS || "";
-          STATE.pausedUntil = Number(data.pausedUntil) || 0;
+          STATE.pausedUntil = sanePausedUntil(data.pausedUntil);
           STATE.blockedChannels = Array.isArray(data.blockedChannels) ? data.blockedChannels : [];
           STATE.focusLock = data.focusLock || { activeUntil: 0, pinSet: false };
           STATE.hiddenKeywords = Array.isArray(data.hiddenKeywords) ? data.hiddenKeywords : [];
@@ -578,7 +590,7 @@
           STATE.customCSS = msg.customCSS;
         }
         if (typeof msg.pausedUntil === "number") {
-          STATE.pausedUntil = msg.pausedUntil;
+          STATE.pausedUntil = sanePausedUntil(msg.pausedUntil);
         }
         applyBlockers();
         sendResponse({ ok: true });
@@ -604,7 +616,7 @@
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;
       if (changes.pausedUntil) {
-        STATE.pausedUntil = Number(changes.pausedUntil.newValue) || 0;
+        STATE.pausedUntil = sanePausedUntil(changes.pausedUntil.newValue);
         applyBlockers();
       }
       if (changes.settings) {

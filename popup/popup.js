@@ -13,6 +13,16 @@
 
 const EXTPAY_ID = "cleanfeed2342"; // also used in background.js
 const PAUSE_DURATION_MS = 60 * 60 * 1000;   // 1 hour
+// v1.4.9 — any pausedUntil more than (now + max-duration + 5min slack) is
+// treated as corrupted and reset to 0. Fail-OPEN here means fail-CLOSED for
+// the user: a garbage timestamp can never pin the extension paused forever.
+const PAUSE_MAX_SLACK_MS = 5 * 60 * 1000;
+function sanePausedUntil(raw) {
+  const n = Number(raw) || 0;
+  if (n <= 0) return 0;
+  if (n > Date.now() + PAUSE_DURATION_MS + PAUSE_MAX_SLACK_MS) return 0;
+  return n;
+}
 
 // Mirror of blockers.js — kept in sync but isolated so popup doesn't need
 // to load the content-script bundle.
@@ -169,7 +179,7 @@ function loadState() {
         STATE.whitelistedChannels = data.whitelistedChannels || [];
         STATE.customCSS = data.customCSS || "";
         STATE.stats = data.sessionStats || { total: 0, perBlocker: {} };
-        STATE.pausedUntil = Number(data.pausedUntil) || 0;
+        STATE.pausedUntil = sanePausedUntil(data.pausedUntil);
         STATE.focusLock = data.focusLock || { pinSet: false, activeUntil: 0 };
         STATE.timeTracking = data.timeTracking || {};
         STATE.onboardingComplete = !!data.onboardingComplete;
@@ -270,20 +280,42 @@ function formatRemaining(ms) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+// v1.4.9 — re-entrance lock for togglePause. Without this, rapid spam-clicks
+// fire N overlapping async handlers that race on STATE.pausedUntil and on
+// chrome.storage.local. The popup's own storage.onChanged listener can then
+// clobber STATE between successive clicks' sync read-modify-write, leaving
+// storage in a state that doesn't match the user's last intent. The lock
+// + visible button-disable coalesces a burst into a single transition.
+let togglePauseInFlight = false;
+
 async function togglePause() {
   // v1.4.3 — handler is attached synchronously now; STATE.pausedUntil is 0
   // (the default) until loadState() resolves. A click before then would
   // happily start a 1-hour pause based on stale state. Ignore until loaded.
   if (!STATE.loaded) return;
-  if (isPaused()) {
-    STATE.pausedUntil = 0;
-  } else {
-    STATE.pausedUntil = Date.now() + PAUSE_DURATION_MS;
+  // v1.4.9 — if a previous toggle is still mid-flight (storage write or
+  // re-render not yet finished) drop the click. The button is also disabled
+  // visually for the duration so the user sees no-op feedback.
+  if (togglePauseInFlight) return;
+  togglePauseInFlight = true;
+  const btn = $("cf-pause-btn");
+  btn.disabled = true;
+  try {
+    if (isPaused()) {
+      STATE.pausedUntil = 0;
+    } else {
+      STATE.pausedUntil = Date.now() + PAUSE_DURATION_MS;
+    }
+    await chrome.storage.local.set({ pausedUntil: STATE.pausedUntil });
+    pushSettingsToTabs();
+    renderPause();
+    renderBlockers();
+  } finally {
+    togglePauseInFlight = false;
+    // renderPause() may have re-disabled the button if Focus Lock is active;
+    // honour that. Otherwise re-enable.
+    btn.disabled = isFocusLockActive() && STATE.paid;
   }
-  await chrome.storage.local.set({ pausedUntil: STATE.pausedUntil });
-  pushSettingsToTabs();
-  renderPause();
-  renderBlockers();
 }
 
 // Render the red Focus Lock banner with a live MM:SS countdown.
@@ -937,7 +969,7 @@ async function init() {
       renderStats();
     }
     if (changes.pausedUntil) {
-      STATE.pausedUntil = Number(changes.pausedUntil.newValue) || 0;
+      STATE.pausedUntil = sanePausedUntil(changes.pausedUntil.newValue);
       renderPause();
       renderBlockers();
     }
