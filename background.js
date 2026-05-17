@@ -346,8 +346,12 @@ async function updateBadge() {
   const ids = Object.keys(settings).filter((id) => settings[id]);
   let count = ids.length;
   if (!paid) {
-    // free tier: cap at 2 and only count free-tier blockers
-    const FREE_IDS = ["home-feed", "shorts"];
+    // v1.4.11 — canonical free-tier ids. Must stay in sync with
+    // content/blockers.js (tier: "free"). Pre-v1.4.11 this list held only
+    // the two original v1.0 free blockers; the v1.4.0 additions (merch-shelf,
+    // breaking-news) were silently excluded so a free user enabling them
+    // saw badge count 0 instead of 2.
+    const FREE_IDS = ["home-feed", "shorts", "merch-shelf", "breaking-news"];
     count = ids.filter((id) => FREE_IDS.includes(id)).length;
     count = Math.min(count, 2);
   }

@@ -11,6 +11,10 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.4.11 — 2026-05-17
+- **Fixed toolbar badge active-blocker count for v1.4.0 free blockers.** `background.js:350` hardcoded `FREE_IDS = ["home-feed", "shorts"]` — a stale 2-key subset from v1.0. v1.4.0 added two more free-tier blockers (`merch-shelf`, `breaking-news`), but the badge counter wasn't updated, so a free user enabling Merch shelf + Breaking news saw an empty badge instead of "2". Same family of defect as v1.4.10's `resetAll` fix (4.3). `FREE_IDS` now lists all four canonical free-tier ids, with a comment requiring sync with `content/blockers.js`.
+- **New test:** `tests/badge-count.js` covers Pro full-count, free-tier subset, license-downgrade edge cases, and the FREE_LIMIT=2 cap (12/12 pass). Other suites unchanged: pause-rapid-click 15/15, onToggle-rapid-click 13/13, migration-dryrun 30/30, first-install-race 13/13.
+
 ### v1.4.10 — 2026-05-17
 - **`onToggle` re-entrance lock (audit finding 1.1).** Blocker-toggle checkboxes now use the same in-flight lock pattern that v1.4.9 added to `togglePause`: a module-level `onToggleInFlight` flag + `inputEl.disabled = true` during the storage write, with `try/finally` to re-enable. Rapid checkbox clicks (and fast cross-toggle clicks) used to fire overlapping async handlers; `renderBlockers()` rebuilt the `<input>` nodes mid-burst and later clicks landed on destroyed inputs. The lock coalesces a burst into a single committed transition and reverts dropped clicks' UI to the committed STATE.
 - **Completed `resetAll` defaults (audit finding 4.3).** `options/options.js` `resetAll()` defaults now include all four v1.4.0 blockers (`playables`, `merch-shelf`, `breaking-news`, `mixes-playlists`); the previous 10-key subset relied on content/popup re-defaulting at read time. User-visible behaviour of "Reset All" is unchanged — the canonical defaults block just no longer drifts from `BLOCKERS`.
