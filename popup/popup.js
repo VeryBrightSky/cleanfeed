@@ -693,6 +693,15 @@ function renderPerPageSegment(b) {
 
 // ---- interactions -------------------------------------------------------
 
+// v1.4.10 — re-entrance lock for onToggle. Same shape as the v1.4.9
+// togglePause fix: rapid checkbox clicks (or fast cross-toggle clicks)
+// otherwise fire overlapping async handlers, each calling persistSettings
+// + pushSettingsToTabs + renderBlockers. renderBlockers tears down and
+// rebuilds the toggle <input> nodes, so a click that lands on a destroyed
+// input is lost — same "toggles stop working" symptom flagged in the
+// pause-bug audit. The lock coalesces a burst into a single transition.
+let onToggleInFlight = false;
+
 async function onToggle(blocker, inputEl) {
   if (blocker.tier === "pro" && !STATE.paid) {
     inputEl.checked = false;
@@ -706,10 +715,27 @@ async function onToggle(blocker, inputEl) {
       return;
     }
   }
-  STATE.settings[blocker.id] = !!inputEl.checked;
-  await persistSettings();
-  pushSettingsToTabs();
-  renderBlockers();
+  // v1.4.10 — if a previous toggle's storage write is still in flight,
+  // drop the click and revert the checkbox UI to the committed STATE so
+  // no visual inconsistency lingers. Same-input clicks during the write
+  // are also prevented by inputEl.disabled=true below.
+  if (onToggleInFlight) {
+    inputEl.checked = !!STATE.settings[blocker.id];
+    return;
+  }
+  onToggleInFlight = true;
+  inputEl.disabled = true;
+  try {
+    STATE.settings[blocker.id] = !!inputEl.checked;
+    await persistSettings();
+    pushSettingsToTabs();
+    renderBlockers();
+  } finally {
+    onToggleInFlight = false;
+    // renderBlockers() detaches the old inputEl; only re-enable if it's
+    // still in the DOM (e.g. an early bail or a future code path).
+    if (inputEl.isConnected) inputEl.disabled = false;
+  }
 }
 
 // v1.4.2 — small generic "busy state" helper for upgrade / login clicks.

@@ -336,6 +336,13 @@ async function resetAll() {
       "end-screen": false, "comments": false, "explore": false,
       "live-chat": false, "autoplay": false,
       "thumbnails": false, "subs-algo": false,
+      // v1.4.10 — include the four v1.4.0 blockers so a "Reset All"
+      // writes a complete settings object instead of a stale 10-key
+      // subset. Behaviour is unchanged for the user (these were already
+      // re-defaulted to false at content/popup read time), but the
+      // canonical-defaults block no longer drifts from BLOCKERS.
+      "playables": false, "merch-shelf": false,
+      "breaking-news": false, "mixes-playlists": false,
     },
     whitelistedChannels: [],
     customCSS: "",

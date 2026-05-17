@@ -11,6 +11,11 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.4.10 — 2026-05-17
+- **`onToggle` re-entrance lock (audit finding 1.1).** Blocker-toggle checkboxes now use the same in-flight lock pattern that v1.4.9 added to `togglePause`: a module-level `onToggleInFlight` flag + `inputEl.disabled = true` during the storage write, with `try/finally` to re-enable. Rapid checkbox clicks (and fast cross-toggle clicks) used to fire overlapping async handlers; `renderBlockers()` rebuilt the `<input>` nodes mid-burst and later clicks landed on destroyed inputs. The lock coalesces a burst into a single committed transition and reverts dropped clicks' UI to the committed STATE.
+- **Completed `resetAll` defaults (audit finding 4.3).** `options/options.js` `resetAll()` defaults now include all four v1.4.0 blockers (`playables`, `merch-shelf`, `breaking-news`, `mixes-playlists`); the previous 10-key subset relied on content/popup re-defaulting at read time. User-visible behaviour of "Reset All" is unchanged — the canonical defaults block just no longer drifts from `BLOCKERS`.
+- **New test:** `tests/onToggle-rapid-click.js` simulates rapid same-toggle and cross-toggle bursts (13/13 pass). Other suites unchanged: pause-rapid-click 15/15, migration-dryrun 30/30, first-install-race 13/13.
+
 ### v1.4.9 — 2026-05-17
 - **Fixed "Pause for 1 hour" button state corruption on rapid clicks.** Spam-clicking pause used to fire N overlapping async handlers racing on `STATE.pausedUntil` + `chrome.storage.local`, with the popup's own `storage.onChanged` listener clobbering STATE between successive read-modify-write windows. Symptom: after a few rapid clicks the extension would stop hiding videos AND the blocker toggles would stop responding, with no self-recovery. Fix: added an in-flight lock + visible button-disable in `togglePause()` (`popup/popup.js`) that coalesces a click-burst into a single transition; subsequent clicks during the in-flight window are no-ops.
 - **Defensive `sanePausedUntil()` clamp** in popup, content script, and background badge updater. Any `pausedUntil` > `now + 1hr + 5min` is treated as corrupted and reset to 0 — fail-OPEN here means fail-CLOSED for the user, so a bad timestamp can never pin the extension paused forever.
