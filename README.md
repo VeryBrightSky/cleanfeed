@@ -11,6 +11,11 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.4.8 — 2026-05-17
+- **SEO-optimized store-facing metadata.** English name + description now lead with the primary search phrase "Block YouTube Shorts" (name 69/75 chars, description 130/132 chars).
+- **Localized listings** (`_locales/`): Spanish, French, Portuguese (BR), and German names + descriptions rewritten to lead with the local-language equivalent of "Block YouTube Shorts", all within the 75/132 char limits. Japanese, Hindi, and Indonesian deliberately left at their v1.4.4 strings pending human-translator review — flagged for follow-up.
+- **`store-assets/title.txt`** and **`store-assets/short-description.txt`** synced to match the new manifest.
+
 ### v1.4.7 — 2026-05-17
 - **Fixed stale feature count in README.** "10 independent blockers" → "14 independent blockers"; enumerated list extended with the 4 v1.4.0 additions (Playables, Merch shelf, Breaking news, Mixes & playlists).
 - **Fixed "Leave a review" button URL.** `popup.js` `REVIEW_URL` was still the `REPLACE_WITH_FINAL_ID` placeholder; replaced with the canonical Chrome Web Store reviews URL for `mghmfmjlaelbkellppfneocliomiclnn`.
