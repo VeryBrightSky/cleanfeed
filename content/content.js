@@ -38,6 +38,13 @@
     customStyleEl: null,
     statsFlushTimer: 0,
     pausedUntil: 0,        // unix ms; 0 = not paused
+    // v1.4.12 — per-page-view manual reveal of the comments section.
+    // Set when the user clicks the "Show comments" button; reset ONLY on
+    // YouTube navigation (yt-navigate-finish / URL change). Pre-v1.4.12,
+    // applyBlockers() unconditionally stripped cf-comments-shown on every
+    // MutationObserver re-tick, so a click revealed comments for ~100ms
+    // before they re-hid.
+    commentsManuallyShown: false,
     autoplayHandledForVideo: "", // video id we've already turned autoplay off for
     blockedChannels: [],   // [{handle, name}] — videos from these channels are hidden
     focusLock: { activeUntil: 0, pinSet: false }, // PIN hash never sent to content
@@ -174,8 +181,10 @@
     for (const b of BLOCKERS) {
       document.body.classList.remove("cf-block-" + b.id);
     }
-    document.body.classList.remove("cf-comments-shown");
     document.body.classList.remove("cf-paused");
+    // v1.4.12 — NOTE: cf-comments-shown is NOT touched here. It's a
+    // per-page-view user choice persisted in STATE.commentsManuallyShown
+    // and re-applied (or cleared) explicitly at the end of this function.
 
     // PAUSE override: if the user clicked "Pause for 1 hour", bypass
     // everything until the timer expires.
@@ -200,8 +209,19 @@
     const commentsActive = active.some((b) => b.id === "comments");
     if (commentsActive && location.pathname === "/watch") {
       addCommentsRestoreButton();
+      // v1.4.12 — re-apply the user's per-page-view manual reveal so the
+      // "Show comments" choice survives DOM-mutation re-runs of
+      // applyBlockers(). Reset only happens on yt-navigate-finish / URL
+      // change (see watchSPANavigation), so within a single watch-page
+      // view the reveal sticks.
+      if (STATE.commentsManuallyShown) {
+        document.body.classList.add("cf-comments-shown");
+      } else {
+        document.body.classList.remove("cf-comments-shown");
+      }
     } else {
       removeCommentsRestoreButton();
+      document.body.classList.remove("cf-comments-shown");
     }
 
     // Autoplay blocker: when active on a watch page, auto-disable autoplay.
@@ -484,6 +504,9 @@
     btn.appendChild(icon);
     btn.appendChild(label);
     btn.addEventListener("click", () => {
+      // v1.4.12 — record the manual reveal as state so subsequent
+      // applyBlockers() ticks don't strip the class. Cleared on nav.
+      STATE.commentsManuallyShown = true;
       document.body.classList.add("cf-comments-shown");
     });
     anchor.appendChild(btn);
@@ -498,14 +521,25 @@
 
   // ----- counting blocked elements -------------------------------------
 
+  // v1.4.12 — WeakSet of elements we've already counted in this
+  // content-script's lifetime. Without it, applyBlockers() (which fires
+  // ~100ms after every YT subtree mutation via the MutationObserver)
+  // re-counted the same elements on every tick, inflating the popup's
+  // "elements blocked this session" to 5–6 digits within minutes.
+  const _countedEls = new WeakSet();
+
   function countBlockedElements(active) {
-    // We don't recount on every observer tick — only on apply.
     let totalAdded = 0;
     for (const b of active) {
       let found = 0;
       for (const sel of b.selectors) {
         try {
-          found += document.querySelectorAll(sel).length;
+          const els = document.querySelectorAll(sel);
+          for (const el of els) {
+            if (_countedEls.has(el)) continue;
+            _countedEls.add(el);
+            found++;
+          }
         } catch (e) {
           /* :has() not supported in some browsers / iframes; skip */
         }
@@ -554,6 +588,9 @@
     document.addEventListener("yt-navigate-finish", () => {
       STATE.commentsBtnAdded = false;
       STATE.autoplayHandledForVideo = ""; // re-evaluate autoplay for new video
+      // v1.4.12 — reset the manual comments reveal on real navigation.
+      STATE.commentsManuallyShown = false;
+      if (document.body) document.body.classList.remove("cf-comments-shown");
       applyBlockers();
     });
     // Belt-and-suspenders: poll url changes
@@ -563,6 +600,9 @@
         lastUrl = location.href;
         STATE.commentsBtnAdded = false;
         STATE.autoplayHandledForVideo = "";
+        // v1.4.12 — mirror the yt-navigate-finish reset here too.
+        STATE.commentsManuallyShown = false;
+        if (document.body) document.body.classList.remove("cf-comments-shown");
         applyBlockers();
       }
     }, 600);
