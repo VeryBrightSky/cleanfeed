@@ -583,28 +583,52 @@
 
   // ----- SPA nav detection ---------------------------------------------
 
+  // v1.4.13 — canonical "video identity" for navigation comparison.
+  // Pre-v1.4.13, watchSPANavigation reset STATE.commentsManuallyShown on
+  // EITHER yt-navigate-finish OR any change to location.href. Both fire
+  // for non-video-change events:
+  //   - yt-navigate-finish fires for YT-internal page-state transitions
+  //     (comments tab init, page-data re-hydration) even on the same video.
+  //   - location.href changes when YT adds/updates &t=<timestamp> on the
+  //     same video (chapter marker click, scrub, timestamp in description
+  //     or comment, YT's own URL updates).
+  // After click→reveal, either spurious trigger wiped the manual-reveal
+  // state and re-hid comments — the symptom we shipped v1.4.12 to fix
+  // but mis-aimed at applyBlockers() alone. The real reset gate is
+  // "did the canonical video identity change?", not "did anything happen?".
+  function _navIdentity() {
+    let v = "";
+    try { v = new URLSearchParams(location.search).get("v") || ""; } catch (_) {}
+    return location.pathname + "?v=" + v;
+  }
+
   function watchSPANavigation() {
-    // YouTube fires this custom event on every SPA navigation
-    document.addEventListener("yt-navigate-finish", () => {
+    let lastNav = _navIdentity();
+
+    function maybeNavReset() {
+      const cur = _navIdentity();
+      if (cur === lastNav) return false;
+      lastNav = cur;
       STATE.commentsBtnAdded = false;
-      STATE.autoplayHandledForVideo = ""; // re-evaluate autoplay for new video
-      // v1.4.12 — reset the manual comments reveal on real navigation.
+      STATE.autoplayHandledForVideo = "";
       STATE.commentsManuallyShown = false;
       if (document.body) document.body.classList.remove("cf-comments-shown");
+      return true;
+    }
+
+    // YouTube fires yt-navigate-finish for both real nav AND internal page
+    // transitions. We always re-apply blockers on it (cheap + correct on
+    // real nav), but only reset per-video-view state when the canonical
+    // identity (pathname + ?v=) actually changes.
+    document.addEventListener("yt-navigate-finish", () => {
+      maybeNavReset();
       applyBlockers();
     });
-    // Belt-and-suspenders: poll url changes
-    let lastUrl = location.href;
+    // Belt-and-suspenders URL poll. Only acts on canonical-identity changes,
+    // so adding &t=<timestamp> to the same video is a no-op (was reset
+    // pre-v1.4.13 and tripped the comments-reveal bug).
     setInterval(() => {
-      if (location.href !== lastUrl) {
-        lastUrl = location.href;
-        STATE.commentsBtnAdded = false;
-        STATE.autoplayHandledForVideo = "";
-        // v1.4.12 — mirror the yt-navigate-finish reset here too.
-        STATE.commentsManuallyShown = false;
-        if (document.body) document.body.classList.remove("cf-comments-shown");
-        applyBlockers();
-      }
+      if (maybeNavReset()) applyBlockers();
     }, 600);
     // Pause-expiry tick: every 30s, if we were paused and the timer has
     // expired, re-apply blockers (and any popup will refresh on next open).
