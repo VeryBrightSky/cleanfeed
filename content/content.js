@@ -38,12 +38,14 @@
     customStyleEl: null,
     statsFlushTimer: 0,
     pausedUntil: 0,        // unix ms; 0 = not paused
-    // v1.4.12 — per-page-view manual reveal of the comments section.
-    // Set when the user clicks the "Show comments" button; reset ONLY on
-    // YouTube navigation (yt-navigate-finish / URL change). Pre-v1.4.12,
-    // applyBlockers() unconditionally stripped cf-comments-shown on every
-    // MutationObserver re-tick, so a click revealed comments for ~100ms
-    // before they re-hid.
+    // v1.4.14 — per-page-view manual reveal of the comments section.
+    // Set when the user clicks "Show comments"; reset ONLY on real
+    // canonical-video-identity change (pathname + ?v=) via maybeNavReset.
+    // v1.4.14 also drives applyCommentsManualReveal() which sets inline
+    // `display: block !important` on the comments elements directly —
+    // the body class + stylesheet tie-break that v1.4.12-13 relied on
+    // was unreliable in real Chrome (the MutationObserver doesn't watch
+    // body's attributes, so external class wipes went undetected).
     commentsManuallyShown: false,
     autoplayHandledForVideo: "", // video id we've already turned autoplay off for
     blockedChannels: [],   // [{handle, name}] — videos from these channels are hidden
@@ -182,9 +184,9 @@
       document.body.classList.remove("cf-block-" + b.id);
     }
     document.body.classList.remove("cf-paused");
-    // v1.4.12 — NOTE: cf-comments-shown is NOT touched here. It's a
-    // per-page-view user choice persisted in STATE.commentsManuallyShown
-    // and re-applied (or cleared) explicitly at the end of this function.
+    // v1.4.14 — cf-comments-shown body class and the inline-style reveal are
+    // NOT touched here. They reflect a per-page-view user choice persisted
+    // in STATE.commentsManuallyShown and are re-applied (or cleared) below.
 
     // PAUSE override: if the user clicked "Pause for 1 hour", bypass
     // everything until the timer expires.
@@ -209,19 +211,36 @@
     const commentsActive = active.some((b) => b.id === "comments");
     if (commentsActive && location.pathname === "/watch") {
       addCommentsRestoreButton();
-      // v1.4.12 — re-apply the user's per-page-view manual reveal so the
-      // "Show comments" choice survives DOM-mutation re-runs of
-      // applyBlockers(). Reset only happens on yt-navigate-finish / URL
-      // change (see watchSPANavigation), so within a single watch-page
-      // view the reveal sticks.
+      // v1.4.14 — the comments visibility no longer rides on a body-class +
+      // stylesheet tie-break. v1.4.13 kept cf-comments-shown on body and
+      // depended on its CSS rule winning the cascade tie against
+      // cf-block-comments via source order. That mechanism failed in real
+      // Chrome — primarily because our MutationObserver (startObserver) only
+      // watches childList+subtree, NOT body attribute mutations, so any
+      // external modification of body.className (YT's framework, theme
+      // toggles, etc.) that drops cf-comments-shown went undetected until
+      // the next subtree mutation triggered applyBlockers. Idle users could
+      // see the comments stay re-hidden indefinitely.
+      // We now apply inline `display: block !important` directly to each
+      // comments DOM element via applyCommentsManualReveal(). Inline
+      // !important is the TOP of the CSS cascade — it beats every author
+      // stylesheet rule regardless of specificity, source order, or
+      // external body-class wipes. Re-applied on every applyBlockers tick
+      // so YT replacing the ytd-comments element doesn't lose the reveal.
+      // The cf-comments-shown body class is still set/cleared so the
+      // existing CSS rule hiding .cf-show-comments-btn keeps working (no
+      // cascade tie-break risk there — that rule is unopposed).
       if (STATE.commentsManuallyShown) {
         document.body.classList.add("cf-comments-shown");
+        applyCommentsManualReveal();
       } else {
         document.body.classList.remove("cf-comments-shown");
+        clearCommentsManualReveal();
       }
     } else {
       removeCommentsRestoreButton();
       document.body.classList.remove("cf-comments-shown");
+      clearCommentsManualReveal();
     }
 
     // Autoplay blocker: when active on a watch page, auto-disable autoplay.
@@ -484,6 +503,36 @@
 
   // ----- comments restore button ---------------------------------------
 
+  // v1.4.14 — selectors used both by the cf-block-comments stylesheet rule
+  // and by our inline-style reveal. Keep these in sync with styles.css.
+  const _COMMENTS_REVEAL_SELECTORS = [
+    "ytd-comments#comments",
+    "#comments.ytd-watch-flexy",
+    "ytd-comments-header-renderer",
+  ];
+
+  // v1.4.14 — set inline `display: block !important` on each comments
+  // element. Inline !important beats the cf-block-comments stylesheet rule
+  // (and any other author rule) regardless of CSS specificity, source order,
+  // or whether the cf-comments-shown class is still on body. Mark each
+  // element with data-cf-shown="1" so clearCommentsManualReveal can find
+  // them again without trampling YT's own inline display styles.
+  function applyCommentsManualReveal() {
+    for (const sel of _COMMENTS_REVEAL_SELECTORS) {
+      document.querySelectorAll(sel).forEach((el) => {
+        el.style.setProperty("display", "block", "important");
+        el.setAttribute("data-cf-shown", "1");
+      });
+    }
+  }
+
+  function clearCommentsManualReveal() {
+    document.querySelectorAll('[data-cf-shown="1"]').forEach((el) => {
+      el.style.removeProperty("display");
+      el.removeAttribute("data-cf-shown");
+    });
+  }
+
   function addCommentsRestoreButton() {
     if (STATE.commentsBtnAdded) return;
     // place button just above where comments would be — under the description
@@ -504,10 +553,14 @@
     btn.appendChild(icon);
     btn.appendChild(label);
     btn.addEventListener("click", () => {
-      // v1.4.12 — record the manual reveal as state so subsequent
-      // applyBlockers() ticks don't strip the class. Cleared on nav.
+      // v1.4.14 — record the manual reveal as state AND apply inline
+      // `display: block !important` directly to the comments elements.
+      // Inline !important beats any author stylesheet rule regardless of
+      // cascade tie-break. v1.4.12-13 relied on a body class + stylesheet
+      // mechanism that failed in real Chrome (see applyBlockers comment).
       STATE.commentsManuallyShown = true;
       document.body.classList.add("cf-comments-shown");
+      applyCommentsManualReveal();
     });
     anchor.appendChild(btn);
     STATE.commentsBtnAdded = true;
@@ -613,6 +666,7 @@
       STATE.autoplayHandledForVideo = "";
       STATE.commentsManuallyShown = false;
       if (document.body) document.body.classList.remove("cf-comments-shown");
+      clearCommentsManualReveal();   // v1.4.14 — also tear down inline reveal
       return true;
     }
 
