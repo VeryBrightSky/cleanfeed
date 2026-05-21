@@ -255,6 +255,82 @@ function makeV1414(body, dom) {
            applyCommentsManualReveal, clearCommentsManualReveal };
 }
 
+// ---- v1.4.15 fix — same as v1.4.14 PLUS reset STATE.commentsManuallyShown
+// in the else branch of applyBlockers. v1.4.14 cleared the visible reveal
+// when the Comments blocker was toggled OFF but left the state flag sticky,
+// so toggling the blocker back ON re-applied the inline reveal from the
+// pre-toggle-off click. v1.4.13's maybeNavReset already handled the nav
+// path; v1.4.15 closes the same-page settings-change path.
+function makeV1415(body, dom) {
+  const STATE = { commentsManuallyShown: false, commentsBtnAdded: false };
+  const loc = { pathname: "/watch", search: "?v=ABC123" };
+  const SELECTORS = [
+    "ytd-comments#comments",
+    "#comments.ytd-watch-flexy",
+    "ytd-comments-header-renderer",
+  ];
+  function navIdentity() {
+    let v = "";
+    try { v = new URLSearchParams(loc.search).get("v") || ""; } catch (_) {}
+    return loc.pathname + "?v=" + v;
+  }
+  let lastNav = navIdentity();
+  function applyCommentsManualReveal() {
+    for (const sel of SELECTORS) {
+      dom.querySelectorAll(sel).forEach((el) => {
+        el.style.setProperty("display", "block", "important");
+        el.setAttribute("data-cf-shown", "1");
+      });
+    }
+  }
+  function clearCommentsManualReveal() {
+    dom.querySelectorAll('[data-cf-shown="1"]').forEach((el) => {
+      el.style.removeProperty("display");
+      el.removeAttribute("data-cf-shown");
+    });
+  }
+  function maybeNavReset() {
+    const cur = navIdentity();
+    if (cur === lastNav) return false;
+    lastNav = cur;
+    STATE.commentsManuallyShown = false;
+    STATE.commentsBtnAdded = false;
+    body.classList.remove("cf-comments-shown");
+    clearCommentsManualReveal();
+    return true;
+  }
+  function addBtn() { STATE.commentsBtnAdded = true; }
+  function removeBtn() { STATE.commentsBtnAdded = false; }
+  function applyBlockers(commentsActive, onWatch) {
+    for (const c of ["cf-block-comments", "cf-paused"]) body.classList.remove(c);
+    if (commentsActive) body.classList.add("cf-block-comments");
+    if (commentsActive && onWatch) {
+      addBtn();
+      if (STATE.commentsManuallyShown) {
+        body.classList.add("cf-comments-shown");
+        applyCommentsManualReveal();
+      } else {
+        body.classList.remove("cf-comments-shown");
+        clearCommentsManualReveal();
+      }
+    } else {
+      removeBtn();
+      body.classList.remove("cf-comments-shown");
+      clearCommentsManualReveal();
+      STATE.commentsManuallyShown = false;   // v1.4.15 — the FIX
+    }
+  }
+  function clickShowComments() {
+    STATE.commentsManuallyShown = true;
+    body.classList.add("cf-comments-shown");
+    applyCommentsManualReveal();
+  }
+  function ytNavigateFinish() { maybeNavReset(); applyBlockers(true, loc.pathname === "/watch"); }
+  function urlPollTick()       { if (maybeNavReset()) applyBlockers(true, loc.pathname === "/watch"); }
+  return { STATE, loc, dom, applyBlockers, clickShowComments, ytNavigateFinish, urlPollTick,
+           applyCommentsManualReveal, clearCommentsManualReveal };
+}
+
 // Helpers to assert "comments are effectively visible" in v1.4.14:
 // either inline display:block!important is set on at least one element,
 // OR cf-comments-shown is on body AND cf-block-comments is not (no blocker).
@@ -535,6 +611,113 @@ function elsHaveInlineReveal(dom) {
   // never be touched by us. We don't have a way to fabricate that in this
   // shim (DOM only knows about comments selectors), but the data-cf-shown
   // gate ensures clearCommentsManualReveal only touches what we tagged.
+}
+
+// ===== Q-pre — REGRESSION SENTINEL: v1.4.14 fails the toggle-off → toggle-on flow =====
+// User clicks "Show comments" while blocker is on, then toggles the Comments
+// blocker OFF in the popup, then toggles it back ON. v1.4.14's else branch
+// in applyBlockers cleared the visible reveal but did NOT reset
+// STATE.commentsManuallyShown — so when the blocker was toggled back ON the
+// true branch re-applied the inline reveal from the pre-toggle-off click.
+{
+  const body = makeBody();
+  const el = makeEl();
+  const dom = makeDOM({ "ytd-comments#comments": [el] });
+  const p = makeV1414(body, dom);
+  p.applyBlockers(true, true);
+  p.clickShowComments();
+  assertEq("Q-pre) v1.4.14 — click reveals", elsHaveInlineReveal(dom), true);
+  // Popup toggles Comments blocker OFF.
+  p.applyBlockers(false, true);
+  // The visible reveal is cleared (clearCommentsManualReveal ran)…
+  assertEq("Q-pre) v1.4.14 — toggle-off clears the inline reveal",
+    elsHaveInlineReveal(dom), false);
+  // …BUT the state flag is sticky (THE v1.4.14 BUG).
+  assertEq("Q-pre) v1.4.14 — toggle-off LEAVES STATE.commentsManuallyShown sticky (THE BUG)",
+    p.STATE.commentsManuallyShown, true);
+  // So when the user toggles the blocker back ON, the stale flag re-applies
+  // the inline reveal — the toggle appears to do nothing.
+  p.applyBlockers(true, true);
+  assertEq("Q-pre) v1.4.14 — toggle-on STILL reveals (stale state re-applies — THE USER-VISIBLE BUG)",
+    elsHaveInlineReveal(dom), true);
+}
+
+// ===== Q — v1.4.15 toggle-off + toggle-on cleanly resets the reveal =====
+// Repro of the v1.4.14 regression with the v1.4.15 fix applied. The else
+// branch now also resets STATE.commentsManuallyShown so toggling the
+// Comments blocker back ON behaves as fresh (button visible, comments
+// hidden, no inline reveal).
+{
+  const body = makeBody();
+  const el = makeEl();
+  const dom = makeDOM({ "ytd-comments#comments": [el] });
+  const p = makeV1415(body, dom);
+
+  // 1. Comments blocker ON, on /watch.
+  p.applyBlockers(true, true);
+  assertEq("Q1) blocker ON — no reveal yet", elsHaveInlineReveal(dom), false);
+  assertEq("Q1) restore button injected", p.STATE.commentsBtnAdded, true);
+
+  // 2. User clicks Show comments.
+  p.clickShowComments();
+  assertEq("Q2) click applies inline reveal", elsHaveInlineReveal(dom), true);
+  assertEq("Q2) STATE manualShown=true", p.STATE.commentsManuallyShown, true);
+
+  // 3. User toggles Comments blocker OFF in popup → applyBlockers(false, true).
+  p.applyBlockers(false, true);
+  assertEq("Q3) toggle-off clears the inline reveal", elsHaveInlineReveal(dom), false);
+  assertEq("Q3) toggle-off resets STATE.commentsManuallyShown (THE FIX)",
+    p.STATE.commentsManuallyShown, false);
+  assertEq("Q3) toggle-off removes restore button", p.STATE.commentsBtnAdded, false);
+  assertEq("Q3) cf-comments-shown body class cleared",
+    body.classList.contains("cf-comments-shown"), false);
+  assertEq("Q3) data-cf-shown attribute cleared from element",
+    el.dataset.cfShown, undefined);
+
+  // 4. User toggles Comments blocker back ON → applyBlockers(true, true).
+  p.applyBlockers(true, true);
+  assertEq("Q4) toggle-on re-blocks — no stale reveal", elsHaveInlineReveal(dom), false);
+  assertEq("Q4) STATE still fresh after toggle-on", p.STATE.commentsManuallyShown, false);
+  assertEq("Q4) restore button re-injected", p.STATE.commentsBtnAdded, true);
+  assertEq("Q4) cf-block-comments re-applied",
+    body.classList.contains("cf-block-comments"), true);
+
+  // 5. Fresh click still works.
+  p.clickShowComments();
+  assertEq("Q5) fresh click re-reveals", elsHaveInlineReveal(dom), true);
+  assertEq("Q5) STATE re-set", p.STATE.commentsManuallyShown, true);
+}
+
+// ===== Q-nav — v1.4.15 still resets cleanly on real navigation =====
+// Sanity that the v1.4.15 toggle-off reset didn't break the v1.4.13 nav
+// path. Real video change must still clear reveal + state.
+{
+  const body = makeBody();
+  const el = makeEl();
+  const dom = makeDOM({ "ytd-comments#comments": [el] });
+  const p = makeV1415(body, dom);
+  p.applyBlockers(true, true);
+  p.clickShowComments();
+  p.loc.search = "?v=NEW";
+  p.urlPollTick();
+  assertEq("Q-nav) real nav clears reveal", elsHaveInlineReveal(dom), false);
+  assertEq("Q-nav) real nav resets STATE", p.STATE.commentsManuallyShown, false);
+}
+
+// ===== Q-mut — v1.4.15 still survives external body-class wipe =====
+// Sanity that the v1.4.14 J-scenario (external body-class wipe doesn't
+// kill the reveal) still passes — inline style on the element is what
+// keeps comments visible, not the body class.
+{
+  const body = makeBody();
+  const el = makeEl();
+  const dom = makeDOM({ "ytd-comments#comments": [el] });
+  const p = makeV1415(body, dom);
+  p.applyBlockers(true, true);
+  p.clickShowComments();
+  body._externalClassWipe();
+  assertEq("Q-mut) external body-class wipe doesn't kill inline reveal",
+    elsHaveInlineReveal(dom), true);
 }
 
 process.stdout.write("\n");

@@ -241,6 +241,18 @@
       removeCommentsRestoreButton();
       document.body.classList.remove("cf-comments-shown");
       clearCommentsManualReveal();
+      // v1.4.15 — also reset the per-page-view manual reveal state when
+      // we're not in the "comments-blocker-active-on-watch" condition.
+      // Without this, toggling the Comments blocker OFF in the popup
+      // cleared the visible reveal (via clearCommentsManualReveal above)
+      // but left STATE.commentsManuallyShown stale at true; when the user
+      // then toggled the blocker BACK ON, applyBlockers' true branch read
+      // the stale flag and re-applied the inline reveal — the comments
+      // stayed visible and the restore button stayed hidden, so the
+      // toggle-on appeared to do nothing. v1.4.13's maybeNavReset already
+      // handles the navigation path (pathname / v= change); this line
+      // handles the same-page settings-change path.
+      STATE.commentsManuallyShown = false;
     }
 
     // Autoplay blocker: when active on a watch page, auto-disable autoplay.
