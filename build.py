@@ -2,8 +2,8 @@
 """Build dist/cleanfeed-v<version>.zip from the current source tree.
 
 Includes only the files Chrome actually needs (the runtime). Excludes
-repo-only files like README.md, SUBMISSION.md, tests/, store-assets/,
-dist/, dotfiles, and the build script itself.
+repo-only files like README.md, tests/, store-assets/, dist/, dotfiles,
+and the build script itself.
 
 Validates:
 * manifest.json parses as JSON

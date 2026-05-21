@@ -315,7 +315,6 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 ## Install (Chrome Web Store)
 
 CleanFeed will be published to the Chrome Web Store after review.
-See `SUBMISSION.md` for the upload procedure.
 
 ## Controls
 
