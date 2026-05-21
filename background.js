@@ -92,21 +92,123 @@ async function _eagerlyMintApiKey(reason) {
     console.warn("[CleanFeed] eager api_key mint failed:", e);
   }
 }
+// -------- v1.4.17 — license-key support ---------------------------------
+//
+// Pro state has TWO sources from v1.4.17 onward:
+//   1. ExtPay subscription (existing path) — raw flag stored as `extpayPaid`.
+//   2. Single-use lifetime license key redeemed via the Cloudflare Worker
+//      at LICENSE_SERVER — stored as `cleanfeed_license = { active, key,
+//      key_partial, redeemed_at }`.
+//
+// The user-visible "is Pro?" check still reads ONE storage key — `paid` —
+// which is now a DERIVED value = extpayPaid || cleanfeed_license.active.
+// All reader sites (popup.js, content/content.js, options/options.js)
+// continue to read `paid` unchanged. recomputePaid() is the single writer.
+//
+// Migration: v1.4.16 users have `paid` (= ExtPay) but no `extpayPaid`.
+// On first call recomputePaid copies `paid` → `extpayPaid` so the
+// historical ExtPay state is preserved across the upgrade.
+const LICENSE_SERVER = "https://cleanfeed-license.cleanfeed.workers.dev";
+
+async function recomputePaid() {
+  const data = await chrome.storage.local.get(
+    ["paid", "extpayPaid", "cleanfeed_license"]
+  );
+  let ext = data.extpayPaid;
+  const needMigration = (typeof ext !== "boolean");
+  if (needMigration) ext = !!data.paid;        // v1.4.16 → v1.4.17 migration
+  const lic = !!(data.cleanfeed_license && data.cleanfeed_license.active);
+  const next = ext || lic;
+  const patch = {};
+  if (needMigration) patch.extpayPaid = ext;
+  if (data.paid !== next) patch.paid = next;
+  if (Object.keys(patch).length) await chrome.storage.local.set(patch);
+  // Best-effort popup notification — sendMessage with no listeners throws.
+  chrome.runtime.sendMessage({ type: "cf:paid-changed", paid: next }).catch(() => {});
+  return next;
+}
+
+// First-run UUID. Idempotent — never overwrites. Race-tolerant via a
+// re-check between get and set so two callers (e.g. background + options
+// page) can both invoke it without clobbering each other.
+async function ensureInstallId() {
+  const d = await chrome.storage.local.get(["installId"]);
+  if (typeof d.installId === "string" && d.installId.length >= 8) return d.installId;
+  let id;
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    id = crypto.randomUUID();
+  } else {
+    const a = new Uint8Array(16); crypto.getRandomValues(a);
+    id = Array.from(a).map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  // Re-check under "writer wins" semantics — if another caller wrote
+  // between our two reads, prefer theirs.
+  const d2 = await chrome.storage.local.get(["installId"]);
+  if (typeof d2.installId === "string" && d2.installId.length >= 8) return d2.installId;
+  await chrome.storage.local.set({ installId: id });
+  return id;
+}
+
+// Periodic /verify. Only POSTs when the user actually has an active
+// license. NEVER fail-closed on network errors — a paid user must not
+// lose Pro because their wifi blipped. The only state transitions that
+// flip license.active to false are explicit ok:false responses with a
+// concrete reason (revoked / wrong_install / not_found).
+async function verifyLicenseIfPresent() {
+  const d = await chrome.storage.local.get(["cleanfeed_license", "installId"]);
+  const lic = d.cleanfeed_license;
+  if (!lic || !lic.active || !lic.key) return;
+  if (!d.installId) return;
+  try {
+    const resp = await fetch(LICENSE_SERVER + "/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ key: lic.key, install_id: d.installId }),
+    });
+    if (!resp.ok) return;
+    const body = await resp.json();
+    if (body && body.ok === true) return;
+    if (body && body.ok === false && body.reason) {
+      console.warn("[CleanFeed] license invalidated by /verify:", body.reason);
+      await chrome.storage.local.set({
+        cleanfeed_license: Object.assign({}, lic, {
+          active: false,
+          deactivated_reason: body.reason,
+          deactivated_at: Date.now(),
+        }),
+      });
+      // recomputePaid runs via the storage.onChanged listener below; we
+      // also call it directly so popup/badge updates don't wait on it.
+      await recomputePaid();
+    }
+  } catch (_) {
+    // network error — silently retry next cycle
+  }
+}
+
 chrome.runtime.onInstalled.addListener((details) => {
   _eagerlyMintApiKey("install/update (" + details.reason + ")");
+  // v1.4.17 — seed install id + reconcile paid + re-verify license.
+  ensureInstallId().catch(() => {});
+  recomputePaid().catch(() => {});
+  verifyLicenseIfPresent().catch(() => {});
 });
 chrome.runtime.onStartup.addListener(() => {
   _eagerlyMintApiKey("startup");
+  // v1.4.17 — same bookkeeping at every browser launch.
+  ensureInstallId().catch(() => {});
+  recomputePaid().catch(() => {});
+  verifyLicenseIfPresent().catch(() => {});
 });
 
-// Mirror paid status to local storage for fast synchronous reads.
+// Mirror ExtPay paid status to its own storage key, then recompute the
+// derived `paid` flag. Pre-v1.4.17 this listener wrote `paid` directly.
 extpay.onPaid.addListener(async (user) => {
   await chrome.storage.local.set({
-    paid: !!user.paid,
+    extpayPaid: !!user.paid,
     paidAt: user.paidAt ? user.paidAt.toISOString() : null,
   });
-  // notify any open popup
-  chrome.runtime.sendMessage({ type: "cf:paid-changed", paid: !!user.paid }).catch(() => {});
+  await recomputePaid();
 });
 
 // -------- onboarding ----------------------------------------------------
@@ -159,6 +261,11 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       reviewPromptShown: false,     // F3 — one-time review banner gate
       perPageEnabled: false,        // F6 — opt-in per-page rules
       perPageSettings: { homepage: {}, watch: {}, subscriptions: {} },
+      // v1.4.17 — license-key support. extpayPaid mirrors the ExtPay
+      // signal explicitly so the derived `paid` flag has an unambiguous
+      // input even if the license storage entry is null/absent.
+      extpayPaid: false,
+      cleanfeed_license: null,
     };
     await chrome.storage.local.set(defaults);
     // Set the readiness flag in a SEPARATE write so popup/content can
@@ -188,8 +295,9 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   // check license on every browser launch (and on update)
   try {
     const user = await extpay.getUser();
-    await chrome.storage.local.set({ paid: !!user.paid });
+    await chrome.storage.local.set({ extpayPaid: !!user.paid });
   } catch (_) { /* offline — keep cached flag */ }
+  await recomputePaid();
   updateBadge();
 });
 
@@ -369,6 +477,14 @@ async function updateBadge() {
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
   if (changes.settings || changes.paid || changes.pausedUntil || changes.focusLock) updateBadge();
+  // v1.4.17 — license redemption (or revocation) flips an input to
+  // recomputePaid(). The listener only fires on cleanfeed_license /
+  // extpayPaid changes (NOT on the resulting `paid` change) so we don't
+  // recurse — recomputePaid writes `paid` and may write `extpayPaid`
+  // exactly once for migration; the migration write is idempotent.
+  if (changes.cleanfeed_license || changes.extpayPaid) {
+    recomputePaid().catch(() => {});
+  }
 });
 
 // -------- message routing -----------------------------------------------
@@ -590,12 +706,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   // Spec'd handler — return the full ExtPay user record.
   if (msg.type === "cf:get-user") {
-    extpay.getUser().then((user) => {
-      // mirror paid flag so cached reads stay fresh
-      chrome.storage.local.set({
-        paid: !!user.paid,
+    extpay.getUser().then(async (user) => {
+      // v1.4.17 — write extpayPaid (the raw ExtPay signal), then let
+      // recomputePaid() derive the merged `paid` flag.
+      await chrome.storage.local.set({
+        extpayPaid: !!user.paid,
         paidAt: user.paidAt ? user.paidAt.toISOString() : null,
       });
+      await recomputePaid();
       sendResponse(user);
     }).catch(() => sendResponse({ paid: false, error: "network" }));
     return true;

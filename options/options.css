@@ -8,6 +8,7 @@
   --accent:     #3cc8c8;
   --gold:       #f2cf5f;
   --warn:       #ff7a8a;
+  --ok:         #6cd585;
   --radius:     12px;
   --shadow:     0 6px 24px rgba(0,0,0,0.35);
 }
@@ -299,6 +300,31 @@ input:disabled, textarea:disabled {
   color: var(--accent);
 }
 .cf-status-warn { color: var(--warn); font-size: 12.5px; min-height: 18px; margin-top: 6px; }
+.cf-status-ok   { color: var(--ok);   font-size: 12.5px; min-height: 18px; margin-top: 6px; }
+
+/* v1.4.17 — license code panel */
+.cf-license-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 8px; flex-wrap: wrap;
+}
+.cf-license-row input[type="text"] {
+  flex: 1; min-width: 260px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13.5px; letter-spacing: 0.4px;
+  background: var(--bg-elev-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+}
+.cf-license-row input[type="text"]:focus {
+  outline: none; border-color: var(--accent);
+}
+.cf-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 0.4px;
+  color: var(--text);
+}
 
 /* ---- blocked channels list reuses .cf-whitelist styles ---- */
 

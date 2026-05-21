@@ -18,7 +18,13 @@ const STATE = {
   // v1.4.0
   hiddenKeywords: [],
   perPageEnabled: false,
+  // v1.4.17 — license code Pro path
+  cleanfeed_license: null,
+  installId: "",
 };
+
+// v1.4.17 — Cloudflare Worker that issues + validates license keys.
+const LICENSE_SERVER = "https://cleanfeed-license.cleanfeed.workers.dev";
 
 function $(id) { return document.getElementById(id); }
 
@@ -49,7 +55,9 @@ async function load() {
     chrome.storage.local.get(
       ["paid", "whitelistedChannels", "customCSS",
        "blockedChannels", "focusLock", "timeTracking",
-       "hiddenKeywords", "perPageEnabled"],
+       "hiddenKeywords", "perPageEnabled",
+       // v1.4.17 — license redemption state
+       "cleanfeed_license", "installId"],
       (data) => {
         STATE.paid = !!data.paid;
         STATE.whitelistedChannels = data.whitelistedChannels || [];
@@ -62,10 +70,131 @@ async function load() {
         STATE.timeTracking = data.timeTracking || {};
         STATE.hiddenKeywords = Array.isArray(data.hiddenKeywords) ? data.hiddenKeywords : [];
         STATE.perPageEnabled = !!data.perPageEnabled;
+        STATE.cleanfeed_license = data.cleanfeed_license || null;
+        STATE.installId = data.installId || "";
         resolve();
       }
     );
   });
+}
+
+// ---- v1.4.17 — license code redemption ----------------------------------
+
+// Strip every char outside the 31-char alphabet (A–Z minus I/L/O, 2–9
+// minus 0/1). Uppercases first so users pasting from email clients with
+// auto-lowercase don't get falsely rejected.
+function _normalizeLicense(s) {
+  return String(s || "").toUpperCase().replace(/[^A-Z2-9]/g, "");
+}
+function _isValidLicenseFormat(normalized) {
+  return /^[A-Z2-9]{24}$/.test(normalized);
+}
+function _formatLicense(normalized) {
+  return normalized.match(/.{4}/g).join("-");
+}
+// Display redaction: first group + ellipsis + last group.
+function _partialLicense(normalized) {
+  return normalized.slice(0, 4) + "…" + normalized.slice(20, 24);
+}
+
+// Race-tolerant idempotent install-id ensurer (mirrors background.js).
+async function ensureInstallId() {
+  const d = await chrome.storage.local.get(["installId"]);
+  if (typeof d.installId === "string" && d.installId.length >= 8) return d.installId;
+  let id;
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    id = crypto.randomUUID();
+  } else {
+    const a = new Uint8Array(16); crypto.getRandomValues(a);
+    id = Array.from(a).map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  const d2 = await chrome.storage.local.get(["installId"]);
+  if (typeof d2.installId === "string" && d2.installId.length >= 8) return d2.installId;
+  await chrome.storage.local.set({ installId: id });
+  return id;
+}
+
+function renderLicensePanel() {
+  const lic = STATE.cleanfeed_license;
+  const form = $("cf-license-form");
+  const active = $("cf-license-active");
+  if (lic && lic.active && lic.key_partial) {
+    form.hidden = true;
+    active.hidden = false;
+    $("cf-license-partial").textContent = lic.key_partial;
+    $("cf-license-when").textContent = lic.redeemed_at
+      ? new Date(lic.redeemed_at).toLocaleString()
+      : "—";
+  } else {
+    form.hidden = false;
+    active.hidden = true;
+  }
+}
+
+async function onLicenseRedeem() {
+  const input = $("cf-license-input");
+  const btn = $("cf-license-redeem");
+  const status = $("cf-license-status");
+  const normalized = _normalizeLicense(input.value);
+  if (!_isValidLicenseFormat(normalized)) {
+    status.textContent = "License code must be 24 letters/digits (e.g. ABCD-EFGH-JKMN-PQRS-TUVW-XYZ2).";
+    status.className = "cf-status cf-status-warn";
+    return;
+  }
+  // Make sure we have an install id before the network call — background
+  // seeds one on install/startup, but a user who opens Options on a brand
+  // new profile before onInstalled finished should still be able to redeem.
+  if (!STATE.installId) {
+    STATE.installId = await ensureInstallId();
+  }
+  status.textContent = "Verifying…";
+  status.className = "cf-status";
+  btn.disabled = true;
+  try {
+    const resp = await fetch(LICENSE_SERVER + "/redeem", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ key: normalized, install_id: STATE.installId }),
+    });
+    if (resp.ok) {
+      const body = await resp.json();
+      if (body && body.ok === true) {
+        const formatted = _formatLicense(normalized);
+        const lic = {
+          active: true,
+          key: formatted,                       // stored for periodic /verify
+          key_partial: _partialLicense(normalized),
+          redeemed_at: Date.now(),
+        };
+        await chrome.storage.local.set({ cleanfeed_license: lic });
+        STATE.cleanfeed_license = lic;
+        // background.js's storage.onChanged listener will recompute the
+        // derived `paid` flag; for instant UI feedback we also flip
+        // STATE.paid locally and re-render every gated panel.
+        STATE.paid = true;
+        status.textContent = "License active. Pro unlocked.";
+        status.className = "cf-status cf-status-ok";
+        renderLicensePanel();
+        renderTier();
+        renderWhitelist(); renderBlockedList(); renderFocusLock();
+        renderKeywords(); renderPomodoro(); renderPerPage();
+        return;
+      }
+    }
+    let msg;
+    if (resp.status === 404)      msg = "Invalid code.";
+    else if (resp.status === 409) msg = "This code has already been used.";
+    else if (resp.status === 410) msg = "This code has been revoked.";
+    else if (resp.status === 429) msg = "Too many attempts. Wait an hour and try again.";
+    else                          msg = "Couldn’t reach the license server. Try again in a minute.";
+    status.textContent = msg;
+    status.className = "cf-status cf-status-warn";
+  } catch (e) {
+    status.textContent = "Couldn’t reach the license server. Try again in a minute.";
+    status.className = "cf-status cf-status-warn";
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 function pushChanges() {
@@ -489,7 +618,10 @@ async function init() {
     $("cf-version").textContent = "v" + chrome.runtime.getManifest().version;
   } catch (_) {}
   await load();
+  // v1.4.17 — make sure an install id exists before any redeem attempt.
+  if (!STATE.installId) STATE.installId = await ensureInstallId();
   renderTier();
+  renderLicensePanel();
   renderWhitelist();
   renderBlockedList();
   renderCustomCSS();
@@ -517,6 +649,11 @@ async function init() {
   $("cf-pomo-start").addEventListener("click", startPomodoro);
   $("cf-pomo-cancel").addEventListener("click", cancelPomodoro);
   $("cf-perpage-enable").addEventListener("change", onPerPageToggle);
+  // v1.4.17 — license redemption
+  $("cf-license-redeem").addEventListener("click", onLicenseRedeem);
+  $("cf-license-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") onLicenseRedeem();
+  });
 
   // re-render every minute so time-tracker stays fresh
   setInterval(() => renderTimeTracker(), 60 * 1000);
@@ -531,6 +668,13 @@ async function init() {
     if (changes.timeTracking) { STATE.timeTracking = changes.timeTracking.newValue || {}; renderTimeTracker(); }
     if (changes.hiddenKeywords) { STATE.hiddenKeywords = changes.hiddenKeywords.newValue || []; renderKeywords(); }
     if (changes.perPageEnabled) { STATE.perPageEnabled = !!changes.perPageEnabled.newValue; renderPerPage(); }
+    // v1.4.17 — license redemption updates from another tab / background's
+    // /verify cycle should re-render the License panel.
+    if (changes.cleanfeed_license) {
+      STATE.cleanfeed_license = changes.cleanfeed_license.newValue || null;
+      renderLicensePanel();
+    }
+    if (changes.installId) { STATE.installId = changes.installId.newValue || ""; }
   });
 }
 

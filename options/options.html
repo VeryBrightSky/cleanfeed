@@ -17,6 +17,27 @@
       <span class="cf-tier" id="cf-tier-badge">FREE</span>
     </header>
 
+    <!-- v1.4.17 — License code redemption (placed near the top so users see
+         it first; the rest of the panels keep their existing order). -->
+    <section class="cf-panel" id="cf-license-panel">
+      <h2>License code</h2>
+      <div id="cf-license-form">
+        <p class="cf-help">Have a license code? Paste it here to unlock Pro.</p>
+        <div class="cf-license-row">
+          <input id="cf-license-input" type="text" maxlength="64"
+            placeholder="ABCD-EFGH-JKMN-PQRS-TUVW-XYZ2"
+            autocomplete="off" spellcheck="false" />
+          <button id="cf-license-redeem" class="cf-btn cf-btn-primary" type="button">Redeem</button>
+        </div>
+        <p id="cf-license-status" class="cf-status" aria-live="polite"></p>
+      </div>
+      <div id="cf-license-active" hidden>
+        <p class="cf-status cf-status-ok">License active. Pro unlocked.</p>
+        <p class="cf-help">License key: <span id="cf-license-partial" class="cf-mono"></span></p>
+        <p class="cf-help">Redeemed: <span id="cf-license-when"></span></p>
+      </div>
+    </section>
+
     <!-- Today / week time tracker (FREE) -->
     <section class="cf-panel cf-time-panel">
       <h2>Time on YouTube</h2>
