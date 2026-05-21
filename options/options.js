@@ -92,9 +92,25 @@ function _isValidLicenseFormat(normalized) {
 function _formatLicense(normalized) {
   return normalized.match(/.{4}/g).join("-");
 }
-// Display redaction: first group + ellipsis + last group.
+// v1.4.18 — display redaction shows the full 6-group canonical layout
+// with the middle four groups masked as XXXX. Visually identical to a
+// real key, just with everything past the first 4 chars and before the
+// last 4 chars hidden.
 function _partialLicense(normalized) {
-  return normalized.slice(0, 4) + "…" + normalized.slice(20, 24);
+  return normalized.slice(0, 4) + "-XXXX-XXXX-XXXX-XXXX-" + normalized.slice(20, 24);
+}
+
+// Single source of truth for the rendered partial. Always prefer
+// deriving from the full key (which we already store for /verify), so
+// the displayed format is decoupled from whatever's persisted in
+// key_partial. Falls back to whatever's in key_partial if the full key
+// is missing (defensive — shouldn't happen for v1.4.17+ redemptions).
+function _displayPartial(lic) {
+  if (lic && typeof lic.key === "string") {
+    const norm = _normalizeLicense(lic.key);
+    if (norm.length === 24) return _partialLicense(norm);
+  }
+  return (lic && lic.key_partial) || "";
 }
 
 // Race-tolerant idempotent install-id ensurer (mirrors background.js).
@@ -118,13 +134,23 @@ function renderLicensePanel() {
   const lic = STATE.cleanfeed_license;
   const form = $("cf-license-form");
   const active = $("cf-license-active");
-  if (lic && lic.active && lic.key_partial) {
+  if (lic && lic.active && (lic.key || lic.key_partial)) {
     form.hidden = true;
     active.hidden = false;
-    $("cf-license-partial").textContent = lic.key_partial;
+    const display = _displayPartial(lic);
+    $("cf-license-partial").textContent = display;
     $("cf-license-when").textContent = lic.redeemed_at
       ? new Date(lic.redeemed_at).toLocaleString()
       : "—";
+    // v1.4.18 — silently migrate the stored key_partial to the new
+    // 6-group masked format. v1.4.17 wrote the ellipsis form ("ABCD…XYZ2");
+    // we re-write it on first render so the storage value matches what
+    // we now display. Display-only change — no security implication.
+    if (display && lic.key_partial !== display) {
+      const updated = Object.assign({}, lic, { key_partial: display });
+      STATE.cleanfeed_license = updated;
+      chrome.storage.local.set({ cleanfeed_license: updated });
+    }
   } else {
     form.hidden = false;
     active.hidden = true;

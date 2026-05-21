@@ -41,6 +41,19 @@ function isValidLicenseFormat(normalized) {
 function formatLicense(normalized) {
   return normalized.match(/.{4}/g).join("-");
 }
+// v1.4.18 — partial-display redaction (production helper in options.js).
+function partialLicense(normalized) {
+  return normalized.slice(0, 4) + "-XXXX-XXXX-XXXX-XXXX-" + normalized.slice(20, 24);
+}
+// Render-time derivation: prefer the full key; fall back to whatever
+// key_partial holds.
+function displayPartial(lic) {
+  if (lic && typeof lic.key === "string") {
+    const norm = normalizeLicense(lic.key);
+    if (norm.length === 24) return partialLicense(norm);
+  }
+  return (lic && lic.key_partial) || "";
+}
 // background.js recomputePaid pseudo: derived `paid` from inputs.
 function computePaid(extpayPaid, license) {
   return !!extpayPaid || !!(license && license.active);
@@ -123,6 +136,60 @@ assertEq("format: empty -> invalid", isValidLicenseFormat(""), false);
 
 assertEq("format(canonical) -> dashed groups of 4",
   formatLicense(CANON), CANON_DASHED);
+
+// ===== 3b. v1.4.18 partial-display redaction ===========================
+//
+// New format mirrors the full canonical layout (6 groups of 4 separated
+// by dashes) but masks the middle four groups as XXXX. Identical char
+// count to a real key — visually distinguishable only by the mask.
+
+assertEq("partial: canonical -> first4-XXXX-XXXX-XXXX-XXXX-last4",
+  partialLicense(CANON),
+  "ABCD-XXXX-XXXX-XXXX-XXXX-XYZ2");
+assertEq("partial: length matches full key length (29 chars incl. dashes)",
+  partialLicense(CANON).length, 29);
+assertEq("partial: middle 4 groups are exactly XXXX",
+  /^[A-Z2-9]{4}-XXXX-XXXX-XXXX-XXXX-[A-Z2-9]{4}$/.test(partialLicense(CANON)), true);
+
+// 3c. v1.4.18 render-time derivation prefers full key over stored partial.
+//     v1.4.17 stored key_partial in the old ellipsis form "ABCD…XYZ2";
+//     v1.4.18 always re-derives the display from lic.key, so the legacy
+//     storage value is irrelevant for what the user sees.
+{
+  const v1417_legacy_lic = {
+    active: true,
+    key: "ABCD-EFGH-JKMN-PQRS-TUVW-XYZ2",
+    key_partial: "ABCD…XYZ2",          // legacy ellipsis form
+    redeemed_at: 1700000000000,
+  };
+  assertEq("display: v1.4.17 legacy storage -> new 6-group masked display",
+    displayPartial(v1417_legacy_lic),
+    "ABCD-XXXX-XXXX-XXXX-XXXX-XYZ2");
+}
+{
+  const v1418_fresh_lic = {
+    active: true,
+    key: "Z2JQ-EFGH-JKMN-PQRS-TUVW-Y9N2",
+    key_partial: "Z2JQ-XXXX-XXXX-XXXX-XXXX-Y9N2",
+    redeemed_at: 1700000000000,
+  };
+  assertEq("display: v1.4.18 fresh redemption -> idempotent",
+    displayPartial(v1418_fresh_lic),
+    "Z2JQ-XXXX-XXXX-XXXX-XXXX-Y9N2");
+}
+{
+  // Defensive: missing full key, only key_partial available. Return
+  // whatever's there — best-effort, no crash.
+  const stub = { active: true, key_partial: "WEIRDFORMATXYZ", redeemed_at: 1 };
+  assertEq("display: missing key falls back to stored key_partial",
+    displayPartial(stub), "WEIRDFORMATXYZ");
+}
+{
+  // Edge case: lic is null (no license set yet) — return empty string,
+  // never crash the render.
+  assertEq("display: null lic -> empty string",
+    displayPartial(null), "");
+}
 
 // ===== 4. Pro OR logic =================================================
 
