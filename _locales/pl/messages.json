@@ -1,4 +1,25 @@
 {
   "extName": { "message": "CleanFeed – Blokuj YouTube Shorts, kanał i rekomendacje | Focus Lock" },
-  "extDescription": { "message": "Blokuj YouTube Shorts, ukryj kanał główny, rekomendacje i komentarze. YouTube bez rozpraszaczy, Focus Lock + Pomodoro." }
+  "extDescription": { "message": "Blokuj YouTube Shorts, ukryj kanał główny, rekomendacje i komentarze. YouTube bez rozpraszaczy, Focus Lock + Pomodoro." },
+
+  "ytMusicPausedTitle":  { "message": "CleanFeed jest wstrzymany w YouTube Music" },
+  "ytMusicPausedDesc":   { "message": "Tu nie stosujemy blokad, plakietek ani śledzenia czasu – to aplikacja muzyczna, nie kanał." },
+
+  "redirectHomeLabel":   { "message": "Otwieraj YouTube na Subskrypcjach" },
+  "redirectHomeDesc":    { "message": "Automatycznie przekierowuje youtube.com na /feed/subscriptions. Nie wpływa na /watch, /results, /shorts itd." },
+
+  "modeHide":            { "message": "Ukryj" },
+  "modeBlur":            { "message": "Rozmyj" },
+  "modeDim":             { "message": "Przyciemnij" },
+
+  "blockerSubsMostRelevantLabel": { "message": "Ukryj sugestie „Najtrafniejsze”" },
+  "blockerSubsMostRelevantDesc":  { "message": "Na /feed/subscriptions usuwa algorytmiczną wstawkę „Most Relevant”" },
+  "blockerSubsMembersOnlyLabel":  { "message": "Ukryj filmy tylko dla członków" },
+  "blockerSubsMembersOnlyDesc":   { "message": "Ukrywa filmy z subskrypcji z plakietką „tylko dla członków”" },
+  "blockerSubsWatchedLabel":      { "message": "Ukryj już obejrzane (postęp > 95 %)" },
+  "blockerSubsWatchedDesc":       { "message": "Na /feed/subscriptions ukrywa filmy, których pasek postępu przekracza 95 %" },
+
+  "upsellTitle":         { "message": "Odblokuj wszystkie 17 blokad + Focus Lock" },
+  "upsellBody":          { "message": "Pro odblokowuje 17 blokad, blokowanie po słowach kluczowych, Pomodoro Focus Lock, reguły per strona, białą/czarną listę kanałów i własny CSS. Jednorazowa opłata." },
+  "upsellAllBlockers":   { "message": "Wszystkie 17 blokad — pasek boczny, komentarze, miniatury, miksy i więcej" }
 }

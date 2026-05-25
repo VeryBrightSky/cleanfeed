@@ -1,4 +1,25 @@
 {
   "extName": { "message": "CleanFeed – Bloquea YouTube Shorts, Feed y Recomendaciones | Focus Lock" },
-  "extDescription": { "message": "Bloquea YouTube Shorts, oculta el feed de inicio, recomendaciones y comentarios. YouTube sin distracciones, Focus Lock + Pomodoro." }
+  "extDescription": { "message": "Bloquea YouTube Shorts, oculta el feed de inicio, recomendaciones y comentarios. YouTube sin distracciones, Focus Lock + Pomodoro." },
+
+  "ytMusicPausedTitle":  { "message": "CleanFeed está en pausa en YouTube Music" },
+  "ytMusicPausedDesc":   { "message": "Aquí no aplicamos bloqueadores, insignias ni seguimiento de tiempo: es una app de música, no un feed." },
+
+  "redirectHomeLabel":   { "message": "Abrir YouTube en Suscripciones" },
+  "redirectHomeDesc":    { "message": "Redirige automáticamente youtube.com a /feed/subscriptions. No toca /watch, /results, /shorts, etc." },
+
+  "modeHide":            { "message": "Ocultar" },
+  "modeBlur":            { "message": "Desenfocar" },
+  "modeDim":             { "message": "Atenuar" },
+
+  "blockerSubsMostRelevantLabel": { "message": "Ocultar sugerencias «Más relevantes»" },
+  "blockerSubsMostRelevantDesc":  { "message": "En /feed/subscriptions, quita la inserción algorítmica «Más relevantes»" },
+  "blockerSubsMembersOnlyLabel":  { "message": "Ocultar vídeos solo para miembros" },
+  "blockerSubsMembersOnlyDesc":   { "message": "Oculta vídeos de suscripciones con la insignia «solo miembros»" },
+  "blockerSubsWatchedLabel":      { "message": "Ocultar ya visto (progreso > 95 %)" },
+  "blockerSubsWatchedDesc":       { "message": "En /feed/subscriptions, oculta vídeos cuya barra de progreso supera el 95 %" },
+
+  "upsellTitle":         { "message": "Desbloquea los 17 bloqueadores + Focus Lock" },
+  "upsellBody":          { "message": "Pro desbloquea los 17 bloqueadores, bloqueo por palabras clave, Pomodoro Focus Lock, reglas por página, lista blanca/negra de canales y CSS personalizado. Pago único." },
+  "upsellAllBlockers":   { "message": "Los 17 bloqueadores: barra lateral, comentarios, miniaturas, mixes, etc." }
 }

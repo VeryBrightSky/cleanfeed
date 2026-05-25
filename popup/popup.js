@@ -42,6 +42,10 @@ const BLOCKERS = [
   { id: "merch-shelf",   label: "Merch shelf",              desc: "Hides merchandise shelves under videos",            tier: "free" },
   { id: "breaking-news", label: "Breaking news",            desc: "Hides the breaking-news shelf at the top of home",  tier: "free" },
   { id: "mixes-playlists", label: "Mixes & playlists",     desc: "Hides 'Mix' radios and algorithmic playlist suggestions", tier: "pro" },
+  // v1.4.19 — three new Pro blockers for the Subscriptions feed.
+  { id: "subs-most-relevant", label: "Hide 'Most Relevant' suggestions", desc: "On /feed/subscriptions, removes the algorithmic 'Most Relevant' insertion", tier: "pro" },
+  { id: "subs-members-only",  label: "Hide members-only videos",         desc: "Hides subscription videos with a 'members only' badge",                    tier: "pro" },
+  { id: "subs-watched",       label: "Hide already-watched (>95%)",      desc: "On /feed/subscriptions, hides videos whose progress bar is past 95%",      tier: "pro" },
 ];
 const FREE_LIMIT = 2;
 const HOLD_DURATION_MS = 60 * 1000;
@@ -73,6 +77,14 @@ const STATE = {
   // (togglePause, _startHold) guard on this so a click before storage loads
   // is a safe no-op instead of acting on the empty initial STATE.
   loaded: false,
+  // v1.4.19 — per-blocker render mode override. Read from chrome.storage.local
+  // (settings.blockerModes) at loadState; missing entries fall back to "hide".
+  blockerModes: {},
+  // v1.4.19 F2 — homepage → subscriptions redirect toggle (default OFF).
+  redirectHomeToSubs: false,
+  // v1.4.19 F1 — true when the active tab is on music.youtube.com. The popup
+  // collapses to the YT Music explainer + hides the toggle grid.
+  onYouTubeMusic: false,
 };
 const PAGE_TABS = [
   { key: "everywhere",     label: "Everywhere" },
@@ -172,7 +184,9 @@ function loadState() {
       ["settings", "paid", "whitelistedChannels", "customCSS", "sessionStats",
        "pausedUntil", "focusLock", "timeTracking",
        "onboardingComplete", "usageCount", "reviewPromptShown",
-       "perPageEnabled", "perPageSettings"],
+       "perPageEnabled", "perPageSettings",
+       // v1.4.19
+       "blockerModes", "redirectHomeToSubs"],
       (data) => {
         STATE.paid = !!data.paid;
         STATE.settings = data.settings || {};
@@ -190,9 +204,36 @@ function loadState() {
         STATE.reviewPromptShown = !!data.reviewPromptShown;
         STATE.perPageEnabled = !!data.perPageEnabled;
         STATE.perPageSettings = data.perPageSettings || { homepage: {}, watch: {}, subscriptions: {} };
+        STATE.blockerModes = (data.blockerModes && typeof data.blockerModes === "object") ? data.blockerModes : {};
+        STATE.redirectHomeToSubs = !!data.redirectHomeToSubs;
         resolve();
       }
     );
+  });
+}
+
+// v1.4.19 F1 — detect active-tab host for the YT Music smart-exemption.
+// Resolves a boolean even when chrome.tabs.query fails (popup opened on
+// non-tab contexts, permissions blip, etc.) — default false (normal popup).
+function detectActiveYouTubeMusicTab() {
+  return new Promise((resolve) => {
+    try {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (chrome.runtime.lastError || !tabs || !tabs.length) {
+          resolve(false);
+          return;
+        }
+        const url = tabs[0].url || "";
+        // host-match: bare music.youtube.com or any sub of it
+        try {
+          const u = new URL(url);
+          const h = u.hostname || "";
+          resolve(h === "music.youtube.com" || /(^|\.)music\.youtube\.com$/.test(h));
+        } catch (_) {
+          resolve(false);
+        }
+      });
+    } catch (_) { resolve(false); }
   });
 }
 
@@ -570,6 +611,12 @@ function renderBlockers() {
   const activeFree = countActiveFreeBlockers();
   const onEverywhere = STATE.activeTab === "everywhere";
 
+  // v1.4.19 F2 — Homepage → Subscriptions redirect row (free, default off).
+  // Only on the "Everywhere" tab to avoid cluttering per-page views.
+  if (onEverywhere) {
+    container.appendChild(renderHomeRedirectRow());
+  }
+
   for (const b of BLOCKERS) {
     const locked = b.tier === "pro" && !STATE.paid;
     const checked = !!STATE.settings[b.id] && !locked;
@@ -591,6 +638,12 @@ function renderBlockers() {
     row.appendChild(text);
 
     if (onEverywhere) {
+      // v1.4.19 F3 — per-blocker render-mode dropdown (Hide / Blur / Dim).
+      // Autoplay has no DOM target (it's a JS handler), so the dropdown is
+      // hidden for that one — Hide is the only meaningful mode.
+      if (b.id !== "autoplay") {
+        row.appendChild(renderModeDropdown(b, locked));
+      }
       // Standard on/off toggle (the existing v1.4.0 behaviour).
       const sw = el("label", {
         class: "cf-switch",
@@ -624,6 +677,80 @@ function renderBlockers() {
     }
     container.appendChild(row);
   }
+}
+
+// ---- v1.4.19 F3 — per-blocker render-mode dropdown (Hide / Blur / Dim) ----
+function _effectiveModeFor(id) {
+  const m = STATE.blockerModes && STATE.blockerModes[id];
+  return (m === "blur" || m === "dim") ? m : "hide";
+}
+
+function renderModeDropdown(blocker, locked) {
+  const sel = document.createElement("select");
+  sel.className = "cf-mode-select";
+  sel.id = "mode-" + blocker.id;
+  sel.disabled = !!locked;
+  sel.title = "How to hide this — fully (Hide), blurred (Blur), or dimmed (Dim).";
+  const cur = _effectiveModeFor(blocker.id);
+  for (const opt of [
+    { v: "hide", label: "Hide" },
+    { v: "blur", label: "Blur" },
+    { v: "dim",  label: "Dim"  },
+  ]) {
+    const o = document.createElement("option");
+    o.value = opt.v;
+    o.textContent = opt.label;
+    if (opt.v === cur) o.selected = true;
+    sel.appendChild(o);
+  }
+  sel.addEventListener("change", async () => {
+    await _writeBlockerMode(blocker.id, sel.value);
+  });
+  // Don't propagate clicks on the locked row to the upsell modal —
+  // the select is a no-op when disabled, and the visual feedback is enough.
+  sel.addEventListener("click", (e) => { e.stopPropagation(); });
+  return sel;
+}
+
+async function _writeBlockerMode(id, mode) {
+  const next = Object.assign({}, STATE.blockerModes || {});
+  if (mode === "hide") {
+    // Default — don't persist; missing entries are treated as "hide" by
+    // _effectiveModeFor in content.js. Keeps the storage object small.
+    delete next[id];
+  } else {
+    next[id] = mode;
+  }
+  STATE.blockerModes = next;
+  await chrome.storage.local.set({ blockerModes: next });
+  pushSettingsToTabs();
+}
+
+// ---- v1.4.19 F2 — homepage → subscriptions redirect row ----
+function renderHomeRedirectRow() {
+  const row = el("div", { class: "cf-row" });
+  const text = el("div", { class: "cf-row-text" });
+  text.appendChild(el("div", { class: "cf-row-label" }, "Open YouTube on Subscriptions"));
+  text.appendChild(el("div", { class: "cf-row-desc" },
+    "Auto-redirect youtube.com to /feed/subscriptions. Doesn't touch /watch, /results, /shorts, etc."));
+  row.appendChild(text);
+
+  const sw = el("label", { class: "cf-switch" });
+  const input = el("input", {
+    type: "checkbox",
+    id: "tg-redirect-home-to-subs",
+    checked: !!STATE.redirectHomeToSubs,
+  });
+  input.addEventListener("change", async () => {
+    STATE.redirectHomeToSubs = !!input.checked;
+    await chrome.storage.local.set({ redirectHomeToSubs: STATE.redirectHomeToSubs });
+    // Push to active YT tabs so they react without a reload.
+    pushSettingsToTabs();
+  });
+  sw.appendChild(input);
+  sw.appendChild(el("span", { class: "cf-slider" }));
+  row.appendChild(sw);
+  return row;
 }
 
 // ---- v1.4.1 per-page tab bar + 3-state segments ----
@@ -939,6 +1066,15 @@ async function init() {
   await waitForInitialized();
   await loadState();
 
+  // v1.4.19 F1 — YouTube Music smart-exemption: if the active tab is on
+  // music.youtube.com, the popup short-circuits to a "paused on YT Music"
+  // panel and skips the toggle grid + upgrade card entirely.
+  STATE.onYouTubeMusic = await detectActiveYouTubeMusicTab();
+  if (STATE.onYouTubeMusic) {
+    renderYouTubeMusicPause();
+    return;
+  }
+
   // v1.4.0 F3 — bump usage counter for review-prompt gating.
   // v1.4.2 — remember the pre-increment count so we can suppress the
   // banner on the first-ever popup open even if some other code path
@@ -1039,6 +1175,45 @@ async function init() {
       }
     }
   });
+}
+
+// ---------- v1.4.19 F1 — YouTube Music exemption panel ----------
+// When the active tab is on music.youtube.com, hide every CleanFeed control
+// (toggles, pause, stats, upgrade, focus banner, time mini) and show a
+// brief explainer line. CleanFeed's content script also no-ops on this
+// host, so there is nothing on the page to configure from here.
+function renderYouTubeMusicPause() {
+  document.querySelectorAll(
+    ".cf-stats, .cf-time-mini, .cf-pause-bar, .cf-blockers, .cf-upgrade, .cf-focus-banner"
+  ).forEach((el) => { el.style.display = "none"; });
+
+  // Remove any previous panel (popup is destroyed on close — defensive).
+  const old = document.getElementById("cf-ytmusic-pause");
+  if (old) old.remove();
+  const host = document.createElement("section");
+  host.id = "cf-ytmusic-pause";
+  host.className = "cf-ytmusic-pause";
+
+  const icon = document.createElement("div");
+  icon.className = "cf-ytmusic-icon";
+  icon.textContent = "🎵";
+  icon.setAttribute("aria-hidden", "true");
+  host.appendChild(icon);
+
+  const h = document.createElement("h2");
+  h.textContent = "CleanFeed is paused on YouTube Music";
+  host.appendChild(h);
+
+  const p = document.createElement("p");
+  p.textContent = "We don't apply blockers, badges, or time tracking here — it's a music app, not a feed.";
+  host.appendChild(p);
+
+  const header = document.querySelector(".cf-header");
+  if (header && header.parentNode) {
+    header.parentNode.insertBefore(host, header.nextSibling);
+  } else {
+    document.body.appendChild(host);
+  }
 }
 
 // ---------- v1.4.0 F2 — onboarding view ----------

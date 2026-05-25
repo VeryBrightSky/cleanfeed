@@ -1,4 +1,25 @@
 {
-  "extName": { "message": "CleanFeed — YouTubeの気が散る要素を非表示 | 14個のブロッカー、フォーカスロック、ポモドーロ" },
-  "extDescription": { "message": "YouTubeのホームフィード、ショート、おすすめ、コメントを非表示。14個のブロッカー＋ポモドーロ。" }
+  "extName": { "message": "CleanFeed — YouTubeの気が散る要素を非表示 | 17個のブロッカー、フォーカスロック、ポモドーロ" },
+  "extDescription": { "message": "YouTubeのホームフィード、ショート、おすすめ、コメントを非表示。17個のブロッカー＋ポモドーロ。" },
+
+  "ytMusicPausedTitle":  { "message": "CleanFeed is paused on YouTube Music" },
+  "ytMusicPausedDesc":   { "message": "We don't apply blockers, badges, or time tracking here — it's a music app, not a feed." },
+
+  "redirectHomeLabel":   { "message": "Open YouTube on Subscriptions" },
+  "redirectHomeDesc":    { "message": "Auto-redirect youtube.com to /feed/subscriptions. Doesn't touch /watch, /results, /shorts, etc." },
+
+  "modeHide":            { "message": "Hide" },
+  "modeBlur":            { "message": "Blur" },
+  "modeDim":             { "message": "Dim" },
+
+  "blockerSubsMostRelevantLabel": { "message": "Hide 'Most Relevant' suggestions" },
+  "blockerSubsMostRelevantDesc":  { "message": "On /feed/subscriptions, removes the algorithmic 'Most Relevant' insertion" },
+  "blockerSubsMembersOnlyLabel":  { "message": "Hide members-only videos" },
+  "blockerSubsMembersOnlyDesc":   { "message": "Hides subscription videos with a 'members only' badge" },
+  "blockerSubsWatchedLabel":      { "message": "Hide already-watched (progress > 95%)" },
+  "blockerSubsWatchedDesc":       { "message": "On /feed/subscriptions, hides videos whose progress bar is past 95%" },
+
+  "upsellTitle":         { "message": "Unlock all 17 blockers + Focus Lock" },
+  "upsellBody":          { "message": "Pro unlocks all 17 blockers, keyword blocking, Pomodoro Focus Lock, per-page rules, channel whitelist + blocklist, and custom CSS. One-time payment." },
+  "upsellAllBlockers":   { "message": "All 17 blockers — sidebar, comments, thumbnails, mixes, more" }
 }

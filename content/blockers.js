@@ -236,6 +236,45 @@
         "ytd-compact-radio-renderer",
       ],
     },
+    // v1.4.19 — three new Pro blockers for the Subscriptions feed.
+    {
+      id: "subs-most-relevant",
+      label: "Hide 'Most Relevant' suggestions",
+      description: "On /feed/subscriptions, removes the algorithmic 'Most Relevant' insertion",
+      tier: "pro",
+      pages: ["subscriptions"],
+      selectors: [
+        'ytd-browse[page-subtype="subscriptions"] ytd-rich-section-renderer:has(yt-formatted-string[title="Most Relevant"])',
+        'ytd-browse[page-subtype="subscriptions"] ytd-rich-section-renderer:has(yt-formatted-string[title="For you"])',
+        'ytd-browse[page-subtype="subscriptions"] ytd-rich-shelf-renderer:has(yt-formatted-string[title="Most Relevant"])',
+        'ytd-browse[page-subtype="subscriptions"] ytd-rich-shelf-renderer:has(yt-formatted-string[title="For you"])',
+      ],
+    },
+    {
+      id: "subs-members-only",
+      label: "Hide members-only videos",
+      description: "Hides subscription videos with a 'members only' badge",
+      tier: "pro",
+      pages: ["anywhere"],
+      selectors: [
+        'ytd-rich-item-renderer:has(ytd-badge-supported-renderer[aria-label="Members only"])',
+        'ytd-rich-item-renderer:has([aria-label*="Members only"])',
+      ],
+    },
+    {
+      id: "subs-watched",
+      label: "Hide already-watched (progress > 95%)",
+      description: "On /feed/subscriptions, hides videos whose progress bar is past 95%",
+      tier: "pro",
+      pages: ["subscriptions"],
+      // Selectors are no-ops at the CSS layer — JS sweep (applyWatchedSweep
+      // in content.js) tags qualifying cards with data-cf-watched="1" so the
+      // CSS rule body.cf-block-subs-watched [data-cf-watched="1"] hides them.
+      selectors: [
+        'ytd-browse[page-subtype="subscriptions"] ytd-rich-item-renderer[data-cf-watched="1"]',
+      ],
+      jsHandler: "subs-watched",
+    },
   ];
 
   // Free tier allows up to N blockers active simultaneously.

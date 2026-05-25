@@ -87,6 +87,8 @@ function simulateOnInstalledV146(storage) {
       "autoplay": false, "thumbnails": false, "subs-algo": false,
       "playables": false, "merch-shelf": false,
       "breaking-news": false, "mixes-playlists": false,
+      // v1.4.19 — three new Pro blockers seeded OFF.
+      "subs-most-relevant": false, "subs-members-only": false, "subs-watched": false,
     },
     paid: false,
     whitelistedChannels: [],
@@ -214,7 +216,7 @@ function userPicksPreset(storage) {
     // Allow any trailing storage.onChanged callbacks to fire
     await new Promise((r) => setTimeout(r, 5));
     assertTrue("A) popup is loaded",            popup.STATE.loaded === true);
-    assertEq ("A) settings populated",          Object.keys(popup.STATE.settings).length, 14);
+    assertEq ("A) settings populated (v1.4.19 = 17)", Object.keys(popup.STATE.settings).length, 17);
     assertEq ("A) view is NOT dead/blank",      popup.STATE.view !== "none", true);
     // After waitForInitialized, cf_initialized has landed and so has
     // onboardingComplete:false. Popup correctly shows onboarding view

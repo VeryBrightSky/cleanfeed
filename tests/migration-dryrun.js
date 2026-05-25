@@ -14,6 +14,10 @@ const NEW_BLOCKER_DEFAULTS = {
   "merch-shelf": false,
   "breaking-news": false,
   "mixes-playlists": false,
+  // v1.4.19 — three new Pro blockers for the Subscriptions feed.
+  "subs-most-relevant": false,
+  "subs-members-only": false,
+  "subs-watched": false,
 };
 
 // Mirror of background.js _migrateForV140 — pure function form.
@@ -33,6 +37,12 @@ function migrate(initialStorage) {
   if (typeof data.perPageEnabled === "undefined")      patch.perPageEnabled = false;
   if (typeof data.perPageSettings === "undefined") {
     patch.perPageSettings = { homepage: {}, watch: {}, subscriptions: {} };
+  }
+  // v1.4.19 — homepage→subs redirect + per-blocker render modes.
+  if (typeof data.redirectHomeToSubs === "undefined") patch.redirectHomeToSubs = false;
+  if (typeof data.blockerModes === "undefined" || data.blockerModes === null ||
+      typeof data.blockerModes !== "object") {
+    patch.blockerModes = {};
   }
   const fl = Object.assign({}, data.focusLock || {});
   if (typeof fl.mode === "undefined") fl.mode = "standard";
@@ -66,7 +76,7 @@ function assertTrue(name, cond) {
 {
   const before = {};
   const after = migrate(before);
-  assertEq("a) brand-new: settings keys count", Object.keys(after.settings).length, 4);
+  assertEq("a) brand-new: settings keys count (v1.4.19 adds 3)", Object.keys(after.settings).length, 7);
   assertTrue("a) onboardingComplete=false (empty settings)", after.onboardingComplete === false);
   assertEq("a) hiddenKeywords default", after.hiddenKeywords, []);
   assertEq("a) usageCount default", after.usageCount, 0);
@@ -75,6 +85,12 @@ function assertTrue(name, cond) {
   assertEq("a) focusLock.mode default", after.focusLock.mode, "standard");
   assertEq("a) focusLock.pomodoro default", after.focusLock.pomodoro, { focusMin: 25, breakMin: 5, cycles: 4 });
   assertEq("a) focusLock.pomodoroState default", after.focusLock.pomodoroState, null);
+  // v1.4.19 — new top-level keys seeded with safe defaults.
+  assertEq("a) redirectHomeToSubs default", after.redirectHomeToSubs, false);
+  assertEq("a) blockerModes default", after.blockerModes, {});
+  assertEq("a) subs-most-relevant seeded off", after.settings["subs-most-relevant"], false);
+  assertEq("a) subs-members-only seeded off", after.settings["subs-members-only"], false);
+  assertEq("a) subs-watched seeded off",      after.settings["subs-watched"], false);
 }
 
 // b) Existing v1.3.4 free user with settings configured
@@ -96,7 +112,12 @@ function assertTrue(name, cond) {
   assertEq("b) shorts preserved",    after.settings["shorts"],    true);
   assertEq("b) playables added off", after.settings["playables"], false);
   assertEq("b) merch-shelf added off", after.settings["merch-shelf"], false);
-  assertEq("b) settings now 14 keys", Object.keys(after.settings).length, 14);
+  assertEq("b) settings now 17 keys (v1.4.19)", Object.keys(after.settings).length, 17);
+  assertEq("b) subs-most-relevant added off", after.settings["subs-most-relevant"], false);
+  assertEq("b) subs-members-only added off", after.settings["subs-members-only"], false);
+  assertEq("b) subs-watched added off",      after.settings["subs-watched"], false);
+  assertEq("b) redirectHomeToSubs default false", after.redirectHomeToSubs, false);
+  assertEq("b) blockerModes default {}", after.blockerModes, {});
   assertTrue("b) onboardingComplete=true (has truthy)", after.onboardingComplete === true);
   assertEq("b) sessionStats preserved", after.sessionStats, { total: 7, perBlocker: {} });
 }

@@ -239,6 +239,10 @@ chrome.runtime.onInstalled.addListener(async (details) => {
         "merch-shelf": false,
         "breaking-news": false,
         "mixes-playlists": false,
+        // v1.4.19 — three new Pro blockers for the Subscriptions feed
+        "subs-most-relevant": false,
+        "subs-members-only": false,
+        "subs-watched": false,
       },
       paid: false,
       whitelistedChannels: [],
@@ -266,6 +270,9 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       // input even if the license storage entry is null/absent.
       extpayPaid: false,
       cleanfeed_license: null,
+      // v1.4.19 — Homepage→Subs redirect (F2) + per-blocker render modes (F3).
+      redirectHomeToSubs: false,
+      blockerModes: {},
     };
     await chrome.storage.local.set(defaults);
     // Set the readiness flag in a SEPARATE write so popup/content can
@@ -312,6 +319,11 @@ async function _migrateForV140() {
     "merch-shelf": false,
     "breaking-news": false,
     "mixes-playlists": false,
+    // v1.4.19 — three new Pro blockers seeded OFF for existing users so
+    // the upgrade is invisible. The popup BLOCKERS array exposes them.
+    "subs-most-relevant": false,
+    "subs-members-only": false,
+    "subs-watched": false,
   };
   const data = await chrome.storage.local.get(null);
   const patch = {};
@@ -330,6 +342,12 @@ async function _migrateForV140() {
   if (typeof data.perPageEnabled === "undefined") patch.perPageEnabled = false;
   if (typeof data.perPageSettings === "undefined") {
     patch.perPageSettings = { homepage: {}, watch: {}, subscriptions: {} };
+  }
+  // v1.4.19 — homepage→subs redirect + per-blocker render modes.
+  if (typeof data.redirectHomeToSubs === "undefined") patch.redirectHomeToSubs = false;
+  if (typeof data.blockerModes === "undefined" || data.blockerModes === null ||
+      typeof data.blockerModes !== "object") {
+    patch.blockerModes = {};
   }
   // focusLock — preserve existing object, just ensure mode/pomodoro fields exist
   const fl = data.focusLock || {};

@@ -734,6 +734,59 @@ button.is-busy {
   margin: 0 auto;
 }
 
+/* v1.4.19 F1 — YouTube Music smart-exemption panel.
+   Shown in place of the toggle grid when the active tab is on
+   music.youtube.com. Quiet, brand-aligned, no CTAs. */
+.cf-ytmusic-pause {
+  padding: var(--s-5) var(--s-4) var(--s-4);
+  display: grid;
+  gap: 6px;
+  text-align: center;
+  animation: cf-fade 200ms var(--ease) both;
+}
+.cf-ytmusic-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+.cf-ytmusic-pause h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.cf-ytmusic-pause p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
+/* v1.4.19 F3 — render-mode dropdown next to each blocker toggle. */
+.cf-mode-select {
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 6px;
+  background: var(--bg-elev-2);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-right: 6px;
+  letter-spacing: 0.02em;
+  transition: color 150ms var(--ease), border-color 150ms var(--ease);
+}
+.cf-mode-select:hover { color: var(--text); border-color: var(--accent); }
+.cf-mode-select:focus { outline: none; box-shadow: 0 0 0 3px var(--accent-glow); }
+.cf-mode-select[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+/* v1.4.19 F2 — homepage-redirect toggle row, rendered above the blockers list. */
+.cf-extras {
+  padding: var(--s-2) var(--s-3) 0;
+}
+.cf-extras .cf-row { border-bottom: 1px solid var(--border); border-radius: 0; padding-bottom: 12px; }
+
 /* v1.4.3 — cold-start fix.
    Loading line appears at the top edge of the popup if chrome.storage.local
    takes longer than 150ms to resolve (cold SW, slow IO). The bar pulses

@@ -11,6 +11,19 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.4.19 — 2026-05-25
+- **YouTube Music smart exemption (Free).** CleanFeed now no-ops completely on `music.youtube.com` — `content.js`'s IIFE returns immediately if `location.hostname` matches `music.youtube.com` or any subdomain, so no `applyBlockers`, no MutationObserver, no time tracker, no body classes, no badge counting, and no custom CSS injection happens on that host. The popup also detects the active tab and renders a single explainer panel ("CleanFeed is paused on YouTube Music") in place of the toggle grid + upgrade card. Detection is pure hostname match — no extra permissions.
+- **Homepage → Subscriptions redirect (Free, opt-in toggle, default OFF).** New "Open YouTube on Subscriptions" row above the blocker grid. When ON, bare `youtube.com/` (including tracking-only query strings like `?utm_source=*`, `?gclid=*`) auto-redirects to `youtube.com/feed/subscriptions` via `location.replace`. Fires on the initial page load and on every `yt-navigate-finish` so SPA navigation back to home is also caught. **Critical scope:** does NOT redirect `/watch`, `/results`, `/channel`, `/@handle`, `/shorts`, `/feed/anything-else`, `/playlist`, or any non-bare path. URLs with an in-app hash route (`#/foo`) are also treated as non-bare.
+- **Soft-blur / dim render modes per blocker (Free, expands every blocker).** Each blocker (Pro and Free, 16 of 17 — autoplay is a JS handler with no DOM target) now has a Hide / Blur / Dim dropdown next to its toggle in the popup. New per-blocker setting `blockerModes: { "<id>": "hide" | "blur" | "dim" }` stored in `chrome.storage.local`. **Migration:** unmigrated blockers default to `hide` via `_effectiveModeFor()` — existing users see zero behavior change. Blur mode applies `filter: blur(8px) !important; pointer-events: none !important` with a `:hover` rule that lifts both (peek-then-resume). Dim mode uses `opacity: 0.15` with the same hover-restore. Implementation: `content.js` emits a paired `cf-block-{id}` + `cf-mode-{id}-{mode}` body-class pair; new override rules in `styles.css` win via two-class specificity (0,2,1) over the existing one-class hide rules. `applyCommentsManualReveal` extended to set inline `filter: none !important`, `opacity: 1 !important`, `pointer-events: auto !important` alongside `display: block !important` so the v1.4.15 show-comments flow still reveals cleanly when the Comments blocker is set to Blur or Dim.
+- **Three new Pro blockers — subscription-feed cleanup (default OFF, Pro-gated).** Brings the blocker count from 14 → 17.
+  - **Hide 'Most Relevant' suggestions** — CSS selector targets `ytd-browse[page-subtype="subscriptions"] ytd-rich-section-renderer:has(yt-formatted-string[title="Most Relevant"|"For you"])` and the corresponding `ytd-rich-shelf-renderer`. Scoped to `/feed/subscriptions` via the page-subtype attribute.
+  - **Hide members-only videos** — CSS selector targets `ytd-rich-item-renderer:has(ytd-badge-supported-renderer[aria-label="Members only"])` (plus a fallback `[aria-label*="Members only"]` for badge HTML variations).
+  - **Hide already-watched (progress > 95 %)** — JS sweep `applyWatchedSweep()` runs on every `applyBlockers` tick when active; it parses the inline `width: N%` on `ytd-thumbnail-overlay-resume-playback-renderer #progress`, climbs to the parent `ytd-rich-item-renderer`, and tags it with `data-cf-watched="1"` so the matching CSS rule hides it. Scoped to `/feed/subscriptions`, Pro-only, strictly `> 95` (95.0 is NOT hidden).
+- **i18n.** New keys for all 12 `_locales/` (`ytMusicPaused*`, `redirectHome*`, `mode{Hide,Blur,Dim}`, `blockerSubs{MostRelevant,MembersOnly,Watched}*`, `upsell{Title,Body,AllBlockers}`). de/es/fr/it/pl/pt_BR/ru/tr translated; hi/id/ja keep new strings English pending translator review (existing pattern). Manifest-level `extName` / `extDescription` "14 blockers" bumped to "17 blockers" in hi/id/ja. `popup.html` upsell copy bumped 14 → 17 in two places.
+- **Migration.** `_migrateForV140` extended to seed `subs-most-relevant`, `subs-members-only`, `subs-watched` (all `false`) plus `redirectHomeToSubs: false` and `blockerModes: {}` for existing users without clobbering any pre-existing value. Brand-new installs get the same defaults in the `onInstalled.install` branch.
+- **New tests.** `tests/youtube-music-exempt.js` (21/21), `tests/homepage-redirect.js` (33/33), `tests/blocker-modes.js` (32/32), `tests/subs-feed-cleanup.js` (29/29). Existing suites updated for the 14 → 17 blocker count: badge-count 12/12 (now asserts all 17 active → 17, free still capped at 2 with the 3 new Pro blockers correctly excluded), first-install-race 13/13 (seed asserts 17 settings keys), migration-dryrun 30 → 40/40 (new assertions for the 3 new blockers + 2 new top-level keys + the unchanged behavior for existing users). Untouched: license-redeem 54/54, onToggle-rapid-click 13/13, pause-rapid-click 15/15, show-comments-persist 58/58, stats-no-double-count 7/7. Grand total: 327/327.
+- **Anti-scope-creep guarantees.** No changes to: ExtPay (`lib/extpay.js`), license redemption (`options/options.js` redeem flow, `background.js` `recomputePaid` / `verifyLicenseIfPresent` / `_ensureExtpayApiKey`), screenshots, or the 14 pre-v1.4.19 blocker selectors. Pro detection (`extpayPaid || cleanfeed_license.active`) is the gate for the 3 new Pro blockers via the existing `effectiveActive()` path in `content.js`.
+
 ### v1.4.18 — 2026-05-21
 - **UI polish: redacted license-key display now shows full 6-group format with X masking.** Pre-v1.4.18 the active-license panel rendered the partial as `ABCD…XYZ2` (first 4 chars, Unicode ellipsis, last 4 chars). v1.4.18 renders it as `ABCD-XXXX-XXXX-XXXX-XXXX-XYZ2` — visually identical character count and layout to a real key, just with the middle four groups masked. The new `_displayPartial(lic)` helper at `options/options.js` always derives the displayed value from `lic.key` (the full stored key we already keep for `/verify`), so what users see is decoupled from whatever's persisted in `key_partial`. v1.4.17 users see the new format the first time they open Options after upgrading; `key_partial` storage is silently rewritten to the new form on that first render (display-only change, no security implication — the full key has always been the source of truth).
 - **license-redeem tests**: 47 → 54. New assertions cover the new format (`partialLicense(CANON)` length 29, mask shape `^[A-Z2-9]{4}-XXXX-XXXX-XXXX-XXXX-[A-Z2-9]{4}$`), v1.4.17 legacy ellipsis storage rendering to new form, v1.4.18 fresh redemption idempotency, defensive fallback when full key is missing, and null-license render safety.
@@ -274,7 +287,7 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Features
 
-- **14 independent blockers**, each toggleable on/off:
+- **17 independent blockers**, each toggleable on/off, each with a Hide / Blur / Dim render mode:
   1. Homepage recommendation grid
   2. Shorts shelves (homepage, search, left-nav entry)
   3. Sidebar recommendations on watch pages
@@ -289,6 +302,9 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
   12. Merch shelf
   13. Breaking news shelf
   14. Mixes & playlists
+  15. Hide 'Most Relevant' suggestions on /feed/subscriptions (v1.4.19, Pro)
+  16. Hide members-only videos (v1.4.19, Pro)
+  17. Hide already-watched videos (progress > 95 %) (v1.4.19, Pro)
 - **Focus Lock (Pro)** — PIN-protected lock that force-enables every blocker
   for a chosen duration. 60-second hold-to-disable safety valve.
 - **Daily time tracker (free)** — see today / this week / 7-day average.

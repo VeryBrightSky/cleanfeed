@@ -1,4 +1,25 @@
 {
   "extName": { "message": "CleanFeed – Blocca YouTube Shorts, Feed e Consigliati | Focus Lock" },
-  "extDescription": { "message": "Blocca YouTube Shorts, nascondi feed, consigliati e commenti. YouTube senza distrazioni con Focus Lock + Pomodoro." }
+  "extDescription": { "message": "Blocca YouTube Shorts, nascondi feed, consigliati e commenti. YouTube senza distrazioni con Focus Lock + Pomodoro." },
+
+  "ytMusicPausedTitle":  { "message": "CleanFeed è in pausa su YouTube Music" },
+  "ytMusicPausedDesc":   { "message": "Qui non applichiamo blocchi, badge o conteggio del tempo: è un'app di musica, non un feed." },
+
+  "redirectHomeLabel":   { "message": "Apri YouTube su Iscrizioni" },
+  "redirectHomeDesc":    { "message": "Reindirizza automaticamente youtube.com a /feed/subscriptions. Non tocca /watch, /results, /shorts, ecc." },
+
+  "modeHide":            { "message": "Nascondi" },
+  "modeBlur":            { "message": "Sfoca" },
+  "modeDim":             { "message": "Attenua" },
+
+  "blockerSubsMostRelevantLabel": { "message": "Nascondi suggerimenti «Più rilevanti»" },
+  "blockerSubsMostRelevantDesc":  { "message": "Su /feed/subscriptions, rimuove l'inserzione algoritmica «Più rilevanti»" },
+  "blockerSubsMembersOnlyLabel":  { "message": "Nascondi video solo per membri" },
+  "blockerSubsMembersOnlyDesc":   { "message": "Nasconde i video delle iscrizioni con badge «solo membri»" },
+  "blockerSubsWatchedLabel":      { "message": "Nascondi già visti (avanzamento > 95 %)" },
+  "blockerSubsWatchedDesc":       { "message": "Su /feed/subscriptions, nasconde i video la cui barra di avanzamento supera il 95 %" },
+
+  "upsellTitle":         { "message": "Sblocca tutti i 17 blocchi + Focus Lock" },
+  "upsellBody":          { "message": "Pro sblocca tutti i 17 blocchi, blocco per parole chiave, Pomodoro Focus Lock, regole per pagina, whitelist/blocklist canali e CSS personalizzato. Pagamento una tantum." },
+  "upsellAllBlockers":   { "message": "Tutti i 17 blocchi: sidebar, commenti, miniature, mix, e altro" }
 }

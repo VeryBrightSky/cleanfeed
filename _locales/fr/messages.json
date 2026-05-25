@@ -1,4 +1,25 @@
 {
   "extName": { "message": "CleanFeed – Bloquez YouTube Shorts, Fil & Recommandations | Focus Lock" },
-  "extDescription": { "message": "Bloquez YouTube Shorts, masquez le fil d'accueil, recommandations et commentaires. YouTube sans distractions, Focus Lock + Pomodoro." }
+  "extDescription": { "message": "Bloquez YouTube Shorts, masquez le fil d'accueil, recommandations et commentaires. YouTube sans distractions, Focus Lock + Pomodoro." },
+
+  "ytMusicPausedTitle":  { "message": "CleanFeed est en pause sur YouTube Music" },
+  "ytMusicPausedDesc":   { "message": "Aucun bloqueur, badge ou suivi du temps ici — c'est une appli musique, pas un fil." },
+
+  "redirectHomeLabel":   { "message": "Ouvrir YouTube sur Abonnements" },
+  "redirectHomeDesc":    { "message": "Redirige automatiquement youtube.com vers /feed/subscriptions. Ne touche pas /watch, /results, /shorts, etc." },
+
+  "modeHide":            { "message": "Masquer" },
+  "modeBlur":            { "message": "Flouter" },
+  "modeDim":             { "message": "Atténuer" },
+
+  "blockerSubsMostRelevantLabel": { "message": "Masquer les suggestions « Plus pertinentes »" },
+  "blockerSubsMostRelevantDesc":  { "message": "Sur /feed/subscriptions, retire l'insertion algorithmique « Plus pertinentes »" },
+  "blockerSubsMembersOnlyLabel":  { "message": "Masquer les vidéos réservées aux membres" },
+  "blockerSubsMembersOnlyDesc":   { "message": "Masque les vidéos d'abonnements avec le badge « réservé aux membres »" },
+  "blockerSubsWatchedLabel":      { "message": "Masquer déjà regardés (> 95 %)" },
+  "blockerSubsWatchedDesc":       { "message": "Sur /feed/subscriptions, masque les vidéos dont la barre de progression dépasse 95 %" },
+
+  "upsellTitle":         { "message": "Débloquez les 17 bloqueurs + Focus Lock" },
+  "upsellBody":          { "message": "Pro débloque les 17 bloqueurs, blocage par mots-clés, Pomodoro Focus Lock, règles par page, liste blanche/noire de chaînes et CSS personnalisé. Paiement unique." },
+  "upsellAllBlockers":   { "message": "Les 17 bloqueurs — barre latérale, commentaires, miniatures, mix, etc." }
 }

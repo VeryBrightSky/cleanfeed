@@ -1,4 +1,25 @@
 {
   "extName": { "message": "CleanFeed – YouTube Shorts'u engelle, akış ve önerileri kapat | Focus Lock" },
-  "extDescription": { "message": "YouTube Shorts'u engelle, ana sayfa akışını, önerileri ve yorumları gizle. Dikkat dağıtıcı olmadan YouTube, Focus Lock + Pomodoro." }
+  "extDescription": { "message": "YouTube Shorts'u engelle, ana sayfa akışını, önerileri ve yorumları gizle. Dikkat dağıtıcı olmadan YouTube, Focus Lock + Pomodoro." },
+
+  "ytMusicPausedTitle":  { "message": "CleanFeed YouTube Music'te duraklatıldı" },
+  "ytMusicPausedDesc":   { "message": "Burada engelleyici, rozet veya süre takibi uygulanmaz — bu bir akış değil, müzik uygulaması." },
+
+  "redirectHomeLabel":   { "message": "YouTube'u Abonelikler'de aç" },
+  "redirectHomeDesc":    { "message": "youtube.com adresini otomatik olarak /feed/subscriptions sayfasına yönlendirir. /watch, /results, /shorts vb. etkilenmez." },
+
+  "modeHide":            { "message": "Gizle" },
+  "modeBlur":            { "message": "Bulanıklaştır" },
+  "modeDim":             { "message": "Soluklaştır" },
+
+  "blockerSubsMostRelevantLabel": { "message": "«En İlgili» önerileri gizle" },
+  "blockerSubsMostRelevantDesc":  { "message": "/feed/subscriptions üzerinde algoritmik «Most Relevant» eklemesini kaldırır" },
+  "blockerSubsMembersOnlyLabel":  { "message": "Yalnızca üyelere özel videoları gizle" },
+  "blockerSubsMembersOnlyDesc":   { "message": "Abonelik videolarında «yalnızca üyeler» rozetine sahip olanları gizler" },
+  "blockerSubsWatchedLabel":      { "message": "Zaten izlenenleri gizle (ilerleme > %95)" },
+  "blockerSubsWatchedDesc":       { "message": "/feed/subscriptions üzerinde ilerleme çubuğu %95'i geçen videoları gizler" },
+
+  "upsellTitle":         { "message": "17 engelleyicinin tamamını + Focus Lock'u aç" },
+  "upsellBody":          { "message": "Pro; 17 engelleyici, anahtar kelime engelleme, Pomodoro Focus Lock, sayfa bazlı kurallar, kanal beyaz/kara listesi ve özel CSS açar. Tek seferlik ödeme." },
+  "upsellAllBlockers":   { "message": "17 engelleyicinin hepsi — kenar çubuğu, yorumlar, küçük resimler, mixler ve daha fazlası" }
 }

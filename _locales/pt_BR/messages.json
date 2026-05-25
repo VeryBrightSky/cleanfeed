@@ -1,4 +1,25 @@
 {
   "extName": { "message": "CleanFeed – Bloqueie YouTube Shorts, Feed & Recomendações | Focus Lock" },
-  "extDescription": { "message": "Bloqueie YouTube Shorts, esconda o feed inicial, recomendações e comentários. YouTube sem distrações com Focus Lock + Pomodoro." }
+  "extDescription": { "message": "Bloqueie YouTube Shorts, esconda o feed inicial, recomendações e comentários. YouTube sem distrações com Focus Lock + Pomodoro." },
+
+  "ytMusicPausedTitle":  { "message": "CleanFeed está pausado no YouTube Music" },
+  "ytMusicPausedDesc":   { "message": "Aqui não aplicamos bloqueadores, selos ou rastreio de tempo — é um app de música, não um feed." },
+
+  "redirectHomeLabel":   { "message": "Abrir o YouTube em Inscrições" },
+  "redirectHomeDesc":    { "message": "Redireciona automaticamente youtube.com para /feed/subscriptions. Não afeta /watch, /results, /shorts, etc." },
+
+  "modeHide":            { "message": "Ocultar" },
+  "modeBlur":            { "message": "Desfocar" },
+  "modeDim":             { "message": "Esmaecer" },
+
+  "blockerSubsMostRelevantLabel": { "message": "Ocultar sugestões «Mais relevantes»" },
+  "blockerSubsMostRelevantDesc":  { "message": "Em /feed/subscriptions, remove a inserção algorítmica «Mais relevantes»" },
+  "blockerSubsMembersOnlyLabel":  { "message": "Ocultar vídeos exclusivos para membros" },
+  "blockerSubsMembersOnlyDesc":   { "message": "Esconde vídeos das inscrições com selo «somente membros»" },
+  "blockerSubsWatchedLabel":      { "message": "Ocultar já assistidos (progresso > 95 %)" },
+  "blockerSubsWatchedDesc":       { "message": "Em /feed/subscriptions, esconde vídeos cuja barra de progresso passa de 95 %" },
+
+  "upsellTitle":         { "message": "Desbloqueie todos os 17 bloqueadores + Focus Lock" },
+  "upsellBody":          { "message": "O Pro libera todos os 17 bloqueadores, bloqueio por palavra-chave, Pomodoro Focus Lock, regras por página, whitelist/blocklist de canais e CSS personalizado. Pagamento único." },
+  "upsellAllBlockers":   { "message": "Os 17 bloqueadores — sidebar, comentários, miniaturas, mixes e mais" }
 }

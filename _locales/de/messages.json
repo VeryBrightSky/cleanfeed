@@ -1,4 +1,25 @@
 {
   "extName": { "message": "CleanFeed – Blockiere YouTube Shorts, Feed & Empfehlungen | Focus Lock" },
-  "extDescription": { "message": "Blockiere YouTube Shorts, blende Startfeed, Empfehlungen und Kommentare aus. YouTube ohne Ablenkung mit Focus Lock + Pomodoro." }
+  "extDescription": { "message": "Blockiere YouTube Shorts, blende Startfeed, Empfehlungen und Kommentare aus. YouTube ohne Ablenkung mit Focus Lock + Pomodoro." },
+
+  "ytMusicPausedTitle":  { "message": "CleanFeed ist auf YouTube Music pausiert" },
+  "ytMusicPausedDesc":   { "message": "Hier werden keine Blocker, Badges oder Zeitmessungen angewendet – es ist eine Musik-App, kein Feed." },
+
+  "redirectHomeLabel":   { "message": "YouTube direkt mit Abos öffnen" },
+  "redirectHomeDesc":    { "message": "Leite youtube.com automatisch auf /feed/subscriptions um. Greift nicht in /watch, /results, /shorts usw. ein." },
+
+  "modeHide":            { "message": "Ausblenden" },
+  "modeBlur":            { "message": "Weichzeichnen" },
+  "modeDim":             { "message": "Dimmen" },
+
+  "blockerSubsMostRelevantLabel": { "message": "„Relevanteste“ Vorschläge ausblenden" },
+  "blockerSubsMostRelevantDesc":  { "message": "Entfernt die algorithmische „Relevanteste“-Einfügung auf /feed/subscriptions" },
+  "blockerSubsMembersOnlyLabel":  { "message": "Mitglieder-Videos ausblenden" },
+  "blockerSubsMembersOnlyDesc":   { "message": "Versteckt Abo-Videos mit dem „Nur für Mitglieder“-Badge" },
+  "blockerSubsWatchedLabel":      { "message": "Bereits gesehen ausblenden (> 95 %)" },
+  "blockerSubsWatchedDesc":       { "message": "Auf /feed/subscriptions: versteckt Videos, deren Fortschrittsbalken über 95 % liegt" },
+
+  "upsellTitle":         { "message": "Alle 17 Blocker + Focus Lock freischalten" },
+  "upsellBody":          { "message": "Pro schaltet alle 17 Blocker, Keyword-Blocker, Pomodoro Focus Lock, seitenbasierte Regeln, Kanal-Whitelist/Blocklist und eigenes CSS frei. Einmalzahlung." },
+  "upsellAllBlockers":   { "message": "Alle 17 Blocker – Seitenleiste, Kommentare, Vorschaubilder, Mixe und mehr" }
 }

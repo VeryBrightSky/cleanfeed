@@ -39,14 +39,15 @@ assertEq("Pro: 5 active → 5",
     "home-feed": true, "shorts": true, "comments": true,
     "autoplay": true, "thumbnails": true,
   }, true), 5);
-assertEq("Pro: all 14 active → 14",
+assertEq("Pro: all 17 active → 17 (v1.4.19 adds subs-most-relevant, subs-members-only, subs-watched)",
   computeBadgeCount({
     "home-feed": true, "shorts": true, "watch-sidebar": true,
     "end-screen": true, "comments": true, "explore": true,
     "live-chat": true, "autoplay": true, "thumbnails": true,
     "subs-algo": true, "playables": true, "merch-shelf": true,
     "breaking-news": true, "mixes-playlists": true,
-  }, true), 14);
+    "subs-most-relevant": true, "subs-members-only": true, "subs-watched": true,
+  }, true), 17);
 
 // ---- Free user, original v1.0 free blockers ----
 assertEq("Free: home-feed only → 1",
@@ -66,11 +67,13 @@ assertEq("Free: merch-shelf + breaking-news → 2 (was 0 pre-v1.4.11)",
 // Pro blockers in storage are ignored for free badge count.
 assertEq("Free: home-feed (free) + comments (pro) → 1",
   computeBadgeCount({ "home-feed": true, "comments": true }, false), 1);
-assertEq("Free: all 14 active but free tier → capped at 2",
+assertEq("Free: all 17 active but free tier → capped at 2",
   computeBadgeCount({
     "home-feed": true, "shorts": true, "watch-sidebar": true,
     "comments": true, "merch-shelf": true, "breaking-news": true,
     "mixes-playlists": true,
+    // v1.4.19 — Pro-only additions; must NOT count toward free badge.
+    "subs-most-relevant": true, "subs-members-only": true, "subs-watched": true,
   }, false), 2);
 
 // ---- Free user cap: 4 free blockers active but FREE_LIMIT=2 caps it ----

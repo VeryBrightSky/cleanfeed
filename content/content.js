@@ -13,6 +13,20 @@
 (function () {
   "use strict";
 
+  // v1.4.19 — Smart exemption for YouTube Music.
+  // The manifest matches *.youtube.com so this content script also loads on
+  // music.youtube.com. Music users almost universally don't want CleanFeed's
+  // distraction-blocking applied to a music app, so we bail out completely
+  // before any state load, observer setup, time tracking, or DOM mutation.
+  // The popup mirrors this — see popup.js's _isOnYouTubeMusicTab().
+  function isYouTubeMusicHost() {
+    const h = (location && location.hostname) || "";
+    return h === "music.youtube.com" || /(^|\.)music\.youtube\.com$/.test(h);
+  }
+  if (isYouTubeMusicHost()) {
+    return;
+  }
+
   // v1.4.9 — defensively clamp pausedUntil reads to (now + 1hr + 5min).
   // Anything bigger is treated as 0. Fail-OPEN here means fail-CLOSED for
   // the user: a corrupted timestamp can never pin the extension paused.
@@ -37,6 +51,8 @@
     commentsBtnAdded: false,
     customStyleEl: null,
     statsFlushTimer: 0,
+    redirectHomeToSubs: false,    // v1.4.19 F2
+    blockerModes: {},             // v1.4.19 F3 — per-blocker render mode
     pausedUntil: 0,        // unix ms; 0 = not paused
     // v1.4.14 — per-page-view manual reveal of the comments section.
     // Set when the user clicks "Show comments"; reset ONLY on real
@@ -63,7 +79,9 @@
       chrome.storage.local.get(
         ["settings", "paid", "whitelistedChannels", "customCSS", "stats",
          "pausedUntil", "blockedChannels", "focusLock",
-         "hiddenKeywords", "perPageEnabled", "perPageSettings"],
+         "hiddenKeywords", "perPageEnabled", "perPageSettings",
+         // v1.4.19
+         "redirectHomeToSubs", "blockerModes"],
         (data) => {
           // default — only home-feed + shorts are on by default for new users
           const defaults = {};
@@ -80,6 +98,8 @@
           STATE.hiddenKeywords = Array.isArray(data.hiddenKeywords) ? data.hiddenKeywords : [];
           STATE.perPageEnabled = !!data.perPageEnabled;
           STATE.perPageSettings = data.perPageSettings || { homepage: {}, watch: {}, subscriptions: {} };
+          STATE.redirectHomeToSubs = !!data.redirectHomeToSubs;
+          STATE.blockerModes = (data.blockerModes && typeof data.blockerModes === "object") ? data.blockerModes : {};
           // session stats reset on page nav by default — caller decides
           resolve();
         }
@@ -93,6 +113,37 @@
 
   function isPaused() {
     return STATE.pausedUntil > Date.now();
+  }
+
+  // v1.4.19 F2 — Homepage → Subscriptions redirect.
+  //
+  // Only fires when:
+  //   - settings.redirectHomeToSubs is true
+  //   - host is exactly youtube.com (or www.youtube.com), NOT music.youtube.com
+  //     (that case never reaches here — the music guard at the top of the IIFE
+  //     bailed). We still allow www subdomains so URL bookmarks work.
+  //   - pathname is the bare root: "/" or empty string
+  //   - the URL doesn't reference an in-app hash route like #/foo
+  //
+  // We use location.replace so the homepage doesn't end up in browser history.
+  // SPA navigations (clicking the YouTube logo) are caught via yt-navigate-finish.
+  function _isBareHomepage() {
+    const p = location.pathname || "";
+    if (p !== "/" && p !== "") return false;
+    const h = location.hash || "";
+    if (h && h.length > 1 && h.charAt(1) !== "?") return false;
+    return true;
+  }
+  function maybeRedirectHomeToSubs() {
+    if (!STATE.redirectHomeToSubs) return false;
+    if (!_isBareHomepage()) return false;
+    // Already on /feed/subscriptions? (shouldn't be possible past the path
+    // check but belt-and-suspenders against future logic changes.)
+    if (location.pathname.indexOf("/feed/subscriptions") === 0) return false;
+    try {
+      location.replace("/feed/subscriptions");
+    } catch (_) { /* about:blank or sandbox — skip */ }
+    return true;
   }
 
   function persistStats() {
@@ -177,11 +228,23 @@
 
   // ----- apply blocker state -------------------------------------------
 
+  // v1.4.19 F3 — read the user's render-mode choice for a given blocker.
+  // Missing entries (unmigrated users, blockers never touched in the popup)
+  // fall back to "hide" — zero behaviour change from pre-v1.4.19.
+  function _effectiveModeFor(id) {
+    const m = STATE.blockerModes && STATE.blockerModes[id];
+    return (m === "blur" || m === "dim") ? m : "hide";
+  }
+
   function applyBlockers() {
     if (!document.body) return;       // very early frame
     // remove all CleanFeed body classes first
     for (const b of BLOCKERS) {
       document.body.classList.remove("cf-block-" + b.id);
+      // v1.4.19 F3 — also remove any prior mode class for this blocker.
+      document.body.classList.remove("cf-mode-" + b.id + "-hide");
+      document.body.classList.remove("cf-mode-" + b.id + "-blur");
+      document.body.classList.remove("cf-mode-" + b.id + "-dim");
     }
     document.body.classList.remove("cf-paused");
     // v1.4.14 — cf-comments-shown body class and the inline-style reveal are
@@ -205,6 +268,9 @@
     const active = effectiveActive();
     for (const b of active) {
       document.body.classList.add("cf-block-" + b.id);
+      // v1.4.19 F3 — pair the cf-block-* class with the chosen render mode.
+      // CSS lives in styles.css under "BLOCKER RENDER MODES".
+      document.body.classList.add("cf-mode-" + b.id + "-" + _effectiveModeFor(b.id));
     }
 
     // inject "Show comments" button if comments blocker is active on a watch page
@@ -270,8 +336,55 @@
     // v1.4.0 F1 — hide video cards whose title contains any blocked keyword
     applyKeywordBlocks();
 
+    // v1.4.19 F4 — mark already-watched (>95% progress) tiles on /feed/subscriptions
+    // with data-cf-watched="1" so the cf-block-subs-watched CSS rule can hide them.
+    // Active flag is read from the `active` list passed in by effectiveActive().
+    const subsWatchedActive = active.some((b) => b.id === "subs-watched");
+    applyWatchedSweep(subsWatchedActive);
+
     // count visible elements that would be hidden — for stats
     countBlockedElements(active);
+  }
+
+  // v1.4.19 F4 — sweep subscription tiles for >95% progress.
+  // Idempotent: cards already tagged are skipped on subsequent ticks. When
+  // the blocker is toggled off (active===false), un-tag everything we marked
+  // so the cards reappear without a page reload.
+  function applyWatchedSweep(active) {
+    if (!active) {
+      // Clean up our markers; the CSS hide rule depends on the attribute.
+      document.querySelectorAll('ytd-rich-item-renderer[data-cf-watched="1"]').forEach((el) => {
+        el.removeAttribute("data-cf-watched");
+      });
+      return;
+    }
+    // Pro-only feature — skip the sweep entirely for free users (defensive;
+    // effectiveActive should already have filtered it out).
+    if (!STATE.paid) return;
+    // Scope: only /feed/subscriptions cards have meaningful "already watched"
+    // semantics in the user's mental model. The CSS selector also scopes by
+    // page-subtype, so a marked card outside subscriptions wouldn't hide —
+    // but we save CPU by scoping the sweep here too.
+    if (location.pathname.indexOf("/feed/subscriptions") !== 0) return;
+    const overlays = document.querySelectorAll(
+      'ytd-rich-item-renderer ytd-thumbnail-overlay-resume-playback-renderer #progress'
+    );
+    overlays.forEach((bar) => {
+      // Parse the inline width: YT writes style="width: 97%;" on the bar.
+      const style = bar.getAttribute("style") || "";
+      const m = style.match(/width\s*:\s*(\d+(?:\.\d+)?)\s*%/);
+      if (!m) return;
+      const pct = parseFloat(m[1]);
+      if (!isFinite(pct) || pct <= 95) return;
+      // Climb to the parent ytd-rich-item-renderer (the grid card).
+      let cur = bar;
+      while (cur && cur !== document.body && cur.tagName !== "YTD-RICH-ITEM-RENDERER") {
+        cur = cur.parentElement;
+      }
+      if (cur && cur.tagName === "YTD-RICH-ITEM-RENDERER" && cur.getAttribute("data-cf-watched") !== "1") {
+        cur.setAttribute("data-cf-watched", "1");
+      }
+    });
   }
 
   // F1 — keyword block sweep. No-op if hiddenKeywords is empty (zero CPU).
@@ -533,6 +646,12 @@
     for (const sel of _COMMENTS_REVEAL_SELECTORS) {
       document.querySelectorAll(sel).forEach((el) => {
         el.style.setProperty("display", "block", "important");
+        // v1.4.19 F3 — neutralize any blur/dim mode CSS rule that would
+        // otherwise leave the manually-revealed comments visually muffled.
+        // Inline !important beats the CSS rules' two-class specificity.
+        el.style.setProperty("filter", "none", "important");
+        el.style.setProperty("opacity", "1", "important");
+        el.style.setProperty("pointer-events", "auto", "important");
         el.setAttribute("data-cf-shown", "1");
       });
     }
@@ -541,6 +660,9 @@
   function clearCommentsManualReveal() {
     document.querySelectorAll('[data-cf-shown="1"]').forEach((el) => {
       el.style.removeProperty("display");
+      el.style.removeProperty("filter");
+      el.style.removeProperty("opacity");
+      el.style.removeProperty("pointer-events");
       el.removeAttribute("data-cf-shown");
     });
   }
@@ -687,6 +809,10 @@
     // real nav), but only reset per-video-view state when the canonical
     // identity (pathname + ?v=) actually changes.
     document.addEventListener("yt-navigate-finish", () => {
+      // v1.4.19 F2 — re-check redirect on every SPA nav. Clicking the YT
+      // logo from any sub-page lands on bare "/"; if the user has the
+      // toggle on, hop to /feed/subscriptions before we even paint.
+      if (maybeRedirectHomeToSubs()) return;
       maybeNavReset();
       applyBlockers();
     });
@@ -774,6 +900,22 @@
         STATE.perPageSettings = changes.perPageSettings.newValue || { homepage: {}, watch: {}, subscriptions: {} };
         applyBlockers();
       }
+      // v1.4.19 F2 — react to redirect-toggle flip. If the user enables
+      // the toggle while on the bare homepage, the redirect fires; if they
+      // disable it on /feed/subscriptions, nothing to do (they're already
+      // somewhere — we don't navigate back).
+      if (changes.redirectHomeToSubs) {
+        STATE.redirectHomeToSubs = !!changes.redirectHomeToSubs.newValue;
+        maybeRedirectHomeToSubs();
+      }
+      // v1.4.19 F3 — react to blocker-mode changes. Just re-apply blockers;
+      // applyBlockers reads STATE.blockerModes and emits cf-mode-*-* body
+      // classes so the CSS picks up the new render mode immediately.
+      if (changes.blockerModes) {
+        STATE.blockerModes = (changes.blockerModes.newValue && typeof changes.blockerModes.newValue === "object")
+          ? changes.blockerModes.newValue : {};
+        applyBlockers();
+      }
     });
   }
 
@@ -821,6 +963,12 @@
     startTimeTracker();
     _setupRightClickTracker();
     await getSettings();
+    // v1.4.19 F2 — fire redirect immediately after settings load if we're on
+    // the bare homepage. location.replace navigates away; nothing else this
+    // tick has any effect, but we still register listeners + start observer
+    // for the new page that the redirect lands on (the same content script
+    // re-runs on the new doc).
+    if (maybeRedirectHomeToSubs()) return;
     listenForRuntimeMessages();
     // Wait for body — we run at document_start
     if (document.body) {

@@ -1,4 +1,25 @@
 {
   "extName": { "message": "CleanFeed – Блокируйте YouTube Shorts, ленту и рекомендации | Focus Lock" },
-  "extDescription": { "message": "Блокируйте YouTube Shorts, скрывайте главную ленту, рекомендации и комментарии. YouTube без отвлечений с Focus Lock и Pomodoro." }
+  "extDescription": { "message": "Блокируйте YouTube Shorts, скрывайте главную ленту, рекомендации и комментарии. YouTube без отвлечений с Focus Lock и Pomodoro." },
+
+  "ytMusicPausedTitle":  { "message": "CleanFeed приостановлен на YouTube Music" },
+  "ytMusicPausedDesc":   { "message": "Здесь не применяются блокировщики, бейджи и учёт времени — это музыкальное приложение, а не лента." },
+
+  "redirectHomeLabel":   { "message": "Открывать YouTube на «Подписках»" },
+  "redirectHomeDesc":    { "message": "Автоматически перенаправляет youtube.com на /feed/subscriptions. Не затрагивает /watch, /results, /shorts и т.д." },
+
+  "modeHide":            { "message": "Скрыть" },
+  "modeBlur":            { "message": "Размыть" },
+  "modeDim":             { "message": "Затемнить" },
+
+  "blockerSubsMostRelevantLabel": { "message": "Скрыть подборку «Самое интересное»" },
+  "blockerSubsMostRelevantDesc":  { "message": "На /feed/subscriptions убирает алгоритмическую вставку «Most Relevant»" },
+  "blockerSubsMembersOnlyLabel":  { "message": "Скрыть видео только для участников" },
+  "blockerSubsMembersOnlyDesc":   { "message": "Скрывает видео из подписок с бейджем «только для участников»" },
+  "blockerSubsWatchedLabel":      { "message": "Скрыть просмотренные (> 95 %)" },
+  "blockerSubsWatchedDesc":       { "message": "На /feed/subscriptions скрывает видео, чья шкала прогресса превышает 95 %" },
+
+  "upsellTitle":         { "message": "Откройте все 17 блокировщиков + Focus Lock" },
+  "upsellBody":          { "message": "Pro открывает все 17 блокировщиков, блокировку по ключевым словам, Pomodoro Focus Lock, правила по страницам, белые/чёрные списки каналов и пользовательский CSS. Разовая оплата." },
+  "upsellAllBlockers":   { "message": "Все 17 блокировщиков — боковая панель, комментарии, превью, миксы и др." }
 }

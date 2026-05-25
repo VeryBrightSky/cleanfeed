@@ -213,3 +213,396 @@ body.cf-block-explore ytd-guide-entry-renderer:has(a[title="Fashion & Beauty"]),
 body.cf-block-explore ytd-mini-guide-entry-renderer:has(a[title="Trending"]) {
   display: none !important;
 }
+
+/* --- v1.4.19 SUBSCRIPTION-FEED CLEANUP (Pro) ----------------------- */
+/* "Most Relevant" algorithmic insertion on /feed/subscriptions. YT inserts
+ * a richSectionRenderer with title "Most Relevant" or "For you" between
+ * subscription videos; the next-of-kin rich-shelf-renderer holds the
+ * algorithmic videos. Selector targets both. */
+body.cf-block-subs-most-relevant ytd-browse[page-subtype="subscriptions"] ytd-rich-section-renderer:has(yt-formatted-string[title="Most Relevant"]),
+body.cf-block-subs-most-relevant ytd-browse[page-subtype="subscriptions"] ytd-rich-section-renderer:has(yt-formatted-string[title="For you"]),
+body.cf-block-subs-most-relevant ytd-browse[page-subtype="subscriptions"] ytd-rich-shelf-renderer:has(yt-formatted-string[title="Most Relevant"]),
+body.cf-block-subs-most-relevant ytd-browse[page-subtype="subscriptions"] ytd-rich-shelf-renderer:has(yt-formatted-string[title="For you"]) {
+  display: none !important;
+}
+
+/* Members-only badge → hide the parent rich-item. YT marks the badge
+ * with ytd-badge-supported-renderer whose label is "Members only". */
+body.cf-block-subs-members-only ytd-rich-item-renderer:has(ytd-badge-supported-renderer[aria-label="Members only"]),
+body.cf-block-subs-members-only ytd-rich-item-renderer:has(.badge-style-type-members-only),
+body.cf-block-subs-members-only ytd-rich-item-renderer:has([aria-label*="Members only"]) {
+  display: none !important;
+}
+
+/* Already-watched >95%: selector-side we mark the parent card with
+ * data-cf-watched="1" from content.js (applyWatchedSweep) — pure CSS
+ * here just hides what JS marked. */
+body.cf-block-subs-watched ytd-browse[page-subtype="subscriptions"] ytd-rich-item-renderer[data-cf-watched="1"] {
+  display: none !important;
+}
+
+/* --- v1.4.19 BLOCKER RENDER MODES (blur / dim) --------------------- *
+ * Override the default hide for any blocker when the user sets its mode
+ * to "blur" or "dim" in the popup. Specificity = 0,2,1 (two body classes
+ * + one element/attribute selector) so these always beat the one-class
+ * "display:none" rules above.
+ *
+ * Blur:  filter: blur(8px) + pointer-events: none, hover lifts both.
+ * Dim:   opacity: 0.15      + pointer-events: none, hover restores 1.
+ *
+ * For the autoplay blocker there are no selectors (JS-only), so no
+ * mode override is needed.
+ */
+
+/* Shared transition on the targeted elements — gives blur/dim and the
+ * subsequent hover-restore a smooth animation rather than a snap. */
+body[class*="cf-mode-"][class*="-blur"] [class*=""],
+body[class*="cf-mode-"][class*="-dim"]  [class*=""] {
+  transition: filter 180ms cubic-bezier(0.20, 0.80, 0.30, 1),
+              opacity 180ms cubic-bezier(0.20, 0.80, 0.30, 1) !important;
+}
+
+/* --- home-feed --- */
+body.cf-block-home-feed.cf-mode-home-feed-blur ytd-browse[page-subtype="home"] ytd-rich-grid-renderer,
+body.cf-block-home-feed.cf-mode-home-feed-blur ytd-browse[page-subtype="home"] ytd-feed-filter-chip-bar-renderer {
+  display: revert !important; filter: blur(8px) !important; pointer-events: none !important;
+}
+body.cf-block-home-feed.cf-mode-home-feed-blur ytd-browse[page-subtype="home"] ytd-rich-grid-renderer:hover,
+body.cf-block-home-feed.cf-mode-home-feed-blur ytd-browse[page-subtype="home"] ytd-feed-filter-chip-bar-renderer:hover {
+  filter: none !important; pointer-events: auto !important;
+}
+body.cf-block-home-feed.cf-mode-home-feed-dim ytd-browse[page-subtype="home"] ytd-rich-grid-renderer,
+body.cf-block-home-feed.cf-mode-home-feed-dim ytd-browse[page-subtype="home"] ytd-feed-filter-chip-bar-renderer {
+  display: revert !important; opacity: 0.15 !important; pointer-events: none !important;
+}
+body.cf-block-home-feed.cf-mode-home-feed-dim ytd-browse[page-subtype="home"] ytd-rich-grid-renderer:hover,
+body.cf-block-home-feed.cf-mode-home-feed-dim ytd-browse[page-subtype="home"] ytd-feed-filter-chip-bar-renderer:hover {
+  opacity: 1 !important; pointer-events: auto !important;
+}
+/* In blur/dim modes the empty-state ::after message is misleading — kill it. */
+body.cf-block-home-feed.cf-mode-home-feed-blur ytd-browse[page-subtype="home"]::after,
+body.cf-block-home-feed.cf-mode-home-feed-dim  ytd-browse[page-subtype="home"]::after {
+  display: none !important;
+}
+
+/* --- shorts --- */
+body.cf-block-shorts.cf-mode-shorts-blur ytd-rich-shelf-renderer[is-shorts],
+body.cf-block-shorts.cf-mode-shorts-blur ytd-reel-shelf-renderer,
+body.cf-block-shorts.cf-mode-shorts-blur ytd-reel-item-renderer,
+body.cf-block-shorts.cf-mode-shorts-blur ytd-shorts,
+body.cf-block-shorts.cf-mode-shorts-blur ytd-guide-entry-renderer:has(a[title="Shorts"]),
+body.cf-block-shorts.cf-mode-shorts-blur ytd-mini-guide-entry-renderer:has(a[title="Shorts"]),
+body.cf-block-shorts.cf-mode-shorts-blur grid-shelf-view-model:has([title="Shorts"]) {
+  display: revert !important; filter: blur(8px) !important; pointer-events: none !important;
+}
+body.cf-block-shorts.cf-mode-shorts-blur ytd-rich-shelf-renderer[is-shorts]:hover,
+body.cf-block-shorts.cf-mode-shorts-blur ytd-reel-shelf-renderer:hover,
+body.cf-block-shorts.cf-mode-shorts-blur ytd-reel-item-renderer:hover,
+body.cf-block-shorts.cf-mode-shorts-blur ytd-shorts:hover,
+body.cf-block-shorts.cf-mode-shorts-blur ytd-guide-entry-renderer:has(a[title="Shorts"]):hover,
+body.cf-block-shorts.cf-mode-shorts-blur ytd-mini-guide-entry-renderer:has(a[title="Shorts"]):hover,
+body.cf-block-shorts.cf-mode-shorts-blur grid-shelf-view-model:has([title="Shorts"]):hover {
+  filter: none !important; pointer-events: auto !important;
+}
+body.cf-block-shorts.cf-mode-shorts-dim ytd-rich-shelf-renderer[is-shorts],
+body.cf-block-shorts.cf-mode-shorts-dim ytd-reel-shelf-renderer,
+body.cf-block-shorts.cf-mode-shorts-dim ytd-reel-item-renderer,
+body.cf-block-shorts.cf-mode-shorts-dim ytd-shorts,
+body.cf-block-shorts.cf-mode-shorts-dim ytd-guide-entry-renderer:has(a[title="Shorts"]),
+body.cf-block-shorts.cf-mode-shorts-dim ytd-mini-guide-entry-renderer:has(a[title="Shorts"]),
+body.cf-block-shorts.cf-mode-shorts-dim grid-shelf-view-model:has([title="Shorts"]) {
+  display: revert !important; opacity: 0.15 !important; pointer-events: none !important;
+}
+body.cf-block-shorts.cf-mode-shorts-dim ytd-rich-shelf-renderer[is-shorts]:hover,
+body.cf-block-shorts.cf-mode-shorts-dim ytd-reel-shelf-renderer:hover,
+body.cf-block-shorts.cf-mode-shorts-dim ytd-reel-item-renderer:hover,
+body.cf-block-shorts.cf-mode-shorts-dim ytd-shorts:hover,
+body.cf-block-shorts.cf-mode-shorts-dim ytd-guide-entry-renderer:has(a[title="Shorts"]):hover,
+body.cf-block-shorts.cf-mode-shorts-dim ytd-mini-guide-entry-renderer:has(a[title="Shorts"]):hover,
+body.cf-block-shorts.cf-mode-shorts-dim grid-shelf-view-model:has([title="Shorts"]):hover {
+  opacity: 1 !important; pointer-events: auto !important;
+}
+
+/* --- watch-sidebar --- */
+body.cf-block-watch-sidebar.cf-mode-watch-sidebar-blur ytd-watch-flexy #secondary,
+body.cf-block-watch-sidebar.cf-mode-watch-sidebar-blur ytd-watch-flexy #secondary-inner,
+body.cf-block-watch-sidebar.cf-mode-watch-sidebar-blur ytd-watch-next-secondary-results-renderer,
+body.cf-block-watch-sidebar.cf-mode-watch-sidebar-blur #related.ytd-watch-flexy,
+body.cf-block-watch-sidebar.cf-mode-watch-sidebar-blur ytd-compact-video-renderer {
+  display: revert !important; filter: blur(8px) !important; pointer-events: none !important;
+}
+body.cf-block-watch-sidebar.cf-mode-watch-sidebar-blur #related.ytd-watch-flexy:hover,
+body.cf-block-watch-sidebar.cf-mode-watch-sidebar-blur ytd-compact-video-renderer:hover {
+  filter: none !important; pointer-events: auto !important;
+}
+body.cf-block-watch-sidebar.cf-mode-watch-sidebar-dim ytd-watch-flexy #secondary,
+body.cf-block-watch-sidebar.cf-mode-watch-sidebar-dim ytd-watch-flexy #secondary-inner,
+body.cf-block-watch-sidebar.cf-mode-watch-sidebar-dim ytd-watch-next-secondary-results-renderer,
+body.cf-block-watch-sidebar.cf-mode-watch-sidebar-dim #related.ytd-watch-flexy,
+body.cf-block-watch-sidebar.cf-mode-watch-sidebar-dim ytd-compact-video-renderer {
+  display: revert !important; opacity: 0.15 !important; pointer-events: none !important;
+}
+body.cf-block-watch-sidebar.cf-mode-watch-sidebar-dim #related.ytd-watch-flexy:hover,
+body.cf-block-watch-sidebar.cf-mode-watch-sidebar-dim ytd-compact-video-renderer:hover {
+  opacity: 1 !important; pointer-events: auto !important;
+}
+
+/* --- end-screen --- */
+body.cf-block-end-screen.cf-mode-end-screen-blur .ytp-ce-element,
+body.cf-block-end-screen.cf-mode-end-screen-blur .ytp-endscreen-content,
+body.cf-block-end-screen.cf-mode-end-screen-blur .html5-endscreen,
+body.cf-block-end-screen.cf-mode-end-screen-blur .ytp-pause-overlay {
+  display: revert !important; filter: blur(8px) !important; pointer-events: none !important;
+}
+body.cf-block-end-screen.cf-mode-end-screen-blur .ytp-ce-element:hover,
+body.cf-block-end-screen.cf-mode-end-screen-blur .ytp-endscreen-content:hover,
+body.cf-block-end-screen.cf-mode-end-screen-blur .html5-endscreen:hover,
+body.cf-block-end-screen.cf-mode-end-screen-blur .ytp-pause-overlay:hover {
+  filter: none !important; pointer-events: auto !important;
+}
+body.cf-block-end-screen.cf-mode-end-screen-dim .ytp-ce-element,
+body.cf-block-end-screen.cf-mode-end-screen-dim .ytp-endscreen-content,
+body.cf-block-end-screen.cf-mode-end-screen-dim .html5-endscreen,
+body.cf-block-end-screen.cf-mode-end-screen-dim .ytp-pause-overlay {
+  display: revert !important; opacity: 0.15 !important; pointer-events: none !important;
+}
+body.cf-block-end-screen.cf-mode-end-screen-dim .ytp-ce-element:hover,
+body.cf-block-end-screen.cf-mode-end-screen-dim .ytp-endscreen-content:hover,
+body.cf-block-end-screen.cf-mode-end-screen-dim .html5-endscreen:hover,
+body.cf-block-end-screen.cf-mode-end-screen-dim .ytp-pause-overlay:hover {
+  opacity: 1 !important; pointer-events: auto !important;
+}
+
+/* --- comments --- */
+body.cf-block-comments.cf-mode-comments-blur ytd-comments#comments,
+body.cf-block-comments.cf-mode-comments-blur #comments.ytd-watch-flexy,
+body.cf-block-comments.cf-mode-comments-blur ytd-comments-header-renderer {
+  display: revert !important; filter: blur(8px) !important; pointer-events: none !important;
+}
+body.cf-block-comments.cf-mode-comments-blur ytd-comments#comments:hover,
+body.cf-block-comments.cf-mode-comments-blur #comments.ytd-watch-flexy:hover,
+body.cf-block-comments.cf-mode-comments-blur ytd-comments-header-renderer:hover {
+  filter: none !important; pointer-events: auto !important;
+}
+body.cf-block-comments.cf-mode-comments-dim ytd-comments#comments,
+body.cf-block-comments.cf-mode-comments-dim #comments.ytd-watch-flexy,
+body.cf-block-comments.cf-mode-comments-dim ytd-comments-header-renderer {
+  display: revert !important; opacity: 0.15 !important; pointer-events: none !important;
+}
+body.cf-block-comments.cf-mode-comments-dim ytd-comments#comments:hover,
+body.cf-block-comments.cf-mode-comments-dim #comments.ytd-watch-flexy:hover,
+body.cf-block-comments.cf-mode-comments-dim ytd-comments-header-renderer:hover {
+  opacity: 1 !important; pointer-events: auto !important;
+}
+
+/* --- explore --- */
+body.cf-block-explore.cf-mode-explore-blur ytd-guide-section-renderer:has(#guide-section-title yt-formatted-string[title="Explore"]),
+body.cf-block-explore.cf-mode-explore-blur ytd-guide-entry-renderer:has(a[title="Trending"]),
+body.cf-block-explore.cf-mode-explore-blur ytd-guide-entry-renderer:has(a[title="Music"]),
+body.cf-block-explore.cf-mode-explore-blur ytd-guide-entry-renderer:has(a[title="Gaming"]),
+body.cf-block-explore.cf-mode-explore-blur ytd-guide-entry-renderer:has(a[title="News"]),
+body.cf-block-explore.cf-mode-explore-blur ytd-guide-entry-renderer:has(a[title="Sports"]),
+body.cf-block-explore.cf-mode-explore-blur ytd-guide-entry-renderer:has(a[title="Learning"]),
+body.cf-block-explore.cf-mode-explore-blur ytd-guide-entry-renderer:has(a[title="Fashion & Beauty"]),
+body.cf-block-explore.cf-mode-explore-blur ytd-mini-guide-entry-renderer:has(a[title="Trending"]) {
+  display: revert !important; filter: blur(8px) !important; pointer-events: none !important;
+}
+body.cf-block-explore.cf-mode-explore-blur ytd-guide-entry-renderer:hover { filter: none !important; pointer-events: auto !important; }
+body.cf-block-explore.cf-mode-explore-dim ytd-guide-section-renderer:has(#guide-section-title yt-formatted-string[title="Explore"]),
+body.cf-block-explore.cf-mode-explore-dim ytd-guide-entry-renderer:has(a[title="Trending"]),
+body.cf-block-explore.cf-mode-explore-dim ytd-guide-entry-renderer:has(a[title="Music"]),
+body.cf-block-explore.cf-mode-explore-dim ytd-guide-entry-renderer:has(a[title="Gaming"]),
+body.cf-block-explore.cf-mode-explore-dim ytd-guide-entry-renderer:has(a[title="News"]),
+body.cf-block-explore.cf-mode-explore-dim ytd-guide-entry-renderer:has(a[title="Sports"]),
+body.cf-block-explore.cf-mode-explore-dim ytd-guide-entry-renderer:has(a[title="Learning"]),
+body.cf-block-explore.cf-mode-explore-dim ytd-guide-entry-renderer:has(a[title="Fashion & Beauty"]),
+body.cf-block-explore.cf-mode-explore-dim ytd-mini-guide-entry-renderer:has(a[title="Trending"]) {
+  display: revert !important; opacity: 0.15 !important; pointer-events: none !important;
+}
+body.cf-block-explore.cf-mode-explore-dim ytd-guide-entry-renderer:hover { opacity: 1 !important; pointer-events: auto !important; }
+
+/* --- live-chat --- */
+body.cf-block-live-chat.cf-mode-live-chat-blur ytd-live-chat-frame,
+body.cf-block-live-chat.cf-mode-live-chat-blur #chat-container,
+body.cf-block-live-chat.cf-mode-live-chat-blur #chat.ytd-watch-flexy {
+  display: revert !important; filter: blur(8px) !important; pointer-events: none !important;
+}
+body.cf-block-live-chat.cf-mode-live-chat-blur ytd-live-chat-frame:hover,
+body.cf-block-live-chat.cf-mode-live-chat-blur #chat-container:hover,
+body.cf-block-live-chat.cf-mode-live-chat-blur #chat.ytd-watch-flexy:hover {
+  filter: none !important; pointer-events: auto !important;
+}
+body.cf-block-live-chat.cf-mode-live-chat-dim ytd-live-chat-frame,
+body.cf-block-live-chat.cf-mode-live-chat-dim #chat-container,
+body.cf-block-live-chat.cf-mode-live-chat-dim #chat.ytd-watch-flexy {
+  display: revert !important; opacity: 0.15 !important; pointer-events: none !important;
+}
+body.cf-block-live-chat.cf-mode-live-chat-dim ytd-live-chat-frame:hover,
+body.cf-block-live-chat.cf-mode-live-chat-dim #chat-container:hover,
+body.cf-block-live-chat.cf-mode-live-chat-dim #chat.ytd-watch-flexy:hover {
+  opacity: 1 !important; pointer-events: auto !important;
+}
+
+/* --- thumbnails: existing rules use opacity, blur layers on top --- */
+body.cf-block-thumbnails.cf-mode-thumbnails-blur ytd-thumbnail img,
+body.cf-block-thumbnails.cf-mode-thumbnails-blur yt-image img,
+body.cf-block-thumbnails.cf-mode-thumbnails-blur .yt-thumbnail-view-model img {
+  opacity: 1 !important; filter: blur(8px) !important;
+}
+body.cf-block-thumbnails.cf-mode-thumbnails-blur ytd-thumbnail:hover img,
+body.cf-block-thumbnails.cf-mode-thumbnails-blur yt-image:hover img,
+body.cf-block-thumbnails.cf-mode-thumbnails-blur .yt-thumbnail-view-model:hover img {
+  filter: none !important;
+}
+/* Dim mode = existing default (opacity 0). The default hide rule is already
+ * an opacity dimming, so we re-target dim to a stronger 0.15 reveal:
+ * actually identical to default — alias for the user's mental model. */
+body.cf-block-thumbnails.cf-mode-thumbnails-dim ytd-thumbnail img,
+body.cf-block-thumbnails.cf-mode-thumbnails-dim yt-image img,
+body.cf-block-thumbnails.cf-mode-thumbnails-dim .yt-thumbnail-view-model img {
+  opacity: 0.15 !important;
+}
+
+/* --- subs-algo --- */
+body.cf-block-subs-algo.cf-mode-subs-algo-blur ytd-browse[page-subtype="subscriptions"] ytd-shelf-renderer,
+body.cf-block-subs-algo.cf-mode-subs-algo-blur ytd-browse[page-subtype="subscriptions"] ytd-rich-shelf-renderer,
+body.cf-block-subs-algo.cf-mode-subs-algo-blur ytd-browse[page-subtype="subscriptions"] ytd-rich-section-renderer {
+  display: revert !important; filter: blur(8px) !important; pointer-events: none !important;
+}
+body.cf-block-subs-algo.cf-mode-subs-algo-blur ytd-browse[page-subtype="subscriptions"] ytd-shelf-renderer:hover,
+body.cf-block-subs-algo.cf-mode-subs-algo-blur ytd-browse[page-subtype="subscriptions"] ytd-rich-shelf-renderer:hover,
+body.cf-block-subs-algo.cf-mode-subs-algo-blur ytd-browse[page-subtype="subscriptions"] ytd-rich-section-renderer:hover {
+  filter: none !important; pointer-events: auto !important;
+}
+body.cf-block-subs-algo.cf-mode-subs-algo-dim ytd-browse[page-subtype="subscriptions"] ytd-shelf-renderer,
+body.cf-block-subs-algo.cf-mode-subs-algo-dim ytd-browse[page-subtype="subscriptions"] ytd-rich-shelf-renderer,
+body.cf-block-subs-algo.cf-mode-subs-algo-dim ytd-browse[page-subtype="subscriptions"] ytd-rich-section-renderer {
+  display: revert !important; opacity: 0.15 !important; pointer-events: none !important;
+}
+body.cf-block-subs-algo.cf-mode-subs-algo-dim ytd-browse[page-subtype="subscriptions"] ytd-shelf-renderer:hover,
+body.cf-block-subs-algo.cf-mode-subs-algo-dim ytd-browse[page-subtype="subscriptions"] ytd-rich-shelf-renderer:hover,
+body.cf-block-subs-algo.cf-mode-subs-algo-dim ytd-browse[page-subtype="subscriptions"] ytd-rich-section-renderer:hover {
+  opacity: 1 !important; pointer-events: auto !important;
+}
+
+/* --- playables --- */
+body.cf-block-playables.cf-mode-playables-blur ytd-rich-shelf-renderer:has(#title yt-formatted-string[title="Playables"]),
+body.cf-block-playables.cf-mode-playables-blur ytd-rich-shelf-renderer:has(#title yt-formatted-string[title="Mini-games"]),
+body.cf-block-playables.cf-mode-playables-blur ytd-playable-shelf-renderer {
+  display: revert !important; filter: blur(8px) !important; pointer-events: none !important;
+}
+body.cf-block-playables.cf-mode-playables-blur ytd-rich-shelf-renderer:hover,
+body.cf-block-playables.cf-mode-playables-blur ytd-playable-shelf-renderer:hover {
+  filter: none !important; pointer-events: auto !important;
+}
+body.cf-block-playables.cf-mode-playables-dim ytd-rich-shelf-renderer:has(#title yt-formatted-string[title="Playables"]),
+body.cf-block-playables.cf-mode-playables-dim ytd-rich-shelf-renderer:has(#title yt-formatted-string[title="Mini-games"]),
+body.cf-block-playables.cf-mode-playables-dim ytd-playable-shelf-renderer {
+  display: revert !important; opacity: 0.15 !important; pointer-events: none !important;
+}
+body.cf-block-playables.cf-mode-playables-dim ytd-rich-shelf-renderer:hover,
+body.cf-block-playables.cf-mode-playables-dim ytd-playable-shelf-renderer:hover {
+  opacity: 1 !important; pointer-events: auto !important;
+}
+
+/* --- merch-shelf --- */
+body.cf-block-merch-shelf.cf-mode-merch-shelf-blur ytd-merch-shelf-renderer,
+body.cf-block-merch-shelf.cf-mode-merch-shelf-blur yt-merch-shelf-renderer {
+  display: revert !important; filter: blur(8px) !important; pointer-events: none !important;
+}
+body.cf-block-merch-shelf.cf-mode-merch-shelf-blur ytd-merch-shelf-renderer:hover,
+body.cf-block-merch-shelf.cf-mode-merch-shelf-blur yt-merch-shelf-renderer:hover {
+  filter: none !important; pointer-events: auto !important;
+}
+body.cf-block-merch-shelf.cf-mode-merch-shelf-dim ytd-merch-shelf-renderer,
+body.cf-block-merch-shelf.cf-mode-merch-shelf-dim yt-merch-shelf-renderer {
+  display: revert !important; opacity: 0.15 !important; pointer-events: none !important;
+}
+body.cf-block-merch-shelf.cf-mode-merch-shelf-dim ytd-merch-shelf-renderer:hover,
+body.cf-block-merch-shelf.cf-mode-merch-shelf-dim yt-merch-shelf-renderer:hover {
+  opacity: 1 !important; pointer-events: auto !important;
+}
+
+/* --- breaking-news --- */
+body.cf-block-breaking-news.cf-mode-breaking-news-blur ytd-rich-section-renderer:has(yt-formatted-string[title="Breaking news"]),
+body.cf-block-breaking-news.cf-mode-breaking-news-blur ytd-rich-section-renderer:has(yt-formatted-string[title="News"]),
+body.cf-block-breaking-news.cf-mode-breaking-news-blur ytd-rich-shelf-renderer:has(yt-formatted-string[title="Breaking news"]) {
+  display: revert !important; filter: blur(8px) !important; pointer-events: none !important;
+}
+body.cf-block-breaking-news.cf-mode-breaking-news-blur ytd-rich-section-renderer:hover,
+body.cf-block-breaking-news.cf-mode-breaking-news-blur ytd-rich-shelf-renderer:hover {
+  filter: none !important; pointer-events: auto !important;
+}
+body.cf-block-breaking-news.cf-mode-breaking-news-dim ytd-rich-section-renderer:has(yt-formatted-string[title="Breaking news"]),
+body.cf-block-breaking-news.cf-mode-breaking-news-dim ytd-rich-section-renderer:has(yt-formatted-string[title="News"]),
+body.cf-block-breaking-news.cf-mode-breaking-news-dim ytd-rich-shelf-renderer:has(yt-formatted-string[title="Breaking news"]) {
+  display: revert !important; opacity: 0.15 !important; pointer-events: none !important;
+}
+body.cf-block-breaking-news.cf-mode-breaking-news-dim ytd-rich-section-renderer:hover,
+body.cf-block-breaking-news.cf-mode-breaking-news-dim ytd-rich-shelf-renderer:hover {
+  opacity: 1 !important; pointer-events: auto !important;
+}
+
+/* --- mixes-playlists --- */
+body.cf-block-mixes-playlists.cf-mode-mixes-playlists-blur ytd-radio-renderer,
+body.cf-block-mixes-playlists.cf-mode-mixes-playlists-blur ytd-compact-radio-renderer {
+  display: revert !important; filter: blur(8px) !important; pointer-events: none !important;
+}
+body.cf-block-mixes-playlists.cf-mode-mixes-playlists-blur ytd-radio-renderer:hover,
+body.cf-block-mixes-playlists.cf-mode-mixes-playlists-blur ytd-compact-radio-renderer:hover {
+  filter: none !important; pointer-events: auto !important;
+}
+body.cf-block-mixes-playlists.cf-mode-mixes-playlists-dim ytd-radio-renderer,
+body.cf-block-mixes-playlists.cf-mode-mixes-playlists-dim ytd-compact-radio-renderer {
+  display: revert !important; opacity: 0.15 !important; pointer-events: none !important;
+}
+body.cf-block-mixes-playlists.cf-mode-mixes-playlists-dim ytd-radio-renderer:hover,
+body.cf-block-mixes-playlists.cf-mode-mixes-playlists-dim ytd-compact-radio-renderer:hover {
+  opacity: 1 !important; pointer-events: auto !important;
+}
+
+/* --- v1.4.19 new blockers: subs-most-relevant, subs-members-only, subs-watched --- */
+body.cf-block-subs-most-relevant.cf-mode-subs-most-relevant-blur ytd-browse[page-subtype="subscriptions"] ytd-rich-section-renderer:has(yt-formatted-string[title="Most Relevant"]),
+body.cf-block-subs-most-relevant.cf-mode-subs-most-relevant-blur ytd-browse[page-subtype="subscriptions"] ytd-rich-section-renderer:has(yt-formatted-string[title="For you"]),
+body.cf-block-subs-most-relevant.cf-mode-subs-most-relevant-blur ytd-browse[page-subtype="subscriptions"] ytd-rich-shelf-renderer:has(yt-formatted-string[title="Most Relevant"]),
+body.cf-block-subs-most-relevant.cf-mode-subs-most-relevant-blur ytd-browse[page-subtype="subscriptions"] ytd-rich-shelf-renderer:has(yt-formatted-string[title="For you"]) {
+  display: revert !important; filter: blur(8px) !important; pointer-events: none !important;
+}
+body.cf-block-subs-most-relevant.cf-mode-subs-most-relevant-blur ytd-rich-section-renderer:hover,
+body.cf-block-subs-most-relevant.cf-mode-subs-most-relevant-blur ytd-rich-shelf-renderer:hover {
+  filter: none !important; pointer-events: auto !important;
+}
+body.cf-block-subs-most-relevant.cf-mode-subs-most-relevant-dim ytd-browse[page-subtype="subscriptions"] ytd-rich-section-renderer:has(yt-formatted-string[title="Most Relevant"]),
+body.cf-block-subs-most-relevant.cf-mode-subs-most-relevant-dim ytd-browse[page-subtype="subscriptions"] ytd-rich-section-renderer:has(yt-formatted-string[title="For you"]),
+body.cf-block-subs-most-relevant.cf-mode-subs-most-relevant-dim ytd-browse[page-subtype="subscriptions"] ytd-rich-shelf-renderer:has(yt-formatted-string[title="Most Relevant"]),
+body.cf-block-subs-most-relevant.cf-mode-subs-most-relevant-dim ytd-browse[page-subtype="subscriptions"] ytd-rich-shelf-renderer:has(yt-formatted-string[title="For you"]) {
+  display: revert !important; opacity: 0.15 !important; pointer-events: none !important;
+}
+body.cf-block-subs-most-relevant.cf-mode-subs-most-relevant-dim ytd-rich-section-renderer:hover,
+body.cf-block-subs-most-relevant.cf-mode-subs-most-relevant-dim ytd-rich-shelf-renderer:hover {
+  opacity: 1 !important; pointer-events: auto !important;
+}
+
+body.cf-block-subs-members-only.cf-mode-subs-members-only-blur ytd-rich-item-renderer:has(ytd-badge-supported-renderer[aria-label="Members only"]),
+body.cf-block-subs-members-only.cf-mode-subs-members-only-blur ytd-rich-item-renderer:has([aria-label*="Members only"]) {
+  display: revert !important; filter: blur(8px) !important; pointer-events: none !important;
+}
+body.cf-block-subs-members-only.cf-mode-subs-members-only-blur ytd-rich-item-renderer:hover { filter: none !important; pointer-events: auto !important; }
+body.cf-block-subs-members-only.cf-mode-subs-members-only-dim ytd-rich-item-renderer:has(ytd-badge-supported-renderer[aria-label="Members only"]),
+body.cf-block-subs-members-only.cf-mode-subs-members-only-dim ytd-rich-item-renderer:has([aria-label*="Members only"]) {
+  display: revert !important; opacity: 0.15 !important; pointer-events: none !important;
+}
+body.cf-block-subs-members-only.cf-mode-subs-members-only-dim ytd-rich-item-renderer:hover { opacity: 1 !important; pointer-events: auto !important; }
+
+body.cf-block-subs-watched.cf-mode-subs-watched-blur ytd-browse[page-subtype="subscriptions"] ytd-rich-item-renderer[data-cf-watched="1"] {
+  display: revert !important; filter: blur(8px) !important; pointer-events: none !important;
+}
+body.cf-block-subs-watched.cf-mode-subs-watched-blur ytd-browse[page-subtype="subscriptions"] ytd-rich-item-renderer[data-cf-watched="1"]:hover {
+  filter: none !important; pointer-events: auto !important;
+}
+body.cf-block-subs-watched.cf-mode-subs-watched-dim ytd-browse[page-subtype="subscriptions"] ytd-rich-item-renderer[data-cf-watched="1"] {
+  display: revert !important; opacity: 0.15 !important; pointer-events: none !important;
+}
+body.cf-block-subs-watched.cf-mode-subs-watched-dim ytd-browse[page-subtype="subscriptions"] ytd-rich-item-renderer[data-cf-watched="1"]:hover {
+  opacity: 1 !important; pointer-events: auto !important;
+}
