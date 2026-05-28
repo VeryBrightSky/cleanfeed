@@ -128,6 +128,27 @@ async function recomputePaid() {
   return next;
 }
 
+// v1.4.20-beta — idempotent cf_stats seeder. Mirrors ensureInstallId's
+// shape (re-check between get and set so concurrent callers don't clobber).
+// Called from BOTH onInstalled AND onStartup so the Phase 1 analytics
+// instrumentation works even when onInstalled doesn't fire with reason
+// === "update" — including the common dev-mode reload-from-unpacked path
+// that prompted the v1.4.20-alpha → v1.4.20-beta hotfix.
+//
+// _migrateForV140 also has a (now-redundant) cf_stats seed; left in place
+// as defense in depth for the production "onInstalled.update" path.
+async function ensureCfStats() {
+  const d = await chrome.storage.local.get(["cf_stats"]);
+  if (d.cf_stats && typeof d.cf_stats === "object") return d.cf_stats;
+  const seed = { blocked: {}, autoplay_avoided: {}, session_started: Date.now() };
+  // Re-check under "writer wins" semantics — if another caller (or the
+  // _migrateForV140 path) wrote between our two reads, prefer theirs.
+  const d2 = await chrome.storage.local.get(["cf_stats"]);
+  if (d2.cf_stats && typeof d2.cf_stats === "object") return d2.cf_stats;
+  await chrome.storage.local.set({ cf_stats: seed });
+  return seed;
+}
+
 // First-run UUID. Idempotent — never overwrites. Race-tolerant via a
 // re-check between get and set so two callers (e.g. background + options
 // page) can both invoke it without clobbering each other.
@@ -190,6 +211,11 @@ chrome.runtime.onInstalled.addListener((details) => {
   _eagerlyMintApiKey("install/update (" + details.reason + ")");
   // v1.4.17 — seed install id + reconcile paid + re-verify license.
   ensureInstallId().catch(() => {});
+  // v1.4.20-beta — seed cf_stats here, OUTSIDE the reason==="update" gate
+  // of the second onInstalled listener. Real-Chrome bug: that gate misses
+  // dev-mode reloads + any onInstalled.reason !== "install"/"update", so
+  // v1.4.19→v1.4.20-alpha upgraders saw cf_stats never seeded.
+  ensureCfStats().catch(() => {});
   recomputePaid().catch(() => {});
   verifyLicenseIfPresent().catch(() => {});
 });
@@ -197,6 +223,10 @@ chrome.runtime.onStartup.addListener(() => {
   _eagerlyMintApiKey("startup");
   // v1.4.17 — same bookkeeping at every browser launch.
   ensureInstallId().catch(() => {});
+  // v1.4.20-beta — second-chance cf_stats seed on every browser launch
+  // so users whose onInstalled never fired still get the key on next
+  // Chrome restart. Idempotent.
+  ensureCfStats().catch(() => {});
   recomputePaid().catch(() => {});
   verifyLicenseIfPresent().catch(() => {});
 });
