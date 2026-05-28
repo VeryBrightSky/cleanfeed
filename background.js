@@ -140,6 +140,78 @@ async function ensureGrandfather() {
   });
 }
 
+// v1.4.21-phase2 — unified ExtPay subscription sync. Single entry point
+// for every place that needs to translate the raw ExtPay user payload into
+// cf_subscription. Replaces the v1.4.17 extpay.onPaid handler that only
+// knew about the boolean `paid` flag. Pulls from extpay.getUser() and
+// derives the 5-state cf_subscription.status field per the documented
+// machine:
+//
+//   user.paid && !user.subscriptionCancelAt          -> "active"
+//   user.paid && user.subscriptionCancelAt           -> "cancellation_pending"
+//   user.subscriptionStatus === "past_due"           -> "past_due"
+//   user.subscriptionStatus === "canceled"           -> "canceled"
+//   else                                             -> "none"
+//
+// Two defensive behaviors:
+//   1. Legacy one-time-paid detection: `paid===true` with NO
+//      subscriptionStatus AND NO subscriptionCancelAt means this is a
+//      legacy ExtPay buyer (none expected at launch but defensive).
+//      Set extpayPaid=true and lock in grandfather. Never auto-grant
+//      grandfather for monthly/annual subscribers.
+//   2. Network errors NEVER strip Pro. If extpay.getUser() throws, the
+//      function exits without touching cf_subscription; last-known state
+//      stays put. A paid user must not lose Pro because of a wifi blip.
+//
+// Test-mode escape hatch: if chrome.storage.local has the key
+// `cf_devmode_force_sub_status` (string), it OVERRIDES the derived status
+// AFTER the real sync. Production code never writes this key. Documented
+// in README under Testing.
+async function syncSubscriptionFromExtPay(prefetchedUser) {
+  let user = prefetchedUser;
+  if (!user) {
+    try {
+      user = await extpay.getUser();
+    } catch (err) {
+      console.warn("[CleanFeed] syncSubscriptionFromExtPay failed:", err);
+      return;     // last-known cf_subscription preserved as-is
+    }
+  }
+  const next = {
+    lastSyncAt: Date.now(),
+    plan: user.planNickname || user.plan || null,
+    cancelAt: user.subscriptionCancelAt || null,
+    status: "none",
+  };
+  if (user.paid && !user.subscriptionCancelAt) {
+    next.status = "active";
+  } else if (user.paid && user.subscriptionCancelAt) {
+    next.status = "cancellation_pending";
+  } else if (user.subscriptionStatus === "past_due") {
+    next.status = "past_due";
+  } else if (user.subscriptionStatus === "canceled") {
+    next.status = "canceled";
+  } else {
+    next.status = "none";
+  }
+  // Legacy one-time-paid detection. Defensive: zero legacy buyers expected
+  // at v1.4.21 launch (the extension was always subscription-only here)
+  // but if any exist we treat them identically to license-key redeemers.
+  if (user.paid && !user.subscriptionStatus && !user.subscriptionCancelAt) {
+    await chrome.storage.local.set({ extpayPaid: true });
+    await ensureGrandfather();
+  }
+  await chrome.storage.local.set({ cf_subscription: next });
+  // Dev-mode override applied AFTER the real sync so production logic
+  // always runs first and stale overrides don't silently mask real state.
+  const ov = await chrome.storage.local.get(["cf_devmode_force_sub_status"]);
+  if (ov.cf_devmode_force_sub_status && typeof ov.cf_devmode_force_sub_status === "string") {
+    const forced = Object.assign({}, next, { status: ov.cf_devmode_force_sub_status });
+    await chrome.storage.local.set({ cf_subscription: forced });
+  }
+  await recomputePaid();
+}
+
 async function recomputePaid() {
   const data = await chrome.storage.local.get(
     ["paid", "extpayPaid", "cleanfeed_license", "cf_grandfathered", "cf_subscription"]
@@ -243,6 +315,16 @@ async function verifyLicenseIfPresent() {
   }
 }
 
+// v1.4.21-phase2 — 6-hourly periodic sync of cf_subscription so state
+// doesn't drift if the user keeps Chrome open for days without a restart
+// triggering onStartup. periodInMinutes:360 = 6h. Idempotent — calling
+// chrome.alarms.create with the same name replaces the existing alarm.
+function _ensureExtpaySyncAlarm() {
+  try {
+    chrome.alarms.create("cf-extpay-sync", { periodInMinutes: 360 });
+  } catch (_) { /* alarms permission denied — silently no-op */ }
+}
+
 chrome.runtime.onInstalled.addListener((details) => {
   _eagerlyMintApiKey("install/update (" + details.reason + ")");
   // v1.4.17 — seed install id + reconcile paid + re-verify license.
@@ -255,6 +337,10 @@ chrome.runtime.onInstalled.addListener((details) => {
   // v1.4.21-phase1 — lock in grandfather status BEFORE recomputePaid so
   // legacy license/extpay holders carry forward as lifetime Pro.
   ensureGrandfather().then(() => recomputePaid()).catch(() => {});
+  // v1.4.21-phase2 — pull fresh subscription state on every install /
+  // update. Network errors here are silent (sync function handles them).
+  syncSubscriptionFromExtPay().catch(() => {});
+  _ensureExtpaySyncAlarm();
   verifyLicenseIfPresent().catch(() => {});
 });
 chrome.runtime.onStartup.addListener(() => {
@@ -268,17 +354,26 @@ chrome.runtime.onStartup.addListener(() => {
   // v1.4.21-phase1 — second-chance grandfather lock-in on every browser
   // launch; idempotent no-op once cf_grandfathered=true.
   ensureGrandfather().then(() => recomputePaid()).catch(() => {});
+  // v1.4.21-phase2 — pull fresh subscription state on every browser launch.
+  syncSubscriptionFromExtPay().catch(() => {});
+  _ensureExtpaySyncAlarm();
   verifyLicenseIfPresent().catch(() => {});
 });
 
-// Mirror ExtPay paid status to its own storage key, then recompute the
-// derived `paid` flag. Pre-v1.4.17 this listener wrote `paid` directly.
+// v1.4.21-phase2 — unified ExtPay flow. The onPaid listener fires when
+// the user returns from a successful Stripe checkout; we route through
+// syncSubscriptionFromExtPay so cf_subscription is populated from the
+// same code path as periodic + startup syncs. The listener still writes
+// paidAt directly (legacy field used by popup's "paid since" copy) — the
+// sync function alone wouldn't, since it focuses on cf_subscription.
 extpay.onPaid.addListener(async (user) => {
-  await chrome.storage.local.set({
-    extpayPaid: !!user.paid,
-    paidAt: user.paidAt ? user.paidAt.toISOString() : null,
-  });
-  await recomputePaid();
+  try {
+    await chrome.storage.local.set({
+      paidAt: user.paidAt ? user.paidAt.toISOString() : null,
+    });
+  } catch (_) {}
+  // Pass the pre-fetched user so sync doesn't double-fetch over the network.
+  await syncSubscriptionFromExtPay(user);
 });
 
 // -------- onboarding ----------------------------------------------------
@@ -384,12 +479,15 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     // popup's readiness check passes without waiting.
     await chrome.storage.local.set({ cf_initialized: true });
   }
-  // check license on every browser launch (and on update)
-  try {
-    const user = await extpay.getUser();
-    await chrome.storage.local.set({ extpayPaid: !!user.paid });
-  } catch (_) { /* offline — keep cached flag */ }
-  await recomputePaid();
+  // v1.4.21-phase2 — route through the unified sync. Pre-v1.4.21 this
+  // block blanket-set extpayPaid=!!user.paid for every paid user, which
+  // permanently sticky'd subscribers into Pro via the `ext` clause in
+  // recomputePaid (a canceled subscriber would have stayed paid forever).
+  // syncSubscriptionFromExtPay only sets extpayPaid=true in the legacy
+  // one-time-buyer branch, and otherwise routes everything through
+  // cf_subscription.status — preserving the "lapsed subscriber drops to
+  // free" invariant. Network errors are silent inside the sync function.
+  await syncSubscriptionFromExtPay();
   updateBadge();
 });
 
@@ -470,6 +568,13 @@ async function _migrateForV140() {
 // Phase 2: break — blockers off; user browses freely. At alarm fire,
 //   if cycles remain → next focus; else clear state, fire completion.
 chrome.alarms.onAlarm.addListener(async (alarm) => {
+  // v1.4.21-phase2 — 6-hourly subscription sync so cf_subscription doesn't
+  // drift if the user keeps Chrome open for days without a restart. Network
+  // errors here are silent (handled inside syncSubscriptionFromExtPay).
+  if (alarm.name === "cf-extpay-sync") {
+    syncSubscriptionFromExtPay().catch(() => {});
+    return;
+  }
   if (alarm.name !== "cf-pomodoro") return;
   const data = await chrome.storage.local.get(["focusLock"]);
   const fl = data.focusLock || {};
@@ -833,17 +938,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   // Spec'd handler — return the full ExtPay user record.
+  // v1.4.21-phase2 — route through syncSubscriptionFromExtPay so popup
+  // refreshes update cf_subscription via the same path as periodic +
+  // startup syncs. We pass the pre-fetched user to avoid a duplicate
+  // network round-trip.
   if (msg.type === "cf:get-user") {
-    extpay.getUser().then(async (user) => {
-      // v1.4.17 — write extpayPaid (the raw ExtPay signal), then let
-      // recomputePaid() derive the merged `paid` flag.
-      await chrome.storage.local.set({
-        extpayPaid: !!user.paid,
-        paidAt: user.paidAt ? user.paidAt.toISOString() : null,
-      });
-      await recomputePaid();
-      sendResponse(user);
-    }).catch(() => sendResponse({ paid: false, error: "network" }));
+    (async () => {
+      try {
+        const user = await extpay.getUser();
+        try {
+          await chrome.storage.local.set({
+            paidAt: user.paidAt ? user.paidAt.toISOString() : null,
+          });
+        } catch (_) {}
+        await syncSubscriptionFromExtPay(user);
+        sendResponse(user);
+      } catch (_) {
+        sendResponse({ paid: false, error: "network" });
+      }
+    })();
     return true;
   }
   // After user returns from magic-link, popup asks us to force-refresh.
