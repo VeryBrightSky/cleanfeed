@@ -718,6 +718,16 @@ chrome.storage.onChanged.addListener((changes, area) => {
     // first, then recompute so the derived `paid` flag observes it.
     ensureGrandfather().then(() => recomputePaid()).catch(() => {});
   }
+  // v1.4.21-fix1 — cf_grandfathered + cf_subscription are now inputs to
+  // recomputePaid (added in Phase 1). The original listener only re-ran
+  // recompute on cleanfeed_license/extpayPaid changes, so if any other
+  // path flipped cf_grandfathered (e.g. options page reset, dev override,
+  // future feature) the derived `paid` would lag until the next storage
+  // event touched one of the original two keys. This ensures `paid` and
+  // the badge stay in lock-step with every relevant input.
+  if (changes.cf_grandfathered || changes.cf_subscription) {
+    recomputePaid().catch(() => {});
+  }
 });
 
 // -------- message routing -----------------------------------------------
@@ -907,6 +917,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       // openPaymentPage() called with no args.
       const plan = (msg && typeof msg.plan === "string") ? msg.plan : "";
       const validPlan = (plan === "monthly" || plan === "annual") ? plan : "";
+      // v1.4.21-fix1 — surface every failure mode that previously silently
+      // returned ok:true (api_key absent → fallback URL is the bare
+      // extension landing page, not a checkout; popup closes; user sees
+      // "nothing happened").
+      if (plan && !validPlan) {
+        console.error("[CleanFeed] cf:open-payment received invalid plan nickname:",
+          plan, "— falling back to plan-picker URL.");
+      }
+      if (!apiKey) {
+        console.error("[CleanFeed] cf:open-payment: no ExtPay api_key available — opening landing-page fallback. Likely cause: /api/new-key network failure on this profile. Run chrome.storage.sync.get('extensionpay_api_key', console.log) to inspect.");
+      }
       let url;
       if (apiKey) {
         url = validPlan
@@ -916,10 +937,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         url = `https://extensionpay.com/extension/cleanfeed2342?back=choose-plan`;
       }
       try {
-        await chrome.tabs.create({ url, active: true });
-        sendResponse({ ok: true, hasApiKey: !!apiKey, plan: validPlan || null });
+        const tab = await chrome.tabs.create({ url, active: true });
+        console.log("[CleanFeed] cf:open-payment opened tab", tab && tab.id, "url=", url);
+        sendResponse({ ok: true, hasApiKey: !!apiKey, plan: validPlan || null, tabId: tab && tab.id });
       } catch (err) {
-        console.error("[CleanFeed] Failed to open payment tab:", err);
+        console.error("[CleanFeed] Failed to open payment tab:", err, "url=", url);
         sendResponse({ ok: false, error: String(err) });
       }
     })();

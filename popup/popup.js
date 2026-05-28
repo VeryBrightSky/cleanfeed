@@ -829,7 +829,7 @@ function renderUpgrade() {
 
   host.appendChild(planRow);
   host.appendChild(el("p", { class: "cf-upgrade-features" },
-    "Same Pro features. All 14 blockers + Focus Lock + Pomodoro + keyword blocking + per-page rules + custom CSS."));
+    "Same Pro features. All 17 blockers + Focus Lock + Pomodoro + keyword blocking + per-page rules + custom CSS."));
   // Already-paid path still routes through openLogin / extpay reactivate.
   const loginBtn = el("button", { type: "button", class: "cf-link cf-already-paid", id: "cf-login" }, "Already paid? Log in");
   loginBtn.addEventListener("click", openLogin);
@@ -841,22 +841,40 @@ function renderUpgrade() {
 // v1.4.21 Phase 3 — Subscribe button handlers. Each route through
 // background.js cf:open-payment with msg.plan = "monthly" | "annual".
 // The handler validates the nickname server-side; this is just the trigger.
+//
+// v1.4.21-fix1 — each handler sets e._cfHandled = true so the delegated
+// fallback on #cf-upgrade-card (see _attachStaticHandlers) doesn't
+// double-dispatch the same click. The delegation exists as a safety net
+// for re-render races; under normal operation these inline handlers fire
+// first and the delegated path short-circuits.
 function onSubscribeClick(e) {
   const btn = e.currentTarget;
   const plan = (btn && btn.dataset && btn.dataset.plan) || "";
-  if (plan !== "monthly" && plan !== "annual") return;
+  if (plan !== "monthly" && plan !== "annual") {
+    // Surface what would have been a silent no-op pre-fix1. The static
+    // modal Subscribe buttons in popup.html now carry data-plan (fix1),
+    // so this branch should be unreachable in production. If it triggers,
+    // a future button was added without the attribute — log loudly.
+    console.error("[CleanFeed] onSubscribeClick fired without data-plan; id=",
+      btn && btn.id, "dataset=", btn && btn.dataset);
+    if (e) e._cfHandled = true;
+    return;
+  }
+  if (e) e._cfHandled = true;
   _busyClickWithPayload(e, "Opening…", "cf:open-payment", { plan });
 }
 function onResubscribeClick(e) {
   // Same wire, default to monthly if data-plan is missing.
   const btn = e.currentTarget;
   const plan = (btn && btn.dataset && btn.dataset.plan) === "annual" ? "annual" : "monthly";
+  if (e) e._cfHandled = true;
   _busyClickWithPayload(e, "Opening…", "cf:open-payment", { plan });
 }
 function onManageSubscription(e) {
   // Open the Stripe customer portal — ExtPay's openLoginPage() is the
   // existing reactivate/manage route. Routed through background.js to
   // pick up the api_key first.
+  if (e) e._cfHandled = true;
   _busyClick(e, "Opening…", "cf:open-login");
 }
 
@@ -1188,7 +1206,16 @@ function _busyClick(e, text, msgType) {
     chrome.runtime.sendMessage({ type: msgType }, (resp) => {
       clearTimeout(tMid);
       clearTimeout(tSafety);
-      if (chrome.runtime.lastError || !resp || resp.ok === false) {
+      // v1.4.21-fix1 — error surfacing (matches _busyClickWithPayload).
+      if (chrome.runtime.lastError) {
+        console.error("[CleanFeed]", msgType, "failed: message port closed",
+          chrome.runtime.lastError.message);
+        restore();
+        return;
+      }
+      if (!resp || resp.ok === false) {
+        console.error("[CleanFeed]", msgType, "background reported failure:",
+          (resp && resp.error) || "(empty response)");
         restore();
         return;
       }
@@ -1198,6 +1225,7 @@ function _busyClick(e, text, msgType) {
   } catch (err) {
     clearTimeout(tMid);
     clearTimeout(tSafety);
+    console.error("[CleanFeed] _busyClick sendMessage threw:", err);
     restore();
   }
 }
@@ -1231,7 +1259,24 @@ function _busyClickWithPayload(e, text, msgType, payload) {
     chrome.runtime.sendMessage(msg, (resp) => {
       clearTimeout(tMid);
       clearTimeout(tSafety);
-      if (chrome.runtime.lastError || !resp || resp.ok === false) {
+      // v1.4.21-fix1 — surface every failure mode. Pre-fix this branch
+      // collapsed three distinct failures (closed message port, missing
+      // response, background returned ok:false) into a single silent
+      // restore. Future regressions were impossible to debug.
+      if (chrome.runtime.lastError) {
+        console.error("[CleanFeed] cf:open-payment failed: message port closed",
+          chrome.runtime.lastError.message, "msg=", msg);
+        restore();
+        return;
+      }
+      if (!resp) {
+        console.error("[CleanFeed] cf:open-payment got empty response. msg=", msg);
+        restore();
+        return;
+      }
+      if (resp.ok === false) {
+        console.error("[CleanFeed] cf:open-payment background reported failure:",
+          resp.error || "(no error string)", "msg=", msg);
         restore();
         return;
       }
@@ -1240,11 +1285,13 @@ function _busyClickWithPayload(e, text, msgType, payload) {
   } catch (err) {
     clearTimeout(tMid);
     clearTimeout(tSafety);
+    console.error("[CleanFeed] _busyClickWithPayload sendMessage threw:", err);
     restore();
   }
 }
 
 function openPayment(e) {
+  if (e) e._cfHandled = true;
   _busyClick(e, "Opening…", "cf:open-payment");
 }
 function openLogin(e) {
@@ -1252,6 +1299,7 @@ function openLogin(e) {
   // background handler ensures the api_key exists in storage before
   // building the URL (v1.3.4), and we pre-fetch on popup open (v1.4.2)
   // so this is usually instant.
+  if (e) e._cfHandled = true;
   _busyClick(e, "Connecting…", "cf:open-login");
 }
 
@@ -1334,6 +1382,55 @@ function _attachStaticHandlers() {
   // v1.4.21 Phase 3 — cf-upgrade / cf-login are now JS-rendered inside
   // renderUpgrade (Case F), so they're attached at render time, not here.
   $("cf-reset-stats").addEventListener("click", resetStats);
+
+  // v1.4.21-fix1 — event-DELEGATION fallback for every Subscribe / plan
+  // button inside the upgrade card. Why both per-button AND delegated:
+  //   (a) per-button addEventListener inside renderUpgrade is fine on the
+  //       happy path and gives `e.currentTarget` directly;
+  //   (b) renderUpgrade rebuilds the upgrade-card body and re-attaches on
+  //       every re-render (init + storage.onChanged for cf_subscription /
+  //       cf_grandfathered). If a render race ever orphaned a listener
+  //       OR a future button is added without an inline bind, the
+  //       delegated handler here catches it.
+  // The delegated handler dispatches off data-plan (preferred) or button
+  // id (fallback for "manage subscription" / "update payment method" /
+  // "already paid" buttons that route through cf:open-login).
+  const upgradeHost = $("cf-upgrade-card");
+  if (upgradeHost) {
+    upgradeHost.addEventListener("click", (e) => {
+      const t = e.target && e.target.closest("button, .cf-link");
+      if (!t || !upgradeHost.contains(t)) return;
+      // Prefer data-plan when present.
+      const planAttr = t.dataset && t.dataset.plan;
+      if (planAttr === "monthly" || planAttr === "annual") {
+        // Skip if the per-button listener is already firing this very click
+        // — we use a one-shot guard so the same click doesn't dispatch
+        // sendMessage twice. The per-button listener runs first (in order
+        // of attachment); we set a flag there to short-circuit here.
+        if (e._cfHandled) return;
+        e._cfHandled = true;
+        const ev = Object.assign({}, { currentTarget: t });
+        // Reuse onSubscribeClick semantics, but route via _busyClickWithPayload
+        // directly so we can pass `e` as-is (its currentTarget is t).
+        _busyClickWithPayload({ currentTarget: t, target: t }, "Opening…",
+          "cf:open-payment", { plan: planAttr });
+        return;
+      }
+      if (t.id === "cf-manage-sub" || t.id === "cf-update-payment" || t.id === "cf-login") {
+        if (e._cfHandled) return;
+        e._cfHandled = true;
+        _busyClick({ currentTarget: t, target: t }, "Opening…", "cf:open-login");
+        return;
+      }
+      if (t.id === "cf-resubscribe") {
+        if (e._cfHandled) return;
+        e._cfHandled = true;
+        const plan = (t.dataset && t.dataset.plan) === "annual" ? "annual" : "monthly";
+        _busyClickWithPayload({ currentTarget: t, target: t }, "Opening…",
+          "cf:open-payment", { plan });
+      }
+    });
+  }
   $("cf-open-options").addEventListener("click", () => chrome.runtime.openOptionsPage());
   $("cf-open-onboarding").addEventListener("click", () => {
     chrome.tabs.create({ url: chrome.runtime.getURL("onboarding/welcome.html") });
