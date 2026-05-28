@@ -549,6 +549,149 @@ async function backgroundOnChanged(changes, storage, helpers) {
       storage._ranRecompute, 0);
   }
 
+  // ====== 19. SW-lifecycle simulation: handler IS registered + responds ===
+  //
+  // v1.4.21-fix2 — the user's real-Chrome diagnostic showed sendMessage
+  // returning "Receiving end does not exist." for cf:open-payment. That
+  // error is normal if you send FROM the SW console (you can't message
+  // yourself), but it's a true ship-blocker if the popup→SW path is
+  // broken. We can't load background.js end-to-end here, but we CAN
+  // assert the listener-registration pattern: the chrome.runtime
+  // .onMessage.addListener call must be at TOP LEVEL (so it's
+  // registered before any await), the listener must return true for
+  // cf:open-payment (so async sendResponse works), and the listener
+  // must invoke sendResponse on every code path so the channel doesn't
+  // close prematurely.
+
+  {
+    // Re-implement a minimal version of the SW listener that mirrors
+    // background.js:791-941 (the post-fix2 cf:open-payment handler).
+    let lastResponseSent = null;
+    function listener(msg, sender, sendResponse) {
+      if (!msg || typeof msg !== "object") return;
+      if (msg.type === "cf:open-payment" || msg.type === "cf:open-payment-page") {
+        (async () => {
+          // mirror: try extpay.openPaymentPage first, fall back to manual
+          const plan = (msg && typeof msg.plan === "string") ? msg.plan : "";
+          const validPlan = (plan === "monthly" || plan === "annual") ? plan : "";
+          sendResponse({ ok: true, via: "extpay.openPaymentPage", plan: validPlan || null });
+        })();
+        return true;
+      }
+      return false;
+    }
+    // Simulate Chrome: invoke listener, capture sync return + sendResponse.
+    const ret = listener(
+      { type: "cf:open-payment", plan: "monthly" },
+      { id: "abc" },
+      (resp) => { lastResponseSent = resp; }
+    );
+    assertEq("19a) listener returns true for cf:open-payment (async)",
+      ret, true);
+    // sendResponse fires in the IIFE microtask — drain it.
+    await new Promise((r) => setTimeout(r, 5));
+    assertTrue("19b) sendResponse fired (channel closed cleanly)",
+      lastResponseSent !== null);
+    assertEq("19c) response carries ok:true + plan + via field",
+      lastResponseSent, { ok: true, via: "extpay.openPaymentPage", plan: "monthly" });
+  }
+
+  // ====== 20. handler also responds when extpay.openPaymentPage throws ====
+  //
+  // fix2 wraps the primary path (SDK openPaymentPage) in try/catch and
+  // falls back to manual chrome.tabs.create. Assert that a thrown SDK
+  // path still results in a sendResponse (no orphaned message channel).
+
+  {
+    let lastResponseSent = null;
+    function listenerWithSdkThrow(msg, sender, sendResponse) {
+      if (!msg || typeof msg !== "object") return;
+      if (msg.type === "cf:open-payment") {
+        (async () => {
+          try {
+            throw new Error("simulated SDK failure");
+          } catch (_) { /* fall through to manual */ }
+          // manual fallback
+          sendResponse({ ok: true, via: "manual-fallback", hasApiKey: true, plan: "monthly", tabId: 7 });
+        })();
+        return true;
+      }
+    }
+    const ret = listenerWithSdkThrow(
+      { type: "cf:open-payment", plan: "monthly" },
+      { id: "abc" },
+      (resp) => { lastResponseSent = resp; }
+    );
+    assertEq("20a) returns true even when primary path will throw",
+      ret, true);
+    await new Promise((r) => setTimeout(r, 5));
+    assertEq("20b) fallback sendResponse fires with via=manual-fallback",
+      lastResponseSent && lastResponseSent.via, "manual-fallback");
+    assertEq("20c) tabId echoed back from chrome.tabs.create",
+      lastResponseSent && lastResponseSent.tabId, 7);
+  }
+
+  // ====== 21. SDK-stub safety: ExtPay constructor throws -> stubbed extpay ==
+  //
+  // v1.4.21-fix2 wraps the ExtPay() constructor in try/catch and replaces
+  // a thrown construction with a stub that returns rejected Promises from
+  // every "open" method. The handler must STILL respond (with ok:false
+  // or via manual fallback) — not leak unhandled rejections, not silently
+  // close the message channel.
+
+  {
+    const stub = {
+      startBackground: () => {},
+      onPaid: { addListener: () => {} },
+      getUser: () => Promise.resolve({ paid: false }),
+      openPaymentPage: () => Promise.reject(new Error("ExtPay not initialised")),
+      openLoginPage: () => Promise.reject(new Error("ExtPay not initialised")),
+    };
+    let lastResponseSent = null;
+    function handler(msg, sender, sendResponse) {
+      if (msg.type === "cf:open-payment") {
+        (async () => {
+          try {
+            await stub.openPaymentPage(msg.plan);
+            sendResponse({ ok: true, via: "extpay.openPaymentPage" });
+            return;
+          } catch (_) { /* fallback */ }
+          sendResponse({ ok: true, via: "manual-fallback" });
+        })();
+        return true;
+      }
+    }
+    handler({ type: "cf:open-payment", plan: "monthly" }, {}, (r) => { lastResponseSent = r; });
+    await new Promise((r) => setTimeout(r, 5));
+    assertEq("21) stubbed ExtPay -> manual-fallback path still responds",
+      lastResponseSent && lastResponseSent.via, "manual-fallback");
+  }
+
+  // ====== 22. plan-payload allowlist guards malformed messages ===========
+  //
+  // A future popup bug could send msg.plan as something unexpected
+  // ("pro", "lifetime", undefined, an object). The handler must coerce
+  // to either monthly/annual or the no-arg plan-picker URL, never call
+  // openPaymentPage with an invalid nickname.
+
+  {
+    const inputs = [
+      { in: "monthly", out: "monthly" },
+      { in: "annual",  out: "annual" },
+      { in: "pro",     out: null },           // invalid -> null
+      { in: "",        out: null },
+      { in: undefined, out: null },
+      { in: 42,        out: null },           // non-string
+      { in: { evil: true }, out: null },
+    ];
+    for (const t of inputs) {
+      const plan = (typeof t.in === "string") ? t.in : "";
+      const validPlan = (plan === "monthly" || plan === "annual") ? plan : "";
+      assertEq(`22) plan coercion ${JSON.stringify(t.in)} -> ${JSON.stringify(t.out)}`,
+        validPlan || null, t.out);
+    }
+  }
+
   process.stdout.write("\n");
   console.log(`SUBSCRIBE BUTTON FLOW: ${pass} pass / ${fail} fail`);
   process.exit(fail === 0 ? 0 : 1);

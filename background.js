@@ -10,11 +10,76 @@
  *
  * Service workers are short-lived: any state must come from chrome.storage.
  */
+// v1.4.21-fix2 — instrumented boot. The previous Subscribe-button
+// ship-blocker (v1.4.21 + fix1) made debugging real-Chrome failure modes
+// difficult because nothing in the SW boot path emitted a log line. Now
+// every load-bearing init step prints "[CleanFeed] ..." so opening the
+// SW DevTools console after a fresh load tells you immediately whether
+// ExtPay initialised, the onMessage listener registered, and (after a
+// 5 s watchdog) whether the ExtensionPay api_key was minted.
+//
+// CF_DEBUG also gates a per-message log of msg.type at the top of the
+// onMessage listener so future "Subscribe does nothing" reports can be
+// triaged in one glance. Leave it true for the foreseeable future; the
+// per-message log is one line of JSON per click and noise is negligible.
+const CF_DEBUG = true;
+function _cflog() {
+  if (!CF_DEBUG) return;
+  try { console.log.apply(console, ["[CleanFeed]"].concat([].slice.call(arguments))); }
+  catch (_) {}
+}
+_cflog("SW boot start, manifest version", (chrome.runtime.getManifest() || {}).version);
+
 importScripts("lib/extpay.js");
+_cflog("lib/extpay.js loaded; typeof ExtPay =", typeof ExtPay);
 
 const EXTPAY_ID = "cleanfeed2342";
-const extpay = ExtPay(EXTPAY_ID);
-extpay.startBackground();
+let extpay;
+try {
+  extpay = ExtPay(EXTPAY_ID);
+  _cflog("ExtPay constructed for id", EXTPAY_ID);
+} catch (err) {
+  console.error("[CleanFeed] ExtPay constructor threw:", err);
+  // Stub so the rest of the SW boots without throwing on undefined access.
+  extpay = {
+    startBackground: () => {},
+    onPaid: { addListener: () => {} },
+    getUser: () => Promise.resolve({ paid: false }),
+    openPaymentPage: () => Promise.reject(new Error("ExtPay not initialised")),
+    openLoginPage: () => Promise.reject(new Error("ExtPay not initialised")),
+  };
+}
+try {
+  extpay.startBackground();
+  _cflog("extpay.startBackground() returned");
+} catch (err) {
+  console.error("[CleanFeed] extpay.startBackground() threw:", err);
+}
+// v1.4.21-fix2 — 5 s watchdog. The SDK writes extensionpay_installed_at
+// to chrome.storage.SYNC inside the ExtPay(id) constructor; api_key is
+// only minted on first open_payment_page / explicit _createExtpayApiKey.
+// Logging both stores so future diagnostics know exactly where to look
+// (and don't repeat the v1.4.21-fix1 mistake of checking the wrong area).
+setTimeout(() => {
+  try {
+    chrome.storage.sync.get(
+      ["extensionpay_api_key", "extensionpay_installed_at", "extensionpay_user"],
+      (s) => {
+        _cflog("watchdog: chrome.storage.sync ExtPay state =",
+          s && Object.keys(s).length ? s : "(empty)");
+      }
+    );
+    chrome.storage.local.get(
+      ["extensionpay_api_key", "extensionpay_installed_at"],
+      (l) => {
+        _cflog("watchdog: chrome.storage.local ExtPay state =",
+          l && Object.keys(l).length ? l : "(empty)");
+      }
+    );
+  } catch (err) {
+    console.error("[CleanFeed] watchdog threw:", err);
+  }
+}, 5000);
 
 // ----- ExtPay api_key helpers (hoisted to module scope in v1.4.2 so
 // that chrome.runtime.onInstalled and chrome.runtime.onStartup can call
@@ -790,6 +855,12 @@ function _recordTime(ms) {
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || typeof msg !== "object") return;
+  // v1.4.21-fix2 — per-message log gated on CF_DEBUG. Confirms in one
+  // glance that the SW's onMessage handler is reachable. If you click
+  // Subscribe and DON'T see "[CleanFeed] onMessage cf:open-payment" in
+  // the SW DevTools console, the message never arrived (SW idle, sender
+  // context wrong, or background.js syntax-aborted before line 791).
+  _cflog("onMessage", msg.type, "from sender id=", sender && sender.id);
 
   // v1.4.3 — popup pings this synchronously the moment it opens to keep the
   // MV3 service worker awake during render. Just acknowledge — no side effects.
@@ -908,25 +979,47 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === "cf:open-payment" || msg.type === "cf:open-payment-page") {
     (async () => {
-      const apiKey = await _ensureExtpayApiKey();
-      // v1.4.21-phase3 — multi-plan support. ExtPay's openPaymentPage(nick)
-      // routes to /choose-plan/<nick>; we accept the nickname via msg.plan
-      // and validate against the two configured nicknames so a popup bug
-      // can't open arbitrary plan URLs. If msg.plan is absent we fall back
-      // to /choose-plan (ExtPay's plan-picker screen) — matches the SDK's
-      // openPaymentPage() called with no args.
       const plan = (msg && typeof msg.plan === "string") ? msg.plan : "";
       const validPlan = (plan === "monthly" || plan === "annual") ? plan : "";
-      // v1.4.21-fix1 — surface every failure mode that previously silently
-      // returned ok:true (api_key absent → fallback URL is the bare
-      // extension landing page, not a checkout; popup closes; user sees
-      // "nothing happened").
       if (plan && !validPlan) {
         console.error("[CleanFeed] cf:open-payment received invalid plan nickname:",
           plan, "— falling back to plan-picker URL.");
       }
+      _cflog("cf:open-payment plan=", plan, "validPlan=", validPlan);
+
+      // v1.4.21-fix2 — PRIMARY PATH: route through extpay.openPaymentPage,
+      // matching the SDK's documented multi-plan API. The SDK handles
+      // get_key/create_key + chrome.tabs.create internally, writes the
+      // api_key to chrome.storage.sync (where every other ExtPay caller
+      // expects it), and avoids us duplicating that flow in
+      // _ensureExtpayApiKey. Pre-fix2 we built the URL ourselves and
+      // called chrome.tabs.create directly — works when api_key minting
+      // succeeds, fails silently when it doesn't.
+      try {
+        if (extpay && typeof extpay.openPaymentPage === "function") {
+          _cflog("calling extpay.openPaymentPage", validPlan || "(no plan)");
+          // The SDK returns a Promise; await it so failures surface in our
+          // try/catch instead of as unhandled rejections. NOTE: the SDK's
+          // open_payment_page does NOT return the created tab object.
+          await extpay.openPaymentPage(validPlan || undefined);
+          _cflog("extpay.openPaymentPage resolved (tab should be open)");
+          sendResponse({ ok: true, via: "extpay.openPaymentPage", plan: validPlan || null });
+          return;
+        }
+        console.error("[CleanFeed] cf:open-payment: extpay.openPaymentPage unavailable — falling back to manual URL.");
+      } catch (err) {
+        // SDK can throw if create_key fetch fails. Don't fail closed —
+        // try the manual fallback so the user still gets SOMETHING.
+        console.error("[CleanFeed] extpay.openPaymentPage threw, falling back to manual URL:", err);
+      }
+
+      // FALLBACK PATH — manual URL build + chrome.tabs.create. The v1.3.4
+      // path that we used as the primary in v1.4.21 through fix1. Kept as
+      // a defensive backup so a single point of failure in the SDK doesn't
+      // strand the user with a dead button.
+      const apiKey = await _ensureExtpayApiKey();
       if (!apiKey) {
-        console.error("[CleanFeed] cf:open-payment: no ExtPay api_key available — opening landing-page fallback. Likely cause: /api/new-key network failure on this profile. Run chrome.storage.sync.get('extensionpay_api_key', console.log) to inspect.");
+        console.error("[CleanFeed] cf:open-payment fallback: no ExtPay api_key available — opening landing-page fallback. Likely cause: /api/new-key network failure on this profile. Run chrome.storage.sync.get('extensionpay_api_key', console.log) to inspect.");
       }
       let url;
       if (apiKey) {
@@ -938,10 +1031,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       try {
         const tab = await chrome.tabs.create({ url, active: true });
-        console.log("[CleanFeed] cf:open-payment opened tab", tab && tab.id, "url=", url);
-        sendResponse({ ok: true, hasApiKey: !!apiKey, plan: validPlan || null, tabId: tab && tab.id });
+        _cflog("fallback opened tab id=", tab && tab.id, "url=", url);
+        sendResponse({ ok: true, via: "manual-fallback", hasApiKey: !!apiKey, plan: validPlan || null, tabId: tab && tab.id });
       } catch (err) {
-        console.error("[CleanFeed] Failed to open payment tab:", err, "url=", url);
+        console.error("[CleanFeed] Failed to open payment tab (both paths):", err, "url=", url);
         sendResponse({ ok: false, error: String(err) });
       }
     })();

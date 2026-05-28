@@ -11,6 +11,67 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.4.21-fix2 — 2026-05-28 (actually fix Subscribe button — register cf:open-payment handler properly + ensure extpay.startBackground() runs on install (fix1 was incomplete))
+- **Ship-blocker continuation.** v1.4.21-fix1 added popup-side error surfacing but did NOT change the SW-side flow. The user's real-Chrome diagnostic still showed Subscribe doing nothing, with the SW-console reporting "Could not establish connection. Receiving end does not exist." when sending `cf:open-payment` to the SW, and the storage-state check showing the ExtPay api_key + installed_at as empty. fix2 instruments every load-bearing SW init step, routes the payment handler through the SDK's documented multi-plan API, and corrects two diagnostic mistakes from the previous round.
+- **Diagnostic clarifications (both important even before fix2's code changes).**
+  - **The SDK writes to `chrome.storage.SYNC`, not `local`.** `lib/extpay.js:1258-1273` `get`/`set` helpers try sync first, fall back to local only on error. The correct command to inspect ExtPay state is `chrome.storage.sync.get(['extensionpay_api_key', 'extensionpay_installed_at'], console.log)` — the previous test against `chrome.storage.local` returns empty for keys that live in sync, even when ExtPay is healthy.
+  - **`chrome.runtime.sendMessage` from the SW DevTools console does NOT reach the SW's own onMessage listener.** Chrome routes those messages to other extension pages (popup, options, content scripts). With no popup open at test time, "Receiving end does not exist." is normal — it's not proof the handler is broken. The real test is sendMessage from the **popup** DevTools console, which targets the SW.
+- **fix2 — instrumented boot (`background.js:13-78`).** New `CF_DEBUG = true` const and `_cflog()` helper that prefix every log with `[CleanFeed]`. SW boot now emits, in order:
+  - `SW boot start, manifest version <v>` — first line after the `_cflog` definition.
+  - `lib/extpay.js loaded; typeof ExtPay = function` — confirms importScripts succeeded.
+  - `ExtPay constructed for id cleanfeed2342` — confirms the constructor didn't throw.
+  - `extpay.startBackground() returned` — confirms the SDK's onMessage listener was registered for `extpay-fetch-user` / `extpay-trial-start` / `extpay-extinfo`.
+  After 5 s, a watchdog logs the ExtPay state from BOTH stores: `watchdog: chrome.storage.sync ExtPay state = ...` and `watchdog: chrome.storage.local ExtPay state = ...`. If the sync line shows `(empty)` and the local line ALSO shows `(empty)` after 5 s on a fresh install, ExtPay's `extensionpay_installed_at` write inside the constructor failed — almost certainly a `browserPolyfill` initialization issue or a chrome.storage.sync block.
+- **fix2 — defensive ExtPay stub.** `background.js:35-50` wraps `ExtPay(EXTPAY_ID)` and `extpay.startBackground()` in try/catch. If either throws (e.g. browserPolyfill missing, manifest permission lockout), `extpay` is replaced with a stub whose `openPaymentPage` / `openLoginPage` return rejected Promises. The rest of the SW boots without throwing on undefined accesses, and the cf:open-payment handler's try/catch surfaces the stub-failure path explicitly to the SW console.
+- **fix2 — per-message CF_DEBUG log (`background.js:809`).** Top of the chrome.runtime.onMessage listener now logs `[CleanFeed] onMessage <type> from sender id=<id>`. Clicking Subscribe should produce `[CleanFeed] onMessage cf:open-payment from sender id=<extension-id>` in the SW DevTools console. If you click Subscribe and DON'T see that line, the message never reached the SW (SW suspended without wake, sender context wrong, or background.js syntax-aborted before line 791) — a fundamentally different failure mode than the silent restore we patched in fix1.
+- **fix2 — `cf:open-payment` routed through `extpay.openPaymentPage(plan)` (`background.js:927-955`).** PRIMARY PATH is now the SDK's documented multi-plan API. The SDK handles get_key/create_key + chrome.tabs.create internally and writes the api_key to chrome.storage.sync. If the SDK throws (api_key fetch fails, browserPolyfill misbehaves), the handler catches and FALLS BACK to the v1.3.4 manual URL + chrome.tabs.create path. Every branch ends with a sendResponse + a log line. The response includes a `via: "extpay.openPaymentPage" | "manual-fallback"` field so the next diagnostic round can confirm which path opened the tab.
+- **Anti-scope-creep guarantees.** Popup, options, content scripts, _locales, onboarding — unchanged. Manifest permissions unchanged. ExtPay SDK (`lib/extpay.js`) unchanged. Cloudflare Worker license-server unchanged. Test inventory unchanged for 17 of 19 suites; `subscribe-button-flow.js` extended; `subscription-sync.js`/`grandfather-migration.js`/etc untouched.
+- **Tests extended: `tests/subscribe-button-flow.js` (58/58, +14 from fix1's 44).** New assertions: (19) SW-listener returns true for cf:open-payment + sendResponse fires (proves async response wiring is intact); (20) handler still responds when the primary SDK path throws — fallback path's sendResponse fires with `via=manual-fallback`; (21) ExtPay stub (constructor-threw scenario) still routes to fallback; (22) plan-payload coercion allowlist matrix: "monthly" / "annual" / "pro" / "" / undefined / number / object — every non-monthly/annual input coerces to `null` (no-arg plan-picker URL), never reaches openPaymentPage with an invalid nickname.
+- **All 18 existing suites stay green.** Grand total: **614 pass / 0 fail** (+14 from v1.4.21-fix1's 600).
+- **Manifest.** `version: "1.4.21.3" → "1.4.21.4"`. `version_name: "1.4.21-fix1" → "1.4.21-fix2"`. Zip: `dist/cleanfeed-v1.4.21-fix2.zip`. All 12 `_locales/` folders intact.
+- **Diff summary.** `background.js` (+90/-25: CF_DEBUG + _cflog helper, instrumented boot, ExtPay stub, 5 s watchdog, onMessage entry log, refactored cf:open-payment to use extpay.openPaymentPage as primary with manual fallback), `manifest.json` (2 lines), `README.md` (this entry), `tests/subscribe-button-flow.js` (+ ~170 lines for 14 new assertions). Zero changes to `popup/`, `options/`, `_locales/`, `content/`, `onboarding/`, `lib/`, `icons/`, `build.py`.
+- **Manual verification plan (fix2) — CORRECTED diagnostics from fix1.**
+  1. Extract + load: `mkdir -p ~/cleanfeed-v1421-fix2-unpacked && python3 -m zipfile -e ~/workspace/cleanfeed/dist/cleanfeed-v1.4.21-fix2.zip ~/cleanfeed-v1421-fix2-unpacked/`. In `chrome://extensions` → Remove old + Load unpacked → pick the fix2 folder.
+  2. **Open the SW DevTools console** (chrome://extensions → CleanFeed → "service worker" link). Within ~1 s of load you should see, in order:
+     ```
+     [CleanFeed] SW boot start, manifest version 1.4.21.4
+     [CleanFeed] lib/extpay.js loaded; typeof ExtPay = function
+     [CleanFeed] ExtPay constructed for id cleanfeed2342
+     [CleanFeed] extpay.startBackground() returned
+     ```
+     If any of these is MISSING or replaced with `[CleanFeed] ExtPay constructor threw: …`, paste that exact line back — it identifies which part of the SDK loaded broken.
+  3. Wait 5 s. Watchdog logs both stores:
+     ```
+     [CleanFeed] watchdog: chrome.storage.sync ExtPay state = { extensionpay_installed_at: "..." [+ extensionpay_api_key if minted] }
+     [CleanFeed] watchdog: chrome.storage.local ExtPay state = (empty)
+     ```
+     The `extensionpay_installed_at` field in SYNC should be a timestamp. If sync also says `(empty)`, the SDK's constructor's storage write failed.
+  4. Open the popup. SW console should log `[CleanFeed] onMessage cf:wake from sender id=<extension-id>` (the popup's wake-ping). If this is missing, the popup→SW channel is broken.
+  5. Click Monthly Subscribe. SW console logs:
+     ```
+     [CleanFeed] onMessage cf:open-payment from sender id=<extension-id>
+     [CleanFeed] cf:open-payment plan= monthly validPlan= monthly
+     [CleanFeed] calling extpay.openPaymentPage monthly
+     [CleanFeed] extpay.openPaymentPage resolved (tab should be open)
+     ```
+     A new tab opens to `https://extensionpay.com/extension/cleanfeed2342/choose-plan/monthly?api_key=…` → Stripe Monthly checkout. Test card `4242 4242 4242 4242`, any future expiry, any CVC.
+  6. **If the SDK path fails**, the SW console shows the fallback path engaging:
+     ```
+     [CleanFeed] extpay.openPaymentPage threw, falling back to manual URL: Error: ...
+     [CleanFeed] fallback opened tab id=<N> url=https://extensionpay.com/extension/cleanfeed2342/choose-plan/monthly?api_key=...
+     ```
+     A tab still opens — just via the manual chrome.tabs.create path instead. The popup gets `{ok: true, via: "manual-fallback"}`.
+  7. **Correct diagnostic command for ExtPay state** (when you want to test from devtools later):
+     ```javascript
+     chrome.storage.sync.get(['extensionpay_api_key', 'extensionpay_installed_at'], console.log)
+     ```
+     NOT `chrome.storage.local`. The api_key + installed_at live in `sync`.
+  8. **Correct diagnostic command for the message channel**: send the test message from the **popup DevTools console**, not the SW console:
+     - Right-click the popup → Inspect → Console tab.
+     - Paste: `chrome.runtime.sendMessage({type:'cf:open-payment', plan:'monthly'}, r => console.log('resp:', r, 'lastError:', chrome.runtime.lastError?.message))`
+     - Expected: `resp: {ok: true, via: 'extpay.openPaymentPage', plan: 'monthly'} lastError: undefined`
+     - If you see `lastError: "Could not establish connection..."`, the SW listener really isn't responding — paste the SW console output for triage.
+
 ### v1.4.21-fix1 — 2026-05-28 (fix dead Subscribe button + 14→17 copy + grandfather recompute)
 - **Ship-blocker hotfix.** v1.4.21 shipped with the inline Subscribe button (Case F upsell, both Monthly and Annual) silently failing — no tab opened, no console errors anywhere. Diagnosis (jsdom + static trace) confirmed the click chain itself was correct end-to-end; the actual user-visible failure was hidden by a swallowed callback path. fix1 surfaces every failure mode + adds a defensive event-delegation backup + closes two adjacent bugs in the same patch.
 - **Root cause (`popup/popup.js:1234` pre-fix).** The `_busyClickWithPayload` callback collapsed three distinct failure modes — `chrome.runtime.lastError` (closed message port), missing response, and `resp.ok === false` — into a single silent `restore()` with no log line. Compounding factor: the STATIC modal Subscribe buttons (`popup/popup.html:140,147`) lacked the `data-plan` attribute, so any click that reached them was silently early-returned by `onSubscribeClick` (the dataset.plan check failed). Compounding factor 2 (architectural fragility): per-button `addEventListener` inside `renderUpgrade` re-attaches on every re-render, which a future re-render race could orphan.
