@@ -110,15 +110,51 @@ async function _eagerlyMintApiKey(reason) {
 // historical ExtPay state is preserved across the upgrade.
 const LICENSE_SERVER = "https://cleanfeed-license.cleanfeed.workers.dev";
 
+// v1.4.21-phase1 — grandfather lock-in. Anyone who EVER held license-key Pro
+// or legacy ExtPay one-time-paid status gets cf_grandfathered=true permanently
+// the first time we observe them in that state. Once true, never overwritten.
+// Subscription users do NOT get grandfathered — when their sub lapses they
+// drop to free. Idempotent + race-safe via the same double-read pattern as
+// ensureInstallId / ensureCfStats.
+async function ensureGrandfather() {
+  const d1 = await chrome.storage.local.get(
+    ["cf_grandfathered", "extpayPaid", "cleanfeed_license"]
+  );
+  if (d1.cf_grandfathered === true) return;     // already locked in
+  const hasLicense = !!(d1.cleanfeed_license && d1.cleanfeed_license.active);
+  const hasLegacyExtpay = d1.extpayPaid === true;
+  if (!hasLicense && !hasLegacyExtpay) return;  // not Pro right now
+  // Re-check before write under "writer wins" semantics — if another caller
+  // (e.g. a parallel storage.onChanged dispatch) wrote between reads, prefer
+  // theirs so cf_grandfathered_at doesn't churn.
+  const d2 = await chrome.storage.local.get(["cf_grandfathered"]);
+  if (d2.cf_grandfathered === true) return;
+  // legacy_extpay wins precedence when both signals are present — those
+  // users predate the license-key path entirely, so the more specific
+  // historical reason is the right one to record.
+  const reason = hasLegacyExtpay ? "legacy_extpay" : "license_key";
+  await chrome.storage.local.set({
+    cf_grandfathered: true,
+    cf_grandfathered_at: new Date().toISOString(),
+    cf_grandfathered_reason: reason,
+  });
+}
+
 async function recomputePaid() {
   const data = await chrome.storage.local.get(
-    ["paid", "extpayPaid", "cleanfeed_license"]
+    ["paid", "extpayPaid", "cleanfeed_license", "cf_grandfathered", "cf_subscription"]
   );
+  // v1.4.21-phase1 — grandfather is the new permanent layer.
+  const gf = data.cf_grandfathered === true;
+  // v1.4.21-phase1 — subscription is the new revenue layer. past_due is
+  // intentionally treated as paid (ExtPay's automatic-retry grace window).
+  const sub = data.cf_subscription && data.cf_subscription.status;
+  const subActive = (sub === "active" || sub === "cancellation_pending" || sub === "past_due");
   let ext = data.extpayPaid;
   const needMigration = (typeof ext !== "boolean");
   if (needMigration) ext = !!data.paid;        // v1.4.16 → v1.4.17 migration
   const lic = !!(data.cleanfeed_license && data.cleanfeed_license.active);
-  const next = ext || lic;
+  const next = gf || subActive || ext || lic;
   const patch = {};
   if (needMigration) patch.extpayPaid = ext;
   if (data.paid !== next) patch.paid = next;
@@ -216,7 +252,9 @@ chrome.runtime.onInstalled.addListener((details) => {
   // dev-mode reloads + any onInstalled.reason !== "install"/"update", so
   // v1.4.19→v1.4.20-alpha upgraders saw cf_stats never seeded.
   ensureCfStats().catch(() => {});
-  recomputePaid().catch(() => {});
+  // v1.4.21-phase1 — lock in grandfather status BEFORE recomputePaid so
+  // legacy license/extpay holders carry forward as lifetime Pro.
+  ensureGrandfather().then(() => recomputePaid()).catch(() => {});
   verifyLicenseIfPresent().catch(() => {});
 });
 chrome.runtime.onStartup.addListener(() => {
@@ -227,7 +265,9 @@ chrome.runtime.onStartup.addListener(() => {
   // so users whose onInstalled never fired still get the key on next
   // Chrome restart. Idempotent.
   ensureCfStats().catch(() => {});
-  recomputePaid().catch(() => {});
+  // v1.4.21-phase1 — second-chance grandfather lock-in on every browser
+  // launch; idempotent no-op once cf_grandfathered=true.
+  ensureGrandfather().then(() => recomputePaid()).catch(() => {});
   verifyLicenseIfPresent().catch(() => {});
 });
 
@@ -310,6 +350,14 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       //   session_started: <ms-epoch>   // first-init timestamp
       // No UI consumes this yet; Phase 2 will read + render.
       cf_stats: { blocked: {}, autoplay_avoided: {}, session_started: Date.now() },
+      // v1.4.21-phase1 — subscription model + grandfather. Brand-new
+      // installs are NOT grandfathered (they never held legacy paid
+      // status). cf_subscription tracks ExtPay subscription state once
+      // Phase 2's sync wiring lands. lastSyncAt=0 marks "never synced".
+      cf_grandfathered: false,
+      cf_grandfathered_at: null,
+      cf_grandfathered_reason: null,
+      cf_subscription: { status: "none", plan: null, cancelAt: null, lastSyncAt: 0 },
     };
     await chrome.storage.local.set(defaults);
     // Set the readiness flag in a SEPARATE write so popup/content can
@@ -394,6 +442,17 @@ async function _migrateForV140() {
   if (typeof data.cf_stats === "undefined" || data.cf_stats === null ||
       typeof data.cf_stats !== "object") {
     patch.cf_stats = { blocked: {}, autoplay_avoided: {}, session_started: Date.now() };
+  }
+  // v1.4.21-phase1 — seed subscription + grandfather defaults for upgrading
+  // users. cf_grandfathered stays FALSE here; the actual lock-in to TRUE for
+  // qualifying users (active license OR legacy extpayPaid) happens in
+  // ensureGrandfather(), called from the lifecycle listeners after migration.
+  if (typeof data.cf_grandfathered === "undefined") patch.cf_grandfathered = false;
+  if (typeof data.cf_grandfathered_at === "undefined") patch.cf_grandfathered_at = null;
+  if (typeof data.cf_grandfathered_reason === "undefined") patch.cf_grandfathered_reason = null;
+  if (typeof data.cf_subscription === "undefined" || data.cf_subscription === null ||
+      typeof data.cf_subscription !== "object") {
+    patch.cf_subscription = { status: "none", plan: null, cancelAt: null, lastSyncAt: 0 };
   }
   // focusLock — preserve existing object, just ensure mode/pomodoro fields exist
   const fl = data.focusLock || {};
@@ -547,7 +606,12 @@ chrome.storage.onChanged.addListener((changes, area) => {
   // recurse — recomputePaid writes `paid` and may write `extpayPaid`
   // exactly once for migration; the migration write is idempotent.
   if (changes.cleanfeed_license || changes.extpayPaid) {
-    recomputePaid().catch(() => {});
+    // v1.4.21-phase1 — newly-redeemed license keys (via options.js) and
+    // legacy extpayPaid flips both feed grandfather lock-in. ensureGrandfather
+    // is idempotent, so re-firing on every storage event is safe; it only
+    // writes the first time qualifying state appears. Order: grandfather
+    // first, then recompute so the derived `paid` flag observes it.
+    ensureGrandfather().then(() => recomputePaid()).catch(() => {});
   }
 });
 
