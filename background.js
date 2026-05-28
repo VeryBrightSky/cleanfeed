@@ -273,6 +273,13 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       // v1.4.19 — Homepage→Subs redirect (F2) + per-blocker render modes (F3).
       redirectHomeToSubs: false,
       blockerModes: {},
+      // v1.4.20-alpha — analytics dashboard Phase 1 instrumentation.
+      // Schema (also documented in content/content.js _flushStats):
+      //   blocked: { "YYYY-MM-DD": { <blocker-id>: <count> } }
+      //   autoplay_avoided: { "YYYY-MM-DD": { videos: N, estimated_minutes: M } }
+      //   session_started: <ms-epoch>   // first-init timestamp
+      // No UI consumes this yet; Phase 2 will read + render.
+      cf_stats: { blocked: {}, autoplay_avoided: {}, session_started: Date.now() },
     };
     await chrome.storage.local.set(defaults);
     // Set the readiness flag in a SEPARATE write so popup/content can
@@ -348,6 +355,15 @@ async function _migrateForV140() {
   if (typeof data.blockerModes === "undefined" || data.blockerModes === null ||
       typeof data.blockerModes !== "object") {
     patch.blockerModes = {};
+  }
+  // v1.4.20-alpha — analytics dashboard Phase 1 instrumentation.
+  // IDEMPOTENT seed: only write cf_stats if no key exists on this profile.
+  // If the user has any prior cf_stats (even a partial one from a previous
+  // v1.4.20-alpha install), we do NOT overwrite — Phase 2's reader needs
+  // to trust that the daily counters keep accumulating across upgrades.
+  if (typeof data.cf_stats === "undefined" || data.cf_stats === null ||
+      typeof data.cf_stats !== "object") {
+    patch.cf_stats = { blocked: {}, autoplay_avoided: {}, session_started: Date.now() };
   }
   // focusLock — preserve existing object, just ensure mode/pomodoro fields exist
   const fl = data.focusLock || {};

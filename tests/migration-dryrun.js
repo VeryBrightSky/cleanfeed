@@ -44,6 +44,12 @@ function migrate(initialStorage) {
       typeof data.blockerModes !== "object") {
     patch.blockerModes = {};
   }
+  // v1.4.20-alpha — analytics dashboard Phase 1 instrumentation.
+  // Idempotent: only seed if missing. NEVER overwrite an existing cf_stats.
+  if (typeof data.cf_stats === "undefined" || data.cf_stats === null ||
+      typeof data.cf_stats !== "object") {
+    patch.cf_stats = { blocked: {}, autoplay_avoided: {}, session_started: 1234567 };
+  }
   const fl = Object.assign({}, data.focusLock || {});
   if (typeof fl.mode === "undefined") fl.mode = "standard";
   if (typeof fl.pomodoro === "undefined") fl.pomodoro = { focusMin: 25, breakMin: 5, cycles: 4 };
@@ -91,6 +97,31 @@ function assertTrue(name, cond) {
   assertEq("a) subs-most-relevant seeded off", after.settings["subs-most-relevant"], false);
   assertEq("a) subs-members-only seeded off", after.settings["subs-members-only"], false);
   assertEq("a) subs-watched seeded off",      after.settings["subs-watched"], false);
+  // v1.4.20-alpha — analytics seed shape.
+  assertEq("a) cf_stats.blocked seeded {}",          after.cf_stats.blocked, {});
+  assertEq("a) cf_stats.autoplay_avoided seeded {}", after.cf_stats.autoplay_avoided, {});
+  assertTrue("a) cf_stats.session_started > 0",       typeof after.cf_stats.session_started === "number" && after.cf_stats.session_started > 0);
+}
+
+// v1.4.20-alpha — IDEMPOTENCY check: re-running migrate on a user who
+// already has cf_stats with real counters must NOT clobber those counters.
+{
+  const existing = {
+    blocked: { "2026-05-24": { "shorts": 42 } },
+    autoplay_avoided: { "2026-05-24": { videos: 3, estimated_minutes: 30 } },
+    session_started: 1700000000000,
+  };
+  const before = {
+    settings: { "home-feed": true },
+    cf_stats: existing,
+  };
+  const after = migrate(before);
+  assertEq("idempotent: existing cf_stats.blocked preserved",
+    after.cf_stats.blocked, { "2026-05-24": { "shorts": 42 } });
+  assertEq("idempotent: existing autoplay_avoided preserved",
+    after.cf_stats.autoplay_avoided, { "2026-05-24": { videos: 3, estimated_minutes: 30 } });
+  assertEq("idempotent: existing session_started preserved",
+    after.cf_stats.session_started, 1700000000000);
 }
 
 // b) Existing v1.3.4 free user with settings configured

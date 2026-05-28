@@ -91,7 +91,10 @@ def validate(manifest: dict, files: list[tuple[str, str]]) -> None:
 
 def main() -> int:
     manifest = read_manifest()
-    version = manifest.get("version", "0.0.0")
+    # Prefer version_name (display label like "1.4.20-alpha") for the zip
+    # filename so pre-release builds are obvious in dist/. Falls back to the
+    # numeric `version` field that Chrome requires.
+    version = manifest.get("version_name") or manifest.get("version", "0.0.0")
     print(f"Building CleanFeed v{version}")
     files = collect_files(HERE)
     validate(manifest, files)

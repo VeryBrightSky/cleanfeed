@@ -344,6 +344,10 @@
 
     // count visible elements that would be hidden — for stats
     countBlockedElements(active);
+
+    // v1.4.20-alpha — Phase 1: capture the current "Up next" candidate for
+    // the autoplay counterfactual tracker. Idempotent per /watch?v= identity.
+    _captureAutoplayContext();
   }
 
   // v1.4.19 F4 — sweep subscription tiles for >95% progress.
@@ -715,14 +719,34 @@
   // "elements blocked this session" to 5–6 digits within minutes.
   const _countedEls = new WeakSet();
 
+  // v1.4.20-alpha — Phase 1 analytics instrumentation.
+  // PER-BLOCKER WeakSet of elements we've already credited to that blocker's
+  // daily counter. Separate from _countedEls so that an element matched by
+  // both blocker A and blocker B (selector overlap, rare) counts for both —
+  // matches the user's mental model of "each blocker hid N items today".
+  // Same per-page-load lifetime as _countedEls: the WeakSet is GC'd when the
+  // content script's IIFE is unloaded (tab close, navigation away).
+  const _perBlockerCounted = new Map();   // blockerId -> WeakSet
+
   function countBlockedElements(active) {
     let totalAdded = 0;
     for (const b of active) {
       let found = 0;
+      let perBlockerNew = 0;
+      if (!_perBlockerCounted.has(b.id)) _perBlockerCounted.set(b.id, new WeakSet());
+      const blockerSet = _perBlockerCounted.get(b.id);
       for (const sel of b.selectors) {
         try {
           const els = document.querySelectorAll(sel);
           for (const el of els) {
+            // v1.4.20-alpha — per-blocker counter (cf_stats.blocked).
+            // Uses the per-blocker WeakSet so overlapping selectors still
+            // credit each blocker for an element it covers.
+            if (!blockerSet.has(el)) {
+              blockerSet.add(el);
+              perBlockerNew++;
+            }
+            // v1.4.12 — session-stats global dedupe (unchanged behaviour).
             if (_countedEls.has(el)) continue;
             _countedEls.add(el);
             found++;
@@ -731,12 +755,280 @@
           /* :has() not supported in some browsers / iframes; skip */
         }
       }
+      if (perBlockerNew > 0) _statsIncrementBlocker(b.id, perBlockerNew);
       STATE.counts.perBlocker[b.id] =
         (STATE.counts.perBlocker[b.id] || 0) + found;
       totalAdded += found;
     }
     STATE.counts.total += totalAdded;
     if (totalAdded > 0) persistStats();
+  }
+
+  // ============================================================
+  // v1.4.20-alpha Phase 1 — analytics instrumentation
+  //
+  // Two persistent data streams accumulate into chrome.storage.local.cf_stats:
+  //   1. blocked: per-blocker, per-day count of items hidden
+  //   2. autoplay_avoided: per-day count of "Up next" videos the user
+  //      navigated away from instead of letting autoplay continue
+  //
+  // No UI consumes these in Phase 1. Phase 2 will render the dashboard.
+  //
+  // Write strategy: in-memory delta map + 30s coalescing timer + flush on
+  // pagehide. Prevents the storage write-storm that would happen if every
+  // applyBlockers tick wrote synchronously. The delta is merged with a fresh
+  // read of storage at flush time, so two content scripts on different tabs
+  // don't clobber each other's counts.
+  // ============================================================
+
+  // Coalescing delta. Reset to empty after each successful flush. Anything
+  // accumulated during the flush's await lands in the *next* delta and
+  // flushes on the next timer tick — no data loss.
+  let _statsDelta = { blocked: {}, autoplay_avoided: { videos: 0, estimated_minutes: 0 } };
+  let _statsFlushTimer = 0;
+  let _statsFlushInFlight = false;
+  const STATS_FLUSH_MS = 30 * 1000;
+
+  function _statsTodayKey() {
+    const d = new Date();
+    return d.getFullYear() + "-" +
+      String(d.getMonth() + 1).padStart(2, "0") + "-" +
+      String(d.getDate()).padStart(2, "0");
+  }
+
+  function _statsIncrementBlocker(blockerId, delta) {
+    if (!blockerId || delta <= 0) return;
+    const day = _statsTodayKey();
+    if (!_statsDelta.blocked[day]) _statsDelta.blocked[day] = {};
+    _statsDelta.blocked[day][blockerId] = (_statsDelta.blocked[day][blockerId] || 0) + delta;
+    _scheduleStatsFlush();
+  }
+
+  function _statsIncrementAutoplayAvoided(minutes) {
+    _statsDelta.autoplay_avoided.videos++;
+    _statsDelta.autoplay_avoided.estimated_minutes += Math.max(0, Math.round(minutes));
+    _scheduleStatsFlush();
+  }
+
+  function _statsHasPending() {
+    if (_statsDelta.autoplay_avoided.videos > 0) return true;
+    for (const day of Object.keys(_statsDelta.blocked)) {
+      if (Object.keys(_statsDelta.blocked[day]).length > 0) return true;
+    }
+    return false;
+  }
+
+  function _scheduleStatsFlush() {
+    if (_statsFlushTimer || _statsFlushInFlight) return;
+    _statsFlushTimer = setTimeout(() => {
+      _statsFlushTimer = 0;
+      _flushStats();
+    }, STATS_FLUSH_MS);
+  }
+
+  async function _flushStats() {
+    if (_statsFlushInFlight) return;
+    if (!_statsHasPending()) return;
+    _statsFlushInFlight = true;
+    // Snapshot + reset the delta BEFORE the async read so any new
+    // increments during the await land in a fresh delta (no double-count).
+    const snapshot = _statsDelta;
+    _statsDelta = { blocked: {}, autoplay_avoided: { videos: 0, estimated_minutes: 0 } };
+    try {
+      const data = await new Promise((resolve) => {
+        chrome.storage.local.get(["cf_stats"], (d) => resolve(d || {}));
+      });
+      // Defensive: if cf_stats doesn't exist (background migration hasn't
+      // run yet on a brand-new install), seed it lazily. The session_started
+      // here is the first time we ever observed activity — typically only
+      // happens if a YouTube tab loads before background's onInstalled fires.
+      const cf_stats = (data.cf_stats && typeof data.cf_stats === "object")
+        ? data.cf_stats
+        : { blocked: {}, autoplay_avoided: {}, session_started: Date.now() };
+      if (!cf_stats.blocked) cf_stats.blocked = {};
+      if (!cf_stats.autoplay_avoided) cf_stats.autoplay_avoided = {};
+      // Merge blocked counters.
+      for (const day of Object.keys(snapshot.blocked)) {
+        if (!cf_stats.blocked[day]) cf_stats.blocked[day] = {};
+        for (const id of Object.keys(snapshot.blocked[day])) {
+          cf_stats.blocked[day][id] = (cf_stats.blocked[day][id] || 0) + snapshot.blocked[day][id];
+        }
+      }
+      // Merge autoplay-avoided counter (single bucket = today).
+      if (snapshot.autoplay_avoided.videos > 0 || snapshot.autoplay_avoided.estimated_minutes > 0) {
+        const day = _statsTodayKey();
+        if (!cf_stats.autoplay_avoided[day]) {
+          cf_stats.autoplay_avoided[day] = { videos: 0, estimated_minutes: 0 };
+        }
+        cf_stats.autoplay_avoided[day].videos += snapshot.autoplay_avoided.videos;
+        cf_stats.autoplay_avoided[day].estimated_minutes += snapshot.autoplay_avoided.estimated_minutes;
+      }
+      await new Promise((resolve) => {
+        chrome.storage.local.set({ cf_stats }, () => resolve());
+      });
+    } catch (_) {
+      // If storage write fails, re-merge the snapshot back into the delta
+      // so the next flush picks it up. Better to over-count once than to
+      // silently drop a user's day of stats.
+      for (const day of Object.keys(snapshot.blocked)) {
+        if (!_statsDelta.blocked[day]) _statsDelta.blocked[day] = {};
+        for (const id of Object.keys(snapshot.blocked[day])) {
+          _statsDelta.blocked[day][id] = (_statsDelta.blocked[day][id] || 0) + snapshot.blocked[day][id];
+        }
+      }
+      _statsDelta.autoplay_avoided.videos += snapshot.autoplay_avoided.videos;
+      _statsDelta.autoplay_avoided.estimated_minutes += snapshot.autoplay_avoided.estimated_minutes;
+    } finally {
+      _statsFlushInFlight = false;
+    }
+  }
+
+  // ----- autoplay counterfactual tracker (Phase 1) ---------------------
+  //
+  // On /watch pages we capture the FIRST "Up next" candidate in the
+  // recommendations sidebar (videoId + duration + a snapshot of YT's
+  // autoplay-toggle state at the moment of capture). When the user
+  // navigates AWAY from /watch — to a different /watch?v=, to a non-/watch
+  // path, or via pagehide — we evaluate:
+  //
+  //   Skip if no candidate was captured (sidebar never loaded in time).
+  //   Skip if autoplay was OFF at capture time (per spec; nothing to avoid).
+  //   Skip if the user explicitly clicked inside the sidebar (tracked via
+  //     a delegated click listener — they ACTIVELY picked the next video).
+  //   Skip if the destination /watch?v=<id> matches the captured candidate
+  //     (either autoplay progressed naturally, OR the user clicked exactly
+  //     the suggested next — indistinguishable from our perspective; in
+  //     both cases they DID watch the predicted video so it's not avoided).
+  //
+  //   Otherwise: AVOIDED. Increment cf_stats.autoplay_avoided.{videos,
+  //   estimated_minutes}. estimated_minutes uses the captured duration if
+  //   we parsed it; falls back to 10 (per spec) if duration parsing failed.
+  //
+  // ASSUMPTIONS marked in the code where they're load-bearing.
+  STATE.autoplay = {
+    watchVideoId: "",         // current /watch?v= identity
+    capturedNext: null,        // { videoId, duration_sec } or null
+    autoplayWasOn: false,      // YT autoplay toggle state at capture time
+    userClickedSidebar: false, // delegated click landed inside the sidebar
+  };
+
+  function _parseDurationToSec(txt) {
+    if (!txt) return 0;
+    const parts = String(txt).trim().split(":").map((s) => parseInt(s, 10));
+    if (parts.some((n) => !isFinite(n) || isNaN(n))) return 0;
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    if (parts.length === 1) return parts[0];
+    return 0;
+  }
+
+  function _readSidebarDurationFromCard(card) {
+    // YT renders durations in a few different containers depending on layout
+    // experiment cohort. Try the canonical thumbnail-overlay first, then a
+    // couple of fallbacks observed in 2026 experiments.
+    const el = card.querySelector(
+      "ytd-thumbnail-overlay-time-status-renderer #text, " +
+      "ytd-thumbnail-overlay-time-status-renderer span#text, " +
+      ".badge-shape-wiz__text, " +
+      ".ytd-thumbnail-overlay-time-status-renderer"
+    );
+    if (!el) return 0;
+    return _parseDurationToSec(el.textContent || "");
+  }
+
+  function _captureAutoplayContext() {
+    if (location.pathname !== "/watch") return;
+    const myVideoId = (() => {
+      try { return new URLSearchParams(location.search).get("v") || ""; }
+      catch (_) { return ""; }
+    })();
+    // Fresh /watch view: reset capture state. The CALLER (nav handler)
+    // is responsible for evaluating "avoided" against the PREVIOUS video's
+    // capture before we wipe it.
+    if (STATE.autoplay.watchVideoId !== myVideoId) {
+      STATE.autoplay.watchVideoId = myVideoId;
+      STATE.autoplay.capturedNext = null;
+      STATE.autoplay.userClickedSidebar = false;
+      // ASSUMPTION: read autoplay toggle state at capture time, not at
+      // nav-away time. If the user flips autoplay mid-video, we still
+      // evaluate against the moment we recorded the candidate. This avoids
+      // edge cases where YT itself toggles autoplay during playback.
+      const btn = document.querySelector(".ytp-autonav-toggle-button");
+      STATE.autoplay.autoplayWasOn = !!(btn && btn.getAttribute("aria-checked") === "true");
+    }
+    if (STATE.autoplay.capturedNext) return;  // already captured for this video
+    // ASSUMPTION: the FIRST ytd-compact-video-renderer in the sidebar IS the
+    // "Up next" candidate. YT can shuffle the order with chapters / playlist
+    // queue, but the first card is the one YT would auto-progress to. If
+    // chapters / playlist queues become more common, this becomes wrong.
+    const firstCard = document.querySelector(
+      "ytd-watch-next-secondary-results-renderer ytd-compact-video-renderer"
+    ) || document.querySelector("ytd-compact-video-renderer");
+    if (!firstCard) return;
+    const link = firstCard.querySelector("a#thumbnail[href*='/watch'], a.ytd-compact-video-renderer[href*='/watch']");
+    if (!link) return;
+    const href = link.getAttribute("href") || "";
+    const m = href.match(/[?&]v=([A-Za-z0-9_-]{6,})/);
+    if (!m) return;
+    const dur = _readSidebarDurationFromCard(firstCard);
+    STATE.autoplay.capturedNext = {
+      videoId: m[1],
+      duration_sec: dur,
+    };
+  }
+
+  function _setupSidebarClickTracker() {
+    // Delegated click listener — sits at document level, capture-phase, so
+    // even if YT's own handlers stop propagation we still see the click.
+    // ASSUMPTION: "sidebar" is anything inside #secondary or the
+    // ytd-watch-next-secondary-results-renderer. The Comments restore
+    // button injected by CleanFeed lives in #below, NOT here, so it
+    // won't false-trigger this marker.
+    document.addEventListener("click", (e) => {
+      if (location.pathname !== "/watch") return;
+      let cur = e.target;
+      while (cur && cur !== document.body) {
+        if (cur.matches && (
+          cur.matches("ytd-watch-next-secondary-results-renderer") ||
+          cur.matches("ytd-watch-next-secondary-results-renderer *") ||
+          cur.matches("ytd-watch-flexy #secondary") ||
+          cur.matches("ytd-watch-flexy #secondary *") ||
+          cur.matches("ytd-compact-video-renderer") ||
+          cur.matches("ytd-compact-video-renderer *")
+        )) {
+          STATE.autoplay.userClickedSidebar = true;
+          return;
+        }
+        cur = cur.parentElement;
+      }
+    }, true);
+  }
+
+  // Called from the SPA nav handler when we detect a real video-identity
+  // change. `prevIdentity` is the URL identity we WERE on (pathname + ?v=).
+  // `newIdentity` is the URL we are NOW on. Both are passed in because
+  // location has already been updated by the time yt-navigate-finish fires.
+  function _evaluateAutoplayAvoided(prevIdentity, newIdentity) {
+    if (!prevIdentity || prevIdentity.indexOf("/watch?v=") !== 0) return;
+    const prevVideoId = prevIdentity.slice("/watch?v=".length);
+    // The capture state must match the video we're leaving — if STATE was
+    // overwritten by a faster nav, skip rather than misattribute.
+    if (STATE.autoplay.watchVideoId !== prevVideoId) return;
+    if (!STATE.autoplay.capturedNext) return;
+    if (!STATE.autoplay.autoplayWasOn) return;       // spec: skip if YT autoplay was off
+    if (STATE.autoplay.userClickedSidebar) return;   // user actively chose
+    // Destination videoId, if any.
+    let destVideoId = "";
+    if (newIdentity && newIdentity.indexOf("/watch?v=") === 0) {
+      destVideoId = newIdentity.slice("/watch?v=".length);
+    }
+    if (destVideoId && destVideoId === STATE.autoplay.capturedNext.videoId) {
+      // They watched (or auto-progressed to) the predicted next. NOT avoided.
+      return;
+    }
+    const dur = STATE.autoplay.capturedNext.duration_sec;
+    const mins = dur > 0 ? dur / 60 : 10;            // spec fallback: 10 min
+    _statsIncrementAutoplayAvoided(mins);
   }
 
   // ----- mutation observer with debounce -------------------------------
@@ -791,11 +1083,17 @@
 
   function watchSPANavigation() {
     let lastNav = _navIdentity();
+    _lastNavMirror = lastNav;   // v1.4.20-alpha — pagehide handler reads this
 
     function maybeNavReset() {
       const cur = _navIdentity();
       if (cur === lastNav) return false;
+      // v1.4.20-alpha — evaluate the autoplay counterfactual BEFORE we
+      // overwrite lastNav, so we still know which video we were on. This
+      // catches both /watch → /watch?v=different and /watch → non-/watch.
+      _evaluateAutoplayAvoided(lastNav, cur);
       lastNav = cur;
+      _lastNavMirror = cur;
       STATE.commentsBtnAdded = false;
       STATE.autoplayHandledForVideo = "";
       STATE.commentsManuallyShown = false;
@@ -962,6 +1260,7 @@
   async function init() {
     startTimeTracker();
     _setupRightClickTracker();
+    _setupSidebarClickTracker();   // v1.4.20-alpha — autoplay counterfactual
     await getSettings();
     // v1.4.19 F2 — fire redirect immediately after settings load if we're on
     // the bare homepage. location.replace navigates away; nothing else this
@@ -989,7 +1288,32 @@
     // document"). `pagehide` covers tab close, navigation, and
     // bfcache eviction — same cleanup window, no policy warning.
     window.addEventListener("pagehide", stopObserver, { once: true });
+    // v1.4.20-alpha — Phase 1: pagehide is our last chance to record an
+    // autoplay-avoided event (tab close from /watch) and to flush any
+    // pending stats delta. Separate listener so it runs even if
+    // stopObserver throws.
+    window.addEventListener("pagehide", () => {
+      try {
+        // ASSUMPTION: pagehide from /watch with autoplay-was-on and no
+        // sidebar click counts as avoided. We can't observe the
+        // destination at pagehide time (tab is dying) so we treat it
+        // identically to a SPA nav off /watch with destination=non-/watch.
+        if (location.pathname === "/watch") {
+          _evaluateAutoplayAvoided(lastNavForPagehide(), "");
+        }
+      } catch (_) {}
+      // Fire-and-forget the final flush. chrome.storage.local.set called
+      // synchronously during pagehide is documented as best-effort by the
+      // Chrome MV3 spec.
+      _flushStats();
+    }, { once: true });
   }
+
+  // v1.4.20-alpha — pagehide handler needs the latest known nav identity,
+  // but `lastNav` is closed-over inside watchSPANavigation(). We expose
+  // it via the module-level mirror below; the SPA nav function pushes here.
+  let _lastNavMirror = "";
+  function lastNavForPagehide() { return _lastNavMirror; }
 
   init().catch((e) => {
     /* never throw out of a content script */
