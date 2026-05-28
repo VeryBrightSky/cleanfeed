@@ -307,6 +307,131 @@ assertEq("verify: active + ok stays active",
     computePaid(ext, lic), true);
 }
 
-process.stdout.write("\n");
-console.log(`LICENSE REDEEM: ${pass} pass / ${fail} fail`);
-if (fail > 0) process.exit(1);
+// ===== 7. v1.4.21-phase1 — grandfather lock-in on redemption ============
+//
+// Phase 1 introduced ensureGrandfather() which fires automatically via
+// background.js's storage.onChanged listener whenever cleanfeed_license
+// flips to active=true. The contract: after a successful redemption, the
+// user MUST be cf_grandfathered=true with reason="license_key" — even if
+// their subscription later lapses, the grandfather flag preserves Pro.
+//
+// Mirror the same ensureGrandfather logic used in grandfather-migration.js
+// + subscription-sync.js so we can exercise the end-to-end flow in one
+// place: license-redeem-success -> set(cleanfeed_license={active:true})
+// -> ensureGrandfather() -> cf_grandfathered=true.
+
+(async () => {
+  function makeStorage(seed) {
+    const data = Object.assign({}, seed || {});
+    return {
+      async get(keys) {
+        const out = {};
+        const list = Array.isArray(keys) ? keys : (keys ? [keys] : Object.keys(data));
+        for (const k of list) if (k in data) out[k] = data[k];
+        return out;
+      },
+      async set(patch) {
+        for (const k of Object.keys(patch)) data[k] = patch[k];
+      },
+      _peek() { return Object.assign({}, data); },
+    };
+  }
+  async function ensureGrandfather(storage) {
+    const d1 = await storage.get(["cf_grandfathered", "extpayPaid", "cleanfeed_license"]);
+    if (d1.cf_grandfathered === true) return;
+    const hasLicense = !!(d1.cleanfeed_license && d1.cleanfeed_license.active);
+    const hasLegacyExtpay = d1.extpayPaid === true;
+    if (!hasLicense && !hasLegacyExtpay) return;
+    const d2 = await storage.get(["cf_grandfathered"]);
+    if (d2.cf_grandfathered === true) return;
+    const reason = hasLegacyExtpay ? "legacy_extpay" : "license_key";
+    await storage.set({
+      cf_grandfathered: true,
+      cf_grandfathered_at: new Date().toISOString(),
+      cf_grandfathered_reason: reason,
+    });
+  }
+
+  // 7a — fresh-redemption success path
+  {
+    const s = makeStorage({
+      cf_grandfathered: false,
+      extpayPaid: false,
+      cleanfeed_license: null,
+    });
+    // Simulate the options.js redemption-success branch: writes
+    // cleanfeed_license={active:true,...}. background.js's storage.onChanged
+    // listener then fires ensureGrandfather (we run it directly here).
+    await s.set({
+      cleanfeed_license: {
+        active: true,
+        key: "ABCD-EFGH-JKMN-PQRS-TUVW-XYZ2",
+        key_partial: "ABCD-XXXX-XXXX-XXXX-XXXX-XYZ2",
+        redeemed_at: 1700000000000,
+      },
+    });
+    await ensureGrandfather(s);
+    const peek = s._peek();
+    assertEq("redeem -> cf_grandfathered=true",
+      peek.cf_grandfathered, true);
+    assertEq("redeem -> reason=license_key",
+      peek.cf_grandfathered_reason, "license_key");
+    assertEq("redeem -> license still active (audit trail preserved)",
+      peek.cleanfeed_license.active, true);
+  }
+
+  // 7b — grandfather survives later license revocation
+  {
+    const s = makeStorage({
+      cf_grandfathered: false,
+      extpayPaid: false,
+      cleanfeed_license: null,
+    });
+    // initial redemption
+    await s.set({
+      cleanfeed_license: { active: true, key: "Z2JQ-EFGH-JKMN-PQRS-TUVW-Y9N2", redeemed_at: 1700000000000 },
+    });
+    await ensureGrandfather(s);
+    assertEq("revoke-then-grandfather: locked in before revocation",
+      s._peek().cf_grandfathered, true);
+    // worker /verify revokes
+    const lic = s._peek().cleanfeed_license;
+    await s.set({
+      cleanfeed_license: Object.assign({}, lic, {
+        active: false, deactivated_reason: "revoked", deactivated_at: 1700001000000,
+      }),
+    });
+    await ensureGrandfather(s);
+    assertEq("revoke-then-grandfather: cf_grandfathered STILL true (kindness invariant)",
+      s._peek().cf_grandfathered, true);
+    assertEq("revoke-then-grandfather: reason unchanged",
+      s._peek().cf_grandfathered_reason, "license_key");
+  }
+
+  // 7c — pre-grandfathered user redeems a second key: no overwrite churn
+  {
+    const original = new Date("2025-01-01T00:00:00Z").toISOString();
+    const s = makeStorage({
+      cf_grandfathered: true,
+      cf_grandfathered_at: original,
+      cf_grandfathered_reason: "legacy_extpay",
+      extpayPaid: true,
+      cleanfeed_license: null,
+    });
+    // User redeems a license key (defensive — shouldn't normally happen
+    // for an already-grandfathered user but the path must be idempotent).
+    await s.set({
+      cleanfeed_license: { active: true, key: "AAAA-BBBB-CCCC-DDDD-EEEE-FFGG" },
+    });
+    await ensureGrandfather(s);
+    const peek = s._peek();
+    assertEq("double-redeem: cf_grandfathered_at unchanged",
+      peek.cf_grandfathered_at, original);
+    assertEq("double-redeem: reason unchanged (legacy_extpay wins forever)",
+      peek.cf_grandfathered_reason, "legacy_extpay");
+  }
+
+  process.stdout.write("\n");
+  console.log(`LICENSE REDEEM: ${pass} pass / ${fail} fail`);
+  if (fail > 0) process.exit(1);
+})();

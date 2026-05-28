@@ -21,7 +21,38 @@ const STATE = {
   // v1.4.17 — license code Pro path
   cleanfeed_license: null,
   installId: "",
+  // v1.4.21 Phase 3 — subscription + grandfather + dashboard data
+  cf_grandfathered: false,
+  cf_grandfathered_at: null,
+  cf_grandfathered_reason: null,
+  cf_subscription: { status: "none", plan: null, cancelAt: null, lastSyncAt: 0 },
+  cf_stats: { blocked: {}, autoplay_avoided: {}, session_started: 0 },
 };
+
+// v1.4.21 Phase 3 — minimal blocker-id → human-label map for the dashboard
+// breakdown table. Mirrors the popup BLOCKERS array; kept here so options.js
+// doesn't have to load the popup module. Synced manually when blockers are
+// added — last sync v1.4.19's 17 blockers.
+const BLOCKER_LABELS = {
+  "home-feed": "Homepage feed",
+  "shorts": "Shorts everywhere",
+  "watch-sidebar": "Sidebar recommendations",
+  "end-screen": "End-screen suggestions",
+  "comments": "Comments section",
+  "explore": "Trending / Explore tabs",
+  "live-chat": "Live chat",
+  "autoplay": "Autoplay",
+  "thumbnails": "Hide thumbnails",
+  "subs-algo": "Subscription algorithm",
+  "playables": "Playables games panel",
+  "merch-shelf": "Merch shelf",
+  "breaking-news": "Breaking news",
+  "mixes-playlists": "Mixes & playlists",
+  "subs-most-relevant": "'Most Relevant' suggestions",
+  "subs-members-only": "Members-only videos",
+  "subs-watched": "Already-watched (>95%)",
+};
+const CF_AVG_VIDEO_MIN_OPTIONS = 4;
 
 // v1.4.17 — Cloudflare Worker that issues + validates license keys.
 const LICENSE_SERVER = "https://cleanfeed-license.cleanfeed.workers.dev";
@@ -57,7 +88,10 @@ async function load() {
        "blockedChannels", "focusLock", "timeTracking",
        "hiddenKeywords", "perPageEnabled",
        // v1.4.17 — license redemption state
-       "cleanfeed_license", "installId"],
+       "cleanfeed_license", "installId",
+       // v1.4.21 Phase 3
+       "cf_grandfathered", "cf_grandfathered_at", "cf_grandfathered_reason",
+       "cf_subscription", "cf_stats"],
       (data) => {
         STATE.paid = !!data.paid;
         STATE.whitelistedChannels = data.whitelistedChannels || [];
@@ -72,6 +106,15 @@ async function load() {
         STATE.perPageEnabled = !!data.perPageEnabled;
         STATE.cleanfeed_license = data.cleanfeed_license || null;
         STATE.installId = data.installId || "";
+        STATE.cf_grandfathered = data.cf_grandfathered === true;
+        STATE.cf_grandfathered_at = data.cf_grandfathered_at || null;
+        STATE.cf_grandfathered_reason = data.cf_grandfathered_reason || null;
+        STATE.cf_subscription = (data.cf_subscription && typeof data.cf_subscription === "object")
+          ? data.cf_subscription
+          : { status: "none", plan: null, cancelAt: null, lastSyncAt: 0 };
+        STATE.cf_stats = (data.cf_stats && typeof data.cf_stats === "object")
+          ? data.cf_stats
+          : { blocked: {}, autoplay_avoided: {}, session_started: 0 };
         resolve();
       }
     );
@@ -134,6 +177,37 @@ function renderLicensePanel() {
   const lic = STATE.cleanfeed_license;
   const form = $("cf-license-form");
   const active = $("cf-license-active");
+  // v1.4.21 Phase 3 — grandfathered users (legacy ExtPay one-time buyers OR
+  // license-key redeemers) get the "Lifetime Pro" framing in this panel,
+  // even when no license is present (legacy-extpay case has no key). The
+  // form (redemption input) is hidden — a grandfathered user is already
+  // Pro forever and redemption would be a no-op.
+  if (STATE.cf_grandfathered) {
+    form.hidden = true;
+    active.hidden = false;
+    const grantedAt = STATE.cf_grandfathered_at
+      ? new Date(STATE.cf_grandfathered_at).toLocaleDateString(undefined,
+          { year: "numeric", month: "short", day: "numeric" })
+      : "—";
+    const reasonLabel = STATE.cf_grandfathered_reason === "legacy_extpay"
+      ? "legacy one-time purchase"
+      : STATE.cf_grandfathered_reason === "license_key"
+        ? "license key"
+        : "—";
+    // Reuse the existing partial + when fields for the grandfather display.
+    const partialNode = $("cf-license-partial");
+    const whenNode = $("cf-license-when");
+    if (lic && lic.active && (lic.key || lic.key_partial)) {
+      partialNode.textContent = _displayPartial(lic);
+    } else {
+      partialNode.textContent = `Lifetime Pro · ${reasonLabel}`;
+    }
+    whenNode.textContent = `Granted ${grantedAt}`;
+    // Override the headline status copy.
+    const headline = active.querySelector(".cf-status");
+    if (headline) headline.textContent = "Lifetime Pro active.";
+    return;
+  }
   if (lic && lic.active && (lic.key || lic.key_partial)) {
     form.hidden = true;
     active.hidden = false;
@@ -639,6 +713,290 @@ async function onPerPageToggle() {
   pushChanges();
 }
 
+// ---- v1.4.21 Phase 3 — Subscription panel ------------------------------
+//
+// Mirrors the popup's renderUpgrade case logic but with more detail
+// (renewal date when known, plan label, billing amount, customer-portal
+// links + switch-plan link). Hidden entirely for grandfathered users —
+// the License code section above already shows "Lifetime Pro" framing
+// in that case via renderLicensePanel.
+
+function _formatDateOnly(ms) {
+  const n = Number(ms);
+  if (!n || !isFinite(n)) return "";
+  try {
+    return new Date(n).toLocaleDateString(undefined, {
+      year: "numeric", month: "short", day: "numeric",
+    });
+  } catch (_) {
+    const d = new Date(n);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+}
+
+function _openExtpayPortal() {
+  chrome.runtime.sendMessage({ type: "cf:open-login" }, () => { void chrome.runtime.lastError; });
+}
+function _openExtpayPlanSwitch(targetPlan) {
+  // Route through cf:open-payment with the target plan nickname so the
+  // background validates against ("monthly"|"annual") and constructs the
+  // /choose-plan/<nickname> URL.
+  chrome.runtime.sendMessage({ type: "cf:open-payment", plan: targetPlan }, () => {
+    void chrome.runtime.lastError;
+  });
+}
+
+function renderSubscriptionPanel() {
+  const panel = $("cf-sub-panel");
+  const body = $("cf-sub-body");
+  if (!panel || !body) return;
+  // Grandfathered (lifetime) users don't have a subscription. Hide the panel
+  // entirely — renderLicensePanel below shows the "Lifetime Pro" framing.
+  if (STATE.cf_grandfathered) {
+    panel.hidden = true;
+    return;
+  }
+  while (body.firstChild) body.removeChild(body.firstChild);
+  const sub = STATE.cf_subscription || {};
+  const status = sub.status || "none";
+  const plan = sub.plan || null;
+  const cancelAt = sub.cancelAt || null;
+  const planLabel = plan === "annual" ? "Annual ($19.99/yr)" :
+                    plan === "monthly" ? "Monthly ($1.99/mo)" :
+                    "Pro plan";
+
+  const row = (label, value) => {
+    const wrap = document.createElement("div");
+    wrap.className = "cf-sub-row";
+    const k = document.createElement("span");
+    k.className = "cf-sub-key";
+    k.textContent = label;
+    const v = document.createElement("span");
+    v.className = "cf-sub-val";
+    v.textContent = value;
+    wrap.appendChild(k); wrap.appendChild(v);
+    return wrap;
+  };
+  const btnLink = (label, onclick, primary) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = primary ? "cf-btn cf-btn-primary" : "cf-btn";
+    b.textContent = label;
+    b.addEventListener("click", onclick);
+    return b;
+  };
+  const linkBtn = (label, onclick) => {
+    const a = document.createElement("button");
+    a.type = "button";
+    a.className = "cf-link";
+    a.textContent = label;
+    a.addEventListener("click", onclick);
+    return a;
+  };
+
+  if (status === "active") {
+    body.appendChild(row("Status", "Active"));
+    body.appendChild(row("Plan", planLabel));
+    body.appendChild(btnLink("Manage subscription", _openExtpayPortal));
+    const otherPlan = plan === "annual" ? "monthly" : "annual";
+    const switchLabel = otherPlan === "annual" ? "Switch to annual" : "Switch to monthly";
+    body.appendChild(linkBtn(switchLabel, () => _openExtpayPlanSwitch(otherPlan)));
+    panel.hidden = false;
+    return;
+  }
+  if (status === "cancellation_pending") {
+    body.appendChild(row("Status", "Cancels at end of period"));
+    body.appendChild(row("Plan", planLabel));
+    if (cancelAt) body.appendChild(row("Ends", _formatDateOnly(cancelAt)));
+    body.appendChild(btnLink("Resubscribe to keep Pro",
+      () => _openExtpayPlanSwitch(plan === "annual" ? "annual" : "monthly"), true));
+    body.appendChild(linkBtn("Manage subscription", _openExtpayPortal));
+    panel.hidden = false;
+    return;
+  }
+  if (status === "past_due") {
+    const warn = document.createElement("p");
+    warn.className = "cf-status cf-status-warn";
+    warn.textContent = "Card needs updating to keep Pro.";
+    body.appendChild(warn);
+    body.appendChild(row("Plan", planLabel));
+    body.appendChild(btnLink("Update payment method", _openExtpayPortal, true));
+    panel.hidden = false;
+    return;
+  }
+  if (status === "canceled") {
+    body.appendChild(row("Status", "Canceled"));
+    body.appendChild(row("Plan", planLabel));
+    const p = document.createElement("p");
+    p.className = "cf-help";
+    p.textContent = "Your subscription has ended. Subscribe below or use a license code to get Pro back.";
+    body.appendChild(p);
+    body.appendChild(btnLink("Subscribe monthly ($1.99/mo)",
+      () => _openExtpayPlanSwitch("monthly")));
+    body.appendChild(btnLink("Subscribe annual ($19.99/yr)",
+      () => _openExtpayPlanSwitch("annual"), true));
+    panel.hidden = false;
+    return;
+  }
+  // status === "none" — free user, no prior subscription. Don't show the
+  // panel at all; the popup carries the upsell. License code section above
+  // is enough for the options page.
+  panel.hidden = true;
+}
+
+// ---- v1.4.21 Phase 3 — Stats dashboard ---------------------------------
+//
+// Reads cf_stats and renders:
+//   1. A 7-day inline-SVG bar chart of total videos blocked per day.
+//   2. A per-blocker breakdown table for the last 30 days, sorted descending.
+//   3. An all-time totals line.
+//
+// Pure render — never writes storage. Re-runs on every cf_stats change via
+// the storage.onChanged listener.
+
+function _lastNDateKeysOptions(n) {
+  const out = [];
+  const now = new Date();
+  for (let i = 0; i < n; i++) {
+    const d = new Date(now);
+    d.setDate(now.getDate() - i);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    out.push(`${y}-${m}-${day}`);
+  }
+  return out;
+}
+
+function _sumDayTotals(dayObj) {
+  if (!dayObj || typeof dayObj !== "object") return 0;
+  let n = 0;
+  for (const id of Object.keys(dayObj)) {
+    const v = Number(dayObj[id]) || 0;
+    if (v > 0) n += v;
+  }
+  return n;
+}
+
+function renderStatsDashboard() {
+  const weekHost = $("cf-stats-week");
+  const breakHost = $("cf-stats-breakdown");
+  const totalsHost = $("cf-stats-totals");
+  if (!weekHost || !breakHost || !totalsHost) return;
+
+  const blocked = (STATE.cf_stats && STATE.cf_stats.blocked) || {};
+  const auto = (STATE.cf_stats && STATE.cf_stats.autoplay_avoided) || {};
+
+  // ---- 7-day bar chart ----
+  const weekDates = _lastNDateKeysOptions(7).slice().reverse(); // oldest -> newest
+  const dailyTotals = weekDates.map((k) => _sumDayTotals(blocked[k]));
+  const maxDay = Math.max.apply(null, dailyTotals.concat([1]));
+
+  while (weekHost.firstChild) weekHost.removeChild(weekHost.firstChild);
+
+  if (dailyTotals.every((n) => n === 0)) {
+    const empty = document.createElement("p");
+    empty.className = "cf-help";
+    empty.textContent = "No activity in the last 7 days. Open a YouTube tab with blockers enabled and check back.";
+    weekHost.appendChild(empty);
+  } else {
+    const W = 320, H = 90, PAD = 6;
+    const barW = (W - PAD * 2) / weekDates.length;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    svg.setAttribute("width", "100%");
+    svg.setAttribute("height", "" + H);
+    svg.setAttribute("class", "cf-stats-chart");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Videos blocked per day, last 7 days");
+    weekDates.forEach((k, i) => {
+      const v = dailyTotals[i];
+      const h = v > 0 ? Math.max(2, Math.round((v / maxDay) * (H - PAD * 4))) : 0;
+      const x = PAD + i * barW + 2;
+      const y = H - PAD - h;
+      const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      rect.setAttribute("x", "" + x);
+      rect.setAttribute("y", "" + y);
+      rect.setAttribute("width", "" + Math.max(8, barW - 4));
+      rect.setAttribute("height", "" + h);
+      rect.setAttribute("rx", "3");
+      rect.setAttribute("class", "cf-stats-bar");
+      const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+      title.textContent = `${k}: ${v} blocked`;
+      rect.appendChild(title);
+      svg.appendChild(rect);
+    });
+    weekHost.appendChild(svg);
+    // Day labels (Mon/Tue/etc) under each bar — shortest form.
+    const labelRow = document.createElement("div");
+    labelRow.className = "cf-stats-chart-labels";
+    weekDates.forEach((k) => {
+      const cell = document.createElement("span");
+      cell.className = "cf-stats-chart-day";
+      try {
+        const d = new Date(k + "T12:00:00");
+        cell.textContent = d.toLocaleDateString(undefined, { weekday: "short" });
+      } catch (_) {
+        cell.textContent = k.slice(5);
+      }
+      labelRow.appendChild(cell);
+    });
+    weekHost.appendChild(labelRow);
+  }
+
+  // ---- per-blocker breakdown (last 30 days) ----
+  const thirtyDates = _lastNDateKeysOptions(30);
+  const perBlocker = {};
+  for (const k of thirtyDates) {
+    const day = blocked[k];
+    if (!day || typeof day !== "object") continue;
+    for (const id of Object.keys(day)) {
+      const v = Number(day[id]) || 0;
+      if (v > 0) perBlocker[id] = (perBlocker[id] || 0) + v;
+    }
+  }
+  const sorted = Object.keys(perBlocker)
+    .map((id) => ({ id, n: perBlocker[id] }))
+    .sort((a, b) => b.n - a.n);
+
+  while (breakHost.firstChild) breakHost.removeChild(breakHost.firstChild);
+  if (sorted.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "cf-help";
+    empty.textContent = "No blockers have fired in the last 30 days yet.";
+    breakHost.appendChild(empty);
+  } else {
+    const table = document.createElement("table");
+    table.className = "cf-stats-table";
+    const tbody = document.createElement("tbody");
+    for (const { id, n } of sorted) {
+      const tr = document.createElement("tr");
+      const tdLabel = document.createElement("td");
+      tdLabel.textContent = BLOCKER_LABELS[id] || id;
+      const tdN = document.createElement("td");
+      tdN.className = "cf-stats-table-n";
+      tdN.textContent = String(n);
+      tr.appendChild(tdLabel); tr.appendChild(tdN);
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    breakHost.appendChild(table);
+  }
+
+  // ---- all-time totals ----
+  let allTimeBlocked = 0;
+  for (const k of Object.keys(blocked)) {
+    allTimeBlocked += _sumDayTotals(blocked[k]);
+  }
+  let allTimeAutoplay = 0;
+  for (const k of Object.keys(auto)) {
+    const a = auto[k];
+    if (a && typeof a === "object") allTimeAutoplay += Number(a.videos) || 0;
+  }
+  const hours = Math.round(allTimeBlocked * CF_AVG_VIDEO_MIN_OPTIONS / 60 * 10) / 10;
+  totalsHost.textContent = `All-time: ${allTimeBlocked} ${allTimeBlocked === 1 ? "video" : "videos"} blocked, ${hours} ${hours === 1 ? "hour" : "hours"} saved, ${allTimeAutoplay} autoplay ${allTimeAutoplay === 1 ? "chain" : "chains"} avoided.`;
+}
+
 async function init() {
   try {
     $("cf-version").textContent = "v" + chrome.runtime.getManifest().version;
@@ -648,6 +1006,9 @@ async function init() {
   if (!STATE.installId) STATE.installId = await ensureInstallId();
   renderTier();
   renderLicensePanel();
+  // v1.4.21 Phase 3 — subscription card + dashboard
+  renderSubscriptionPanel();
+  renderStatsDashboard();
   renderWhitelist();
   renderBlockedList();
   renderCustomCSS();
@@ -701,6 +1062,25 @@ async function init() {
       renderLicensePanel();
     }
     if (changes.installId) { STATE.installId = changes.installId.newValue || ""; }
+    // v1.4.21 Phase 3 — re-render subscription panel + dashboard on
+    // upstream state changes.
+    if (changes.cf_subscription) {
+      STATE.cf_subscription = changes.cf_subscription.newValue
+        || { status: "none", plan: null, cancelAt: null, lastSyncAt: 0 };
+      renderSubscriptionPanel();
+    }
+    if (changes.cf_grandfathered || changes.cf_grandfathered_reason || changes.cf_grandfathered_at) {
+      if (changes.cf_grandfathered) STATE.cf_grandfathered = changes.cf_grandfathered.newValue === true;
+      if (changes.cf_grandfathered_reason) STATE.cf_grandfathered_reason = changes.cf_grandfathered_reason.newValue || null;
+      if (changes.cf_grandfathered_at) STATE.cf_grandfathered_at = changes.cf_grandfathered_at.newValue || null;
+      renderSubscriptionPanel();
+      renderLicensePanel();
+    }
+    if (changes.cf_stats) {
+      STATE.cf_stats = changes.cf_stats.newValue
+        || { blocked: {}, autoplay_avoided: {}, session_started: 0 };
+      renderStatsDashboard();
+    }
   });
 }
 

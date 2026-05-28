@@ -31,6 +31,15 @@
     <p class="cf-focus-hint">The 60-second hold is the emergency bypass. Auto-unlocks when the timer runs out.</p>
   </section>
 
+  <!-- v1.4.21 Phase 3 — weekly stats mini-card. Visible to FREE and Pro
+       alike. Populated from cf_stats by popup.js renderWeekStats(). When
+       all-zeros (new install) the card shows the "browse YouTube to start
+       tracking" copy; otherwise it shows last-7-days totals. -->
+  <section class="cf-week-stats" id="cf-week-stats" aria-label="This week" hidden>
+    <!-- innerHTML controlled by popup.js renderWeekStats — never trust
+         storage data to be rendered verbatim. -->
+  </section>
+
   <section class="cf-stats" aria-label="Session stats">
     <div class="cf-stat">
       <span class="cf-stat-value" id="cf-stat-total">0</span>
@@ -72,13 +81,13 @@
     <!-- toggles injected by popup.js -->
   </main>
 
+  <!-- v1.4.21 Phase 3 — state-driven upgrade card. popup.js renderUpgrade()
+       writes one of six cases (A–F) into this section based on
+       cf_grandfathered + cf_subscription.status. Body is JS-rendered so
+       the six states share a single DOM mount point. -->
   <section class="cf-upgrade" id="cf-upgrade-card" hidden>
-    <h2>Unlock all 17 blockers + Focus Lock</h2>
-    <p>Pro unlocks all 17 blockers, keyword blocking, Pomodoro Focus Lock, per-page rules, channel whitelist + blocklist, and custom CSS. One-time payment.</p>
-    <div class="cf-upgrade-row">
-      <button id="cf-upgrade" class="cf-btn cf-btn-primary" type="button">Upgrade — $4.99</button>
-      <button id="cf-login" class="cf-btn cf-btn-ghost" type="button">I&nbsp;already&nbsp;paid</button>
-    </div>
+    <!-- innerHTML controlled by popup.js renderUpgrade — never trust
+         storage data to be rendered verbatim. -->
   </section>
 
   <footer class="cf-footer">
@@ -119,11 +128,25 @@
           <span>Per-page rules, channel whitelist + blocklist, custom CSS</span>
         </li>
       </ul>
-      <div class="cf-modal-price">
-        <span class="cf-price">$4.99</span>
-        <span class="cf-price-sub">one-time · no subscription</span>
+      <!-- v1.4.21 Phase 3 — side-by-side plan picker. Annual is the
+           "popular" pre-selected card per the spec. Buttons route through
+           background.js cf:open-payment with msg.plan="monthly"|"annual"
+           which maps to ExtPay's openPaymentPage(nickname). -->
+      <div class="cf-plan-row">
+        <div class="cf-plan cf-plan-monthly">
+          <div class="cf-plan-name">Monthly</div>
+          <div class="cf-plan-price"><span class="cf-price">$1.99</span><span class="cf-plan-period">/month</span></div>
+          <div class="cf-plan-note">Cancel anytime</div>
+          <button id="cf-modal-subscribe-monthly" type="button" class="cf-btn cf-btn-ghost cf-btn-lg">Subscribe</button>
+        </div>
+        <div class="cf-plan cf-plan-annual is-popular">
+          <span class="cf-plan-badge" aria-label="Most popular">⭐ POPULAR</span>
+          <div class="cf-plan-name">Annual</div>
+          <div class="cf-plan-price"><span class="cf-price">$19.99</span><span class="cf-plan-period">/year</span></div>
+          <div class="cf-plan-note">Save $4 (16% off)</div>
+          <button id="cf-modal-subscribe-annual" type="button" class="cf-btn cf-btn-primary cf-btn-lg">Subscribe</button>
+        </div>
       </div>
-      <button id="cf-modal-upgrade" type="button" class="cf-btn cf-btn-primary cf-btn-lg">Upgrade — $4.99</button>
       <button id="cf-modal-login" type="button" class="cf-link cf-modal-login">Already paid? Log in</button>
     </div>
   </div>

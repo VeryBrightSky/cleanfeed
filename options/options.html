@@ -38,6 +38,34 @@
       </div>
     </section>
 
+    <!-- v1.4.21 Phase 3 — Subscription card. Hidden when cf_grandfathered=true
+         (lifetime users see only the License code card above with "Lifetime
+         Pro" framing). renderSubscriptionPanel() in options.js controls
+         visibility + populates the body. -->
+    <section class="cf-panel" id="cf-sub-panel" hidden>
+      <h2>Subscription</h2>
+      <div id="cf-sub-body">
+        <!-- innerHTML controlled by options.js renderSubscriptionPanel -->
+      </div>
+    </section>
+
+    <!-- v1.4.21 Phase 3 — Your stats (dashboard). 7-day bar chart, per-blocker
+         breakdown for last 30 days, all-time totals. Populated by
+         renderStatsDashboard() in options.js from cf_stats. -->
+    <section class="cf-panel" id="cf-stats-panel">
+      <h2>Your stats</h2>
+      <p class="cf-help">Counts every blocker fire across the last week, plus a per-blocker breakdown for the last 30 days. Time-saved is estimated at 4 minutes per blocked video.</p>
+      <div id="cf-stats-week" class="cf-stats-week">
+        <!-- 7-day inline-SVG bar chart, populated by options.js -->
+      </div>
+      <div id="cf-stats-breakdown" class="cf-stats-breakdown">
+        <!-- per-blocker table for last 30 days -->
+      </div>
+      <p id="cf-stats-totals" class="cf-stats-totals">
+        <!-- "All-time: X videos blocked, Y hours saved, Z autoplay chains avoided." -->
+      </p>
+    </section>
+
     <!-- Today / week time tracker (FREE) -->
     <section class="cf-panel cf-time-panel">
       <h2>Time on YouTube</h2>

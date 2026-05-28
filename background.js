@@ -899,14 +899,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "cf:open-payment" || msg.type === "cf:open-payment-page") {
     (async () => {
       const apiKey = await _ensureExtpayApiKey();
-      // Matches SDK's open_payment_page("pro"):
-      //   ${EXTENSION_URL}/choose-plan/${plan_nickname}?api_key=...
-      const url = apiKey
-        ? `https://extensionpay.com/extension/cleanfeed2342/choose-plan/pro?api_key=${encodeURIComponent(apiKey)}`
-        : `https://extensionpay.com/extension/cleanfeed2342?back=choose-plan`;
+      // v1.4.21-phase3 — multi-plan support. ExtPay's openPaymentPage(nick)
+      // routes to /choose-plan/<nick>; we accept the nickname via msg.plan
+      // and validate against the two configured nicknames so a popup bug
+      // can't open arbitrary plan URLs. If msg.plan is absent we fall back
+      // to /choose-plan (ExtPay's plan-picker screen) — matches the SDK's
+      // openPaymentPage() called with no args.
+      const plan = (msg && typeof msg.plan === "string") ? msg.plan : "";
+      const validPlan = (plan === "monthly" || plan === "annual") ? plan : "";
+      let url;
+      if (apiKey) {
+        url = validPlan
+          ? `https://extensionpay.com/extension/cleanfeed2342/choose-plan/${validPlan}?api_key=${encodeURIComponent(apiKey)}`
+          : `https://extensionpay.com/extension/cleanfeed2342/choose-plan?api_key=${encodeURIComponent(apiKey)}`;
+      } else {
+        url = `https://extensionpay.com/extension/cleanfeed2342?back=choose-plan`;
+      }
       try {
         await chrome.tabs.create({ url, active: true });
-        sendResponse({ ok: true, hasApiKey: !!apiKey });
+        sendResponse({ ok: true, hasApiKey: !!apiKey, plan: validPlan || null });
       } catch (err) {
         console.error("[CleanFeed] Failed to open payment tab:", err);
         sendResponse({ ok: false, error: String(err) });

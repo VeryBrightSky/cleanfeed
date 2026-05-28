@@ -85,7 +85,20 @@ const STATE = {
   // v1.4.19 F1 — true when the active tab is on music.youtube.com. The popup
   // collapses to the YT Music explainer + hides the toggle grid.
   onYouTubeMusic: false,
+  // v1.4.21 Phase 3 — subscription model. Read from chrome.storage.local
+  // in loadState; defaults match the install-seed shape from background.js.
+  cf_grandfathered: false,
+  cf_grandfathered_reason: null,
+  cf_subscription: { status: "none", plan: null, cancelAt: null, lastSyncAt: 0 },
+  // v1.4.21 Phase 3 — analytics dashboard. Phase 1 (v1.4.20-alpha) collects
+  // this; Phase 3 reads + renders. Schema documented in background.js.
+  cf_stats: { blocked: {}, autoplay_avoided: {}, session_started: 0 },
 };
+// v1.4.21 Phase 3 — average video length used for the "time saved" estimate
+// shown in the weekly stats card. Conservative midpoint; tracking precise
+// per-video duration would require persisting metadata we don't currently
+// have. 4 min matches the v1.4.20-alpha autoplay-avoidance fallback.
+const CF_AVG_VIDEO_MIN = 4;
 const PAGE_TABS = [
   { key: "everywhere",     label: "Everywhere" },
   { key: "homepage",       label: "Homepage" },
@@ -186,7 +199,10 @@ function loadState() {
        "onboardingComplete", "usageCount", "reviewPromptShown",
        "perPageEnabled", "perPageSettings",
        // v1.4.19
-       "blockerModes", "redirectHomeToSubs"],
+       "blockerModes", "redirectHomeToSubs",
+       // v1.4.21 Phase 3 — subscription + grandfather + dashboard data
+       "cf_grandfathered", "cf_grandfathered_reason", "cf_subscription",
+       "cf_stats"],
       (data) => {
         STATE.paid = !!data.paid;
         STATE.settings = data.settings || {};
@@ -206,6 +222,14 @@ function loadState() {
         STATE.perPageSettings = data.perPageSettings || { homepage: {}, watch: {}, subscriptions: {} };
         STATE.blockerModes = (data.blockerModes && typeof data.blockerModes === "object") ? data.blockerModes : {};
         STATE.redirectHomeToSubs = !!data.redirectHomeToSubs;
+        STATE.cf_grandfathered = data.cf_grandfathered === true;
+        STATE.cf_grandfathered_reason = data.cf_grandfathered_reason || null;
+        STATE.cf_subscription = (data.cf_subscription && typeof data.cf_subscription === "object")
+          ? data.cf_subscription
+          : { status: "none", plan: null, cancelAt: null, lastSyncAt: 0 };
+        STATE.cf_stats = (data.cf_stats && typeof data.cf_stats === "object")
+          ? data.cf_stats
+          : { blocked: {}, autoplay_avoided: {}, session_started: 0 };
         resolve();
       }
     );
@@ -568,9 +592,272 @@ function renderTierBadge() {
   }
 }
 
+// v1.4.21 Phase 3 — return YYYY-MM-DD in the user's local timezone for the
+// last N days, newest first. Mirrors content/content.js _todayLocalDateKey
+// so cf_stats date keys line up exactly. Read-only; cheap to recompute.
+function _lastNDateKeys(n) {
+  const out = [];
+  const now = new Date();
+  for (let i = 0; i < n; i++) {
+    const d = new Date(now);
+    d.setDate(now.getDate() - i);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    out.push(`${y}-${m}-${day}`);
+  }
+  return out;
+}
+
+// v1.4.21 Phase 3 — sum cf_stats for the last 7 days into { videos,
+// estimatedMinutes, autoplayVideos, autoplayMinutes }. `videos` is the
+// total count of blocked elements summed across every blocker and day.
+// `estimatedMinutes` uses CF_AVG_VIDEO_MIN as the per-video estimate.
+// Autoplay-avoidance numbers come from the separate autoplay_avoided
+// accumulator written by content.js _evaluateAutoplayAvoided.
+function computeWeekStats() {
+  const dates = _lastNDateKeys(7);
+  const blocked = (STATE.cf_stats && STATE.cf_stats.blocked) || {};
+  const auto = (STATE.cf_stats && STATE.cf_stats.autoplay_avoided) || {};
+  let videos = 0;
+  let autoplayVideos = 0;
+  let autoplayMinutes = 0;
+  for (const k of dates) {
+    const day = blocked[k];
+    if (day && typeof day === "object") {
+      for (const id of Object.keys(day)) {
+        const n = Number(day[id]) || 0;
+        if (n > 0) videos += n;
+      }
+    }
+    const adata = auto[k];
+    if (adata && typeof adata === "object") {
+      autoplayVideos += Number(adata.videos) || 0;
+      autoplayMinutes += Number(adata.estimated_minutes) || 0;
+    }
+  }
+  return {
+    videos,
+    estimatedMinutes: videos * CF_AVG_VIDEO_MIN,
+    autoplayVideos,
+    autoplayMinutes,
+  };
+}
+
+// v1.4.21 Phase 3 — format "1h 14m" / "47m" / "0m" for the time-saved cell.
+function _formatHM(totalMinutes) {
+  const m = Math.max(0, Math.round(totalMinutes));
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return rm === 0 ? `${h}h` : `${h}h ${rm}m`;
+}
+
+function renderWeekStats() {
+  const host = $("cf-week-stats");
+  if (!host) return;
+  // Hide on YT Music (matches the rest of the YT-Music-paused state).
+  if (STATE.onYouTubeMusic) { host.hidden = true; return; }
+  const s = computeWeekStats();
+  // Reset content idempotently — popup may re-render on storage events.
+  while (host.firstChild) host.removeChild(host.firstChild);
+  if (s.videos === 0 && s.autoplayVideos === 0) {
+    // All-zeros (new install / no activity). Show the prompt copy instead
+    // of three 0/0/0 cells, per spec.
+    const head = el("div", { class: "cf-week-head" }, "This week");
+    const body = el("div", { class: "cf-week-empty" },
+      "Browse YouTube to start tracking what you’re saving.");
+    host.appendChild(head);
+    host.appendChild(body);
+    host.hidden = false;
+    return;
+  }
+  const head = el("div", { class: "cf-week-head" }, "This week");
+  const row = el("div", { class: "cf-week-row" },
+    el("div", { class: "cf-week-cell" },
+      el("span", { class: "cf-week-value" }, String(s.videos)),
+      el("span", { class: "cf-week-label" }, s.videos === 1 ? "video blocked" : "videos blocked")
+    ),
+    el("span", { class: "cf-week-sep" }, "·"),
+    el("div", { class: "cf-week-cell" },
+      el("span", { class: "cf-week-value" }, _formatHM(s.estimatedMinutes)),
+      el("span", { class: "cf-week-label" }, "saved")
+    ),
+  );
+  host.appendChild(head);
+  host.appendChild(row);
+  if (s.autoplayVideos > 0) {
+    host.appendChild(el("div", { class: "cf-week-extra" },
+      `+ ${s.autoplayVideos} autoplay${s.autoplayVideos === 1 ? "" : "s"} avoided`));
+  }
+  host.hidden = false;
+}
+
+// v1.4.21 Phase 3 — short locale-aware date string for "Pro ends Aug 12, 2026"
+// renderings. Falls back to a numeric YYYY-MM-DD on Intl failure (very old
+// runtimes — popup targets MV3-capable Chrome which always has Intl, but
+// defensive).
+function _formatRenewDate(ms) {
+  const n = Number(ms);
+  if (!n || !isFinite(n)) return "";
+  try {
+    return new Date(n).toLocaleDateString(undefined, {
+      year: "numeric", month: "short", day: "numeric",
+    });
+  } catch (_) {
+    const d = new Date(n);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+}
+
+// v1.4.21 Phase 3 — six-state upgrade card. The whole body is JS-rendered
+// to keep the six cases at a single source of truth; the spec cases A–F
+// are dispatched on cf_grandfathered + cf_subscription.status.
+//
+//   A: cf_grandfathered=true                              -> lifetime ✓
+//   B: status=active + plan=monthly                       -> manage
+//   C: status=active + plan=annual                        -> manage
+//   D: status=cancellation_pending                        -> resubscribe
+//   E: status=past_due                                    -> amber update-card
+//   F: status=canceled|none AND !cf_grandfathered         -> plan picker
+//
+// A defensive seventh case covers paid=true that doesn't match A–E (e.g. a
+// freshly-redeemed license before ensureGrandfather has fired). Treat that
+// transient state as Case A.
 function renderUpgrade() {
-  const card = $("cf-upgrade-card");
-  card.hidden = !!STATE.paid;
+  const host = $("cf-upgrade-card");
+  if (!host) return;
+  // Hide on YT Music (matches existing renderYouTubeMusicPause behavior).
+  if (STATE.onYouTubeMusic) { host.hidden = true; return; }
+  // Reset content idempotently.
+  while (host.firstChild) host.removeChild(host.firstChild);
+  // Drop variant classes on every render so transitions don't compound.
+  host.className = "cf-upgrade";
+
+  const sub = STATE.cf_subscription || {};
+  const status = sub.status || "none";
+  const plan = sub.plan || null;
+  const cancelAt = sub.cancelAt || null;
+
+  // --- Case A — grandfathered (lifetime) -----------------------------
+  // Catches both legacy ExtPay one-time buyers and license-key redeemers,
+  // plus the transient "paid=true but cf_grandfathered not yet set"
+  // window after redemption.
+  if (STATE.cf_grandfathered || (STATE.paid && status !== "active" &&
+      status !== "cancellation_pending" && status !== "past_due")) {
+    host.classList.add("is-lifetime");
+    host.appendChild(el("div", { class: "cf-upgrade-state" },
+      el("span", { class: "cf-tick", "aria-hidden": "true" }, "✓"),
+      el("span", { class: "cf-upgrade-state-text" }, "Lifetime Pro active"),
+      el("span", { class: "cf-heart", "aria-hidden": "true" }, "♥")));
+    host.hidden = false;
+    return;
+  }
+
+  // --- Cases B / C — active subscription -----------------------------
+  if (status === "active") {
+    host.classList.add("is-active");
+    const planLabel = (plan === "annual") ? "Annual plan" : (plan === "monthly") ? "Monthly plan" : "Pro plan";
+    host.appendChild(el("div", { class: "cf-upgrade-state" },
+      el("span", { class: "cf-tick", "aria-hidden": "true" }, "✓"),
+      el("span", { class: "cf-upgrade-state-text" }, `Pro active — ${planLabel}`)));
+    const btn = el("button", { type: "button", class: "cf-btn cf-btn-ghost", id: "cf-manage-sub" }, "Manage subscription");
+    btn.addEventListener("click", onManageSubscription);
+    host.appendChild(btn);
+    host.hidden = false;
+    return;
+  }
+
+  // --- Case D — cancellation_pending ---------------------------------
+  if (status === "cancellation_pending") {
+    host.classList.add("is-cancellation-pending");
+    const dateStr = _formatRenewDate(cancelAt);
+    host.appendChild(el("div", { class: "cf-upgrade-state" },
+      dateStr ? `Pro ends ${dateStr}` : "Pro ends at end of current period"));
+    const btn = el("button", { type: "button", class: "cf-btn cf-btn-primary",
+      "data-plan": plan === "annual" ? "annual" : "monthly", id: "cf-resubscribe" },
+      "Resubscribe to keep Pro");
+    btn.addEventListener("click", onResubscribeClick);
+    host.appendChild(btn);
+    host.hidden = false;
+    return;
+  }
+
+  // --- Case E — past_due ---------------------------------------------
+  if (status === "past_due") {
+    host.classList.add("is-past-due");
+    host.appendChild(el("div", { class: "cf-upgrade-state" },
+      el("span", { class: "cf-warn", "aria-hidden": "true" }, "!"),
+      el("span", { class: "cf-upgrade-state-text" }, "Card needs updating to keep Pro")));
+    const btn = el("button", { type: "button", class: "cf-btn cf-btn-primary", id: "cf-update-payment" }, "Update payment method");
+    btn.addEventListener("click", onManageSubscription);   // same Stripe portal
+    host.appendChild(btn);
+    host.hidden = false;
+    return;
+  }
+
+  // --- Case F — upsell (canceled / none, NOT grandfathered) ----------
+  host.classList.add("is-free");
+  host.appendChild(el("h2", { class: "cf-upgrade-title" }, "Unlock all 17 blockers + Focus Lock"));
+
+  const planRow = el("div", { class: "cf-plan-row" });
+  // Monthly card
+  const monthlyCard = el("div", { class: "cf-plan cf-plan-monthly" },
+    el("div", { class: "cf-plan-name" }, "Monthly"),
+    el("div", { class: "cf-plan-price" },
+      el("span", { class: "cf-price" }, "$1.99"),
+      el("span", { class: "cf-plan-period" }, "/month")),
+    el("div", { class: "cf-plan-note" }, "Cancel anytime"),
+    el("button", { type: "button", class: "cf-btn cf-btn-ghost cf-btn-lg",
+      "data-plan": "monthly", id: "cf-subscribe-monthly" }, "Subscribe"),
+  );
+  monthlyCard.querySelector("#cf-subscribe-monthly").addEventListener("click", onSubscribeClick);
+  planRow.appendChild(monthlyCard);
+  // Annual card (pre-selected popular)
+  const annualCard = el("div", { class: "cf-plan cf-plan-annual is-popular" },
+    el("span", { class: "cf-plan-badge", "aria-label": "Most popular" }, "⭐ POPULAR"),
+    el("div", { class: "cf-plan-name" }, "Annual"),
+    el("div", { class: "cf-plan-price" },
+      el("span", { class: "cf-price" }, "$19.99"),
+      el("span", { class: "cf-plan-period" }, "/year")),
+    el("div", { class: "cf-plan-note" }, "Save $4 (16% off)"),
+    el("button", { type: "button", class: "cf-btn cf-btn-primary cf-btn-lg",
+      "data-plan": "annual", id: "cf-subscribe-annual" }, "Subscribe"),
+  );
+  annualCard.querySelector("#cf-subscribe-annual").addEventListener("click", onSubscribeClick);
+  planRow.appendChild(annualCard);
+
+  host.appendChild(planRow);
+  host.appendChild(el("p", { class: "cf-upgrade-features" },
+    "Same Pro features. All 14 blockers + Focus Lock + Pomodoro + keyword blocking + per-page rules + custom CSS."));
+  // Already-paid path still routes through openLogin / extpay reactivate.
+  const loginBtn = el("button", { type: "button", class: "cf-link cf-already-paid", id: "cf-login" }, "Already paid? Log in");
+  loginBtn.addEventListener("click", openLogin);
+  host.appendChild(loginBtn);
+
+  host.hidden = false;
+}
+
+// v1.4.21 Phase 3 — Subscribe button handlers. Each route through
+// background.js cf:open-payment with msg.plan = "monthly" | "annual".
+// The handler validates the nickname server-side; this is just the trigger.
+function onSubscribeClick(e) {
+  const btn = e.currentTarget;
+  const plan = (btn && btn.dataset && btn.dataset.plan) || "";
+  if (plan !== "monthly" && plan !== "annual") return;
+  _busyClickWithPayload(e, "Opening…", "cf:open-payment", { plan });
+}
+function onResubscribeClick(e) {
+  // Same wire, default to monthly if data-plan is missing.
+  const btn = e.currentTarget;
+  const plan = (btn && btn.dataset && btn.dataset.plan) === "annual" ? "annual" : "monthly";
+  _busyClickWithPayload(e, "Opening…", "cf:open-payment", { plan });
+}
+function onManageSubscription(e) {
+  // Open the Stripe customer portal — ExtPay's openLoginPage() is the
+  // existing reactivate/manage route. Routed through background.js to
+  // pick up the api_key first.
+  _busyClick(e, "Opening…", "cf:open-login");
 }
 
 function renderStats() {
@@ -915,6 +1202,48 @@ function _busyClick(e, text, msgType) {
   }
 }
 
+// v1.4.21 Phase 3 — variant that lets the caller merge fields into the
+// outgoing message (used by the plan-picker buttons to pass msg.plan).
+// Behaviour is otherwise identical to _busyClick.
+function _busyClickWithPayload(e, text, msgType, payload) {
+  const btn = (e && e.currentTarget) || (e && e.target);
+  const origText = btn ? btn.textContent : "";
+  const origDisabled = btn ? btn.disabled : false;
+  if (btn) {
+    btn.textContent = text;
+    btn.disabled = true;
+    btn.classList.add("is-busy");
+  }
+  let restored = false;
+  const restore = () => {
+    if (restored || !btn) return;
+    restored = true;
+    btn.textContent = origText;
+    btn.disabled = origDisabled;
+    btn.classList.remove("is-busy");
+  };
+  const tMid = setTimeout(() => {
+    if (btn && !restored) btn.textContent = "Still working… check your browser tabs";
+  }, 5000);
+  const tSafety = setTimeout(restore, 8000);
+  try {
+    const msg = Object.assign({ type: msgType }, payload || {});
+    chrome.runtime.sendMessage(msg, (resp) => {
+      clearTimeout(tMid);
+      clearTimeout(tSafety);
+      if (chrome.runtime.lastError || !resp || resp.ok === false) {
+        restore();
+        return;
+      }
+      try { window.close(); } catch (_) { restore(); }
+    });
+  } catch (err) {
+    clearTimeout(tMid);
+    clearTimeout(tSafety);
+    restore();
+  }
+}
+
 function openPayment(e) {
   _busyClick(e, "Opening…", "cf:open-payment");
 }
@@ -944,7 +1273,12 @@ function openUpsellModal() {
   m.hidden = false;
   m.setAttribute("aria-hidden", "false");
   // focus the upgrade button after the slide-in animation
-  setTimeout(() => $("cf-modal-upgrade").focus(), 60);
+  // v1.4.21 Phase 3 — focus the popular (annual) plan button after the
+  // slide-in animation. Was cf-modal-upgrade pre-Phase-3.
+  setTimeout(() => {
+    const target = $("cf-modal-subscribe-annual");
+    if (target) target.focus();
+  }, 60);
   document.addEventListener("keydown", onModalKey, { once: false });
 }
 
@@ -997,8 +1331,8 @@ function _hideLoadingLine() {
 function _attachStaticHandlers() {
   // Fixed buttons — none of these depend on STATE except togglePause/_startHold,
   // which guard internally.
-  $("cf-upgrade").addEventListener("click", openUpsellModal);
-  $("cf-login").addEventListener("click", openLogin);
+  // v1.4.21 Phase 3 — cf-upgrade / cf-login are now JS-rendered inside
+  // renderUpgrade (Case F), so they're attached at render time, not here.
   $("cf-reset-stats").addEventListener("click", resetStats);
   $("cf-open-options").addEventListener("click", () => chrome.runtime.openOptionsPage());
   $("cf-open-onboarding").addEventListener("click", () => {
@@ -1016,8 +1350,11 @@ function _attachStaticHandlers() {
   holdBtn.addEventListener("touchend", _cancelHold);
   holdBtn.addEventListener("touchcancel", _cancelHold);
 
-  // Modal buttons
-  $("cf-modal-upgrade").addEventListener("click", openPayment);
+  // Modal buttons — v1.4.21 Phase 3: plan picker. Same data-plan route as
+  // the inline Case-F cards. The "Already paid? Log in" link is the same
+  // openLogin → cf:open-login → ExtPay reactivate path as before.
+  $("cf-modal-subscribe-monthly").addEventListener("click", onSubscribeClick);
+  $("cf-modal-subscribe-annual").addEventListener("click", onSubscribeClick);
   $("cf-modal-login").addEventListener("click", openLogin);
   document.querySelectorAll("[data-cf-close-modal]").forEach((el) => {
     el.addEventListener("click", closeUpsellModal);
@@ -1097,6 +1434,7 @@ async function init() {
 
   renderTierBadge();
   renderStats();
+  renderWeekStats();
   renderUpgrade();
   renderFocusBanner();
   renderTimeMini();
@@ -1145,6 +1483,25 @@ async function init() {
       STATE.timeTracking = changes.timeTracking.newValue || {};
       renderTimeMini();
     }
+    // v1.4.21 Phase 3 — re-render upgrade card on subscription / grandfather
+    // changes (e.g. ExtPay periodic sync, dev-override flip, redemption).
+    if (changes.cf_subscription) {
+      STATE.cf_subscription = changes.cf_subscription.newValue
+        || { status: "none", plan: null, cancelAt: null, lastSyncAt: 0 };
+      renderUpgrade();
+    }
+    if (changes.cf_grandfathered || changes.cf_grandfathered_reason) {
+      if (changes.cf_grandfathered) STATE.cf_grandfathered = changes.cf_grandfathered.newValue === true;
+      if (changes.cf_grandfathered_reason) STATE.cf_grandfathered_reason = changes.cf_grandfathered_reason.newValue || null;
+      renderUpgrade();
+    }
+    // v1.4.21 Phase 3 — re-render the weekly mini-card when cf_stats updates
+    // (content.js flushes every 30s while the user browses).
+    if (changes.cf_stats) {
+      STATE.cf_stats = changes.cf_stats.newValue
+        || { blocked: {}, autoplay_avoided: {}, session_started: 0 };
+      renderWeekStats();
+    }
     if (changes.perPageEnabled) {
       STATE.perPageEnabled = !!changes.perPageEnabled.newValue;
       renderBlockers();
@@ -1163,10 +1520,11 @@ async function init() {
         const ob = document.getElementById("cf-onboarding");
         if (ob) ob.remove();
         document.querySelectorAll(
-          ".cf-stats, .cf-time-mini, .cf-pause-bar, .cf-blockers, .cf-upgrade"
+          ".cf-stats, .cf-time-mini, .cf-pause-bar, .cf-blockers, .cf-upgrade, .cf-week-stats"
         ).forEach((el) => { el.style.display = ""; });
         renderTierBadge();
         renderStats();
+        renderWeekStats();
         renderUpgrade();
         renderFocusBanner();
         renderTimeMini();
@@ -1184,7 +1542,7 @@ async function init() {
 // host, so there is nothing on the page to configure from here.
 function renderYouTubeMusicPause() {
   document.querySelectorAll(
-    ".cf-stats, .cf-time-mini, .cf-pause-bar, .cf-blockers, .cf-upgrade, .cf-focus-banner"
+    ".cf-stats, .cf-time-mini, .cf-pause-bar, .cf-blockers, .cf-upgrade, .cf-focus-banner, .cf-week-stats"
   ).forEach((el) => { el.style.display = "none"; });
 
   // Remove any previous panel (popup is destroyed on close — defensive).
@@ -1221,7 +1579,7 @@ function renderOnboarding() {
   const root = document.body;
   // hide everything except header (and footer maybe)
   document.querySelectorAll(
-    ".cf-stats, .cf-time-mini, .cf-pause-bar, .cf-blockers, .cf-upgrade, .cf-focus-banner"
+    ".cf-stats, .cf-time-mini, .cf-pause-bar, .cf-blockers, .cf-upgrade, .cf-focus-banner, .cf-week-stats"
   ).forEach((el) => { el.style.display = "none"; });
 
   // Build onboarding container if not already present
@@ -1309,10 +1667,11 @@ async function onPresetChosen(presetKey) {
   const ob = document.getElementById("cf-onboarding");
   if (ob) ob.remove();
   document.querySelectorAll(
-    ".cf-stats, .cf-time-mini, .cf-pause-bar, .cf-blockers, .cf-upgrade"
+    ".cf-stats, .cf-time-mini, .cf-pause-bar, .cf-blockers, .cf-upgrade, .cf-week-stats"
   ).forEach((el) => { el.style.display = ""; });
   renderTierBadge();
   renderStats();
+  renderWeekStats();
   renderUpgrade();
   renderFocusBanner();
   renderTimeMini();
