@@ -967,3 +967,34 @@ body:not(.cf-popup-loading) .cf-blockers {
   margin-bottom: var(--s-1);
 }
 .cf-plan .cf-btn { width: 100%; flex: initial; }
+
+/* ===== v1.4.22 — single-CTA Get Pro card (replaces v1.4.21 plan picker) ===== */
+.cf-upgrade.is-free .cf-upgrade-title {
+  margin: 0 0 var(--s-2);
+}
+.cf-upgrade-price {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  margin-bottom: var(--s-3);
+}
+.cf-upgrade-price .cf-price {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+}
+.cf-upgrade-once {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.cf-upgrade-cta {
+  width: 100%;
+  display: block;
+}
+.cf-modal-fine {
+  margin: var(--s-2) 0 0;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  text-align: center;
+  line-height: 1.45;
+}

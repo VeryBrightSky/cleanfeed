@@ -178,26 +178,42 @@ const LICENSE_SERVER = "https://cleanfeed-license.cleanfeed.workers.dev";
 // v1.4.21-phase1 — grandfather lock-in. Anyone who EVER held license-key Pro
 // or legacy ExtPay one-time-paid status gets cf_grandfathered=true permanently
 // the first time we observe them in that state. Once true, never overwritten.
-// Subscription users do NOT get grandfathered — when their sub lapses they
-// drop to free. Idempotent + race-safe via the same double-read pattern as
+//
+// v1.4.22 — third qualifier: legacy_subscriber. Users who managed to
+// subscribe to the v1.4.21 monthly/annual plans between ship and revert
+// (0 known real users at revert time, but the dev profile counts and there
+// could be webhook lag) are owed an automatic lifetime grant — they paid
+// real money, we changed the model under them.
+//
+// Precedence (when multiple qualifiers are present simultaneously):
+//   legacy_extpay   > legacy_subscriber > license_key
+// Reasoning: legacy_extpay users predate every other path. legacy_subscriber
+// is the user we owe restitution to; their cf_subscription.status is the
+// most specific historical signal. license_key holders also get lifetime,
+// but they got it by redemption, not by paying a recurring fee.
+//
+// Idempotent + race-safe via the same double-read pattern as
 // ensureInstallId / ensureCfStats.
 async function ensureGrandfather() {
   const d1 = await chrome.storage.local.get(
-    ["cf_grandfathered", "extpayPaid", "cleanfeed_license"]
+    ["cf_grandfathered", "extpayPaid", "cleanfeed_license", "cf_subscription"]
   );
   if (d1.cf_grandfathered === true) return;     // already locked in
   const hasLicense = !!(d1.cleanfeed_license && d1.cleanfeed_license.active);
   const hasLegacyExtpay = d1.extpayPaid === true;
-  if (!hasLicense && !hasLegacyExtpay) return;  // not Pro right now
-  // Re-check before write under "writer wins" semantics — if another caller
-  // (e.g. a parallel storage.onChanged dispatch) wrote between reads, prefer
-  // theirs so cf_grandfathered_at doesn't churn.
+  const subStatus = d1.cf_subscription && d1.cf_subscription.status;
+  const hasLegacySubscriber = (subStatus === "active" || subStatus === "cancellation_pending");
+  if (!hasLicense && !hasLegacyExtpay && !hasLegacySubscriber) return;  // not Pro right now
+  // Re-check before write under "writer wins" semantics.
   const d2 = await chrome.storage.local.get(["cf_grandfathered"]);
   if (d2.cf_grandfathered === true) return;
-  // legacy_extpay wins precedence when both signals are present — those
-  // users predate the license-key path entirely, so the more specific
-  // historical reason is the right one to record.
-  const reason = hasLegacyExtpay ? "legacy_extpay" : "license_key";
+  let reason;
+  if (hasLegacyExtpay) reason = "legacy_extpay";
+  else if (hasLegacySubscriber) reason = "legacy_subscriber";
+  else reason = "license_key";
+  if (reason === "legacy_subscriber") {
+    console.log("[CleanFeed] legacy subscriber detected — auto-granting lifetime Pro at no charge.");
+  }
   await chrome.storage.local.set({
     cf_grandfathered: true,
     cf_grandfathered_at: new Date().toISOString(),
@@ -979,37 +995,38 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === "cf:open-payment" || msg.type === "cf:open-payment-page") {
     (async () => {
-      const plan = (msg && typeof msg.plan === "string") ? msg.plan : "";
-      const validPlan = (plan === "monthly" || plan === "annual") ? plan : "";
-      if (plan && !validPlan) {
-        console.error("[CleanFeed] cf:open-payment received invalid plan nickname:",
-          plan, "— falling back to plan-picker URL.");
+      // v1.4.22 — single-plan world. ExtPay dashboard now has ONE plan
+      // ("lifetime", $4.99 once). monthly/annual nicknames are DELETED
+      // from ExtPay. We coerce any non-lifetime value (stale popup state,
+      // future extension code, defensive sender bug) to "lifetime" and
+      // log a warning so unexpected callers can be traced. Pre-v1.4.22
+      // we rejected invalid nicknames into a no-arg fallback URL; that
+      // would now hit ExtPay's empty-plan-picker which has zero plans
+      // configured and would be a confusing dead-end.
+      const rawPlan = (msg && typeof msg.plan === "string") ? msg.plan : "";
+      const validPlan = "lifetime";
+      if (rawPlan && rawPlan !== "lifetime") {
+        console.warn("[CleanFeed] cf:open-payment got non-lifetime plan",
+          JSON.stringify(rawPlan), "— coercing to 'lifetime' (the only configured plan post-v1.4.22).");
       }
-      _cflog("cf:open-payment plan=", plan, "validPlan=", validPlan);
+      _cflog("cf:open-payment rawPlan=", rawPlan, "validPlan=", validPlan);
 
       // v1.4.21-fix2 — PRIMARY PATH: route through extpay.openPaymentPage,
       // matching the SDK's documented multi-plan API. The SDK handles
       // get_key/create_key + chrome.tabs.create internally, writes the
       // api_key to chrome.storage.sync (where every other ExtPay caller
       // expects it), and avoids us duplicating that flow in
-      // _ensureExtpayApiKey. Pre-fix2 we built the URL ourselves and
-      // called chrome.tabs.create directly — works when api_key minting
-      // succeeds, fails silently when it doesn't.
+      // _ensureExtpayApiKey.
       try {
         if (extpay && typeof extpay.openPaymentPage === "function") {
-          _cflog("calling extpay.openPaymentPage", validPlan || "(no plan)");
-          // The SDK returns a Promise; await it so failures surface in our
-          // try/catch instead of as unhandled rejections. NOTE: the SDK's
-          // open_payment_page does NOT return the created tab object.
-          await extpay.openPaymentPage(validPlan || undefined);
+          _cflog("calling extpay.openPaymentPage", validPlan);
+          await extpay.openPaymentPage(validPlan);
           _cflog("extpay.openPaymentPage resolved (tab should be open)");
-          sendResponse({ ok: true, via: "extpay.openPaymentPage", plan: validPlan || null });
+          sendResponse({ ok: true, via: "extpay.openPaymentPage", plan: validPlan });
           return;
         }
         console.error("[CleanFeed] cf:open-payment: extpay.openPaymentPage unavailable — falling back to manual URL.");
       } catch (err) {
-        // SDK can throw if create_key fetch fails. Don't fail closed —
-        // try the manual fallback so the user still gets SOMETHING.
         console.error("[CleanFeed] extpay.openPaymentPage threw, falling back to manual URL:", err);
       }
 
@@ -1021,22 +1038,49 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (!apiKey) {
         console.error("[CleanFeed] cf:open-payment fallback: no ExtPay api_key available — opening landing-page fallback. Likely cause: /api/new-key network failure on this profile. Run chrome.storage.sync.get('extensionpay_api_key', console.log) to inspect.");
       }
-      let url;
-      if (apiKey) {
-        url = validPlan
-          ? `https://extensionpay.com/extension/cleanfeed2342/choose-plan/${validPlan}?api_key=${encodeURIComponent(apiKey)}`
-          : `https://extensionpay.com/extension/cleanfeed2342/choose-plan?api_key=${encodeURIComponent(apiKey)}`;
-      } else {
-        url = `https://extensionpay.com/extension/cleanfeed2342?back=choose-plan`;
-      }
+      const url = apiKey
+        ? `https://extensionpay.com/extension/cleanfeed2342/choose-plan/${validPlan}?api_key=${encodeURIComponent(apiKey)}`
+        : `https://extensionpay.com/extension/cleanfeed2342?back=choose-plan`;
       try {
         const tab = await chrome.tabs.create({ url, active: true });
         _cflog("fallback opened tab id=", tab && tab.id, "url=", url);
-        sendResponse({ ok: true, via: "manual-fallback", hasApiKey: !!apiKey, plan: validPlan || null, tabId: tab && tab.id });
+        sendResponse({ ok: true, via: "manual-fallback", hasApiKey: !!apiKey, plan: validPlan, tabId: tab && tab.id });
       } catch (err) {
         console.error("[CleanFeed] Failed to open payment tab (both paths):", err, "url=", url);
         sendResponse({ ok: false, error: String(err) });
       }
+    })();
+    return true;
+  }
+
+  // v1.4.22 — legacy-subscriber confirmation. options.js's "Switch to
+  // lifetime ($0)" button sends this. On v1.4.22 first SW boot we ALSO
+  // auto-grant via ensureGrandfather's legacy_subscriber branch, so by
+  // the time the user clicks the button cf_grandfathered is usually
+  // already true. The handler still runs ensureGrandfather to make this
+  // idempotent and to handle the edge case where the user clicked before
+  // the first boot path landed (e.g. options open mid-startup).
+  if (msg.type === "cf:legacy-sub-grandfather") {
+    (async () => {
+      const before = await chrome.storage.local.get(["cf_grandfathered", "cf_subscription"]);
+      const subStatus = before.cf_subscription && before.cf_subscription.status;
+      const eligible = (subStatus === "active" || subStatus === "cancellation_pending");
+      if (!eligible && before.cf_grandfathered !== true) {
+        // Not a legacy subscriber and not already grandfathered — refuse.
+        sendResponse({ ok: false, error: "not_eligible", currentStatus: subStatus || "none" });
+        return;
+      }
+      await ensureGrandfather();
+      await recomputePaid();
+      const after = await chrome.storage.local.get(
+        ["cf_grandfathered", "cf_grandfathered_reason", "cf_grandfathered_at"]
+      );
+      sendResponse({
+        ok: true,
+        granted: after.cf_grandfathered === true,
+        reason: after.cf_grandfathered_reason || null,
+        at: after.cf_grandfathered_at || null,
+      });
     })();
     return true;
   }

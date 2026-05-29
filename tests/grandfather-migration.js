@@ -61,14 +61,24 @@ function makeStorage(seed) {
 // ---- production helpers, transcribed from background.js -----------------
 
 async function ensureGrandfather(storage) {
-  const d1 = await storage.get(["cf_grandfathered", "extpayPaid", "cleanfeed_license"]);
+  // v1.4.22 — adds legacy_subscriber qualifier (cf_subscription.status
+  // in {active, cancellation_pending}). Precedence:
+  //   legacy_extpay > legacy_subscriber > license_key
+  const d1 = await storage.get(
+    ["cf_grandfathered", "extpayPaid", "cleanfeed_license", "cf_subscription"]
+  );
   if (d1.cf_grandfathered === true) return;
   const hasLicense = !!(d1.cleanfeed_license && d1.cleanfeed_license.active);
   const hasLegacyExtpay = d1.extpayPaid === true;
-  if (!hasLicense && !hasLegacyExtpay) return;
+  const subStatus = d1.cf_subscription && d1.cf_subscription.status;
+  const hasLegacySubscriber = (subStatus === "active" || subStatus === "cancellation_pending");
+  if (!hasLicense && !hasLegacyExtpay && !hasLegacySubscriber) return;
   const d2 = await storage.get(["cf_grandfathered"]);
   if (d2.cf_grandfathered === true) return;
-  const reason = hasLegacyExtpay ? "legacy_extpay" : "license_key";
+  let reason;
+  if (hasLegacyExtpay) reason = "legacy_extpay";
+  else if (hasLegacySubscriber) reason = "legacy_subscriber";
+  else reason = "license_key";
   await storage.set({
     cf_grandfathered: true,
     cf_grandfathered_at: new Date().toISOString(),
@@ -433,6 +443,135 @@ async function recomputePaid(storage) {
       s._peek().cf_grandfathered, false);
     assertEq("18.3) canceled subscriber drops to free",
       await recomputePaid(s), false);
+  }
+
+  // ===== 19. v1.4.22 legacy_subscriber auto-grandfather ==================
+  //
+  // The pricing-revert kindness invariant. Anyone who managed to subscribe
+  // to the v1.4.21 monthly/annual plans between ship and revert gets
+  // automatically grandfathered on first v1.4.22 SW boot. They paid real
+  // money; we changed the model under them. They get lifetime free.
+
+  {
+    // Active subscriber, no other qualifier -> grandfathered with
+    // reason="legacy_subscriber".
+    const s = makeStorage({
+      cf_grandfathered: false,
+      extpayPaid: false,
+      cleanfeed_license: null,
+      cf_subscription: { status: "active", plan: "monthly", cancelAt: null, lastSyncAt: 0 },
+    });
+    await ensureGrandfather(s);
+    const peek = s._peek();
+    assertEq("19a) active subscriber -> grandfathered",
+      peek.cf_grandfathered, true);
+    assertEq("19a) reason = legacy_subscriber",
+      peek.cf_grandfathered_reason, "legacy_subscriber");
+  }
+  {
+    // cancellation_pending subscriber also auto-grandfathers — they paid
+    // for the current period and would lose Pro at period-end without
+    // the grant.
+    const s = makeStorage({
+      cf_grandfathered: false,
+      cf_subscription: { status: "cancellation_pending", plan: "annual",
+        cancelAt: 1740000000000, lastSyncAt: 0 },
+    });
+    await ensureGrandfather(s);
+    assertEq("19b) cancellation_pending -> grandfathered",
+      s._peek().cf_grandfathered, true);
+    assertEq("19b) reason = legacy_subscriber",
+      s._peek().cf_grandfathered_reason, "legacy_subscriber");
+  }
+  {
+    // past_due subscriber does NOT auto-grandfather (their card failed —
+    // they haven't recently paid). They can still redeem a license key
+    // or fix their card to get back to active.
+    const s = makeStorage({
+      cf_grandfathered: false,
+      cf_subscription: { status: "past_due", plan: "monthly", lastSyncAt: 0 },
+    });
+    await ensureGrandfather(s);
+    assertEq("19c) past_due alone does NOT grandfather",
+      s._peek().cf_grandfathered, false);
+  }
+  {
+    // canceled subscriber (whose period ended) does NOT auto-grandfather.
+    // They had Pro, they lost Pro when their billing ended (pre-v1.4.22
+    // behaviour). Re-granting them lifetime would be over-correction.
+    const s = makeStorage({
+      cf_grandfathered: false,
+      cf_subscription: { status: "canceled", plan: "monthly",
+        cancelAt: 1700000000000, lastSyncAt: 0 },
+    });
+    await ensureGrandfather(s);
+    assertEq("19d) canceled subscriber does NOT grandfather",
+      s._peek().cf_grandfathered, false);
+  }
+  {
+    // Idempotent: clicking "Switch to lifetime ($0)" twice doesn't churn.
+    const s = makeStorage({
+      cf_grandfathered: false,
+      cf_subscription: { status: "active", plan: "monthly", lastSyncAt: 0 },
+    });
+    await ensureGrandfather(s);
+    const firstAt = s._peek().cf_grandfathered_at;
+    await new Promise((r) => setTimeout(r, 5));
+    await ensureGrandfather(s);
+    assertEq("19e) repeat click does NOT churn cf_grandfathered_at",
+      s._peek().cf_grandfathered_at, firstAt);
+  }
+
+  // ===== 20. Precedence matrix ==========================================
+  //
+  // legacy_extpay > legacy_subscriber > license_key. Reasoning: legacy_extpay
+  // users predate every other path. legacy_subscriber is the user we owe
+  // restitution to; that's the most specific historical signal. license_key
+  // holders also get lifetime but they got it by redemption, not by paying
+  // recurring fees we deprecated.
+
+  {
+    // All three qualifiers present -> legacy_extpay wins.
+    const s = makeStorage({
+      extpayPaid: true,
+      cleanfeed_license: { active: true, key: "ABCD-EFGH-JKMN-PQRS-TUVW-XYZ2" },
+      cf_subscription: { status: "active", plan: "monthly", lastSyncAt: 0 },
+    });
+    await ensureGrandfather(s);
+    assertEq("20a) extpay + subscriber + license -> reason=legacy_extpay",
+      s._peek().cf_grandfathered_reason, "legacy_extpay");
+  }
+  {
+    // legacy_subscriber + license_key (no extpay) -> legacy_subscriber wins.
+    // The user paid real money via the subscription before we reverted; they
+    // get the more-specific historical reason recorded.
+    const s = makeStorage({
+      extpayPaid: false,
+      cleanfeed_license: { active: true, key: "ABCD-EFGH-JKMN-PQRS-TUVW-XYZ2" },
+      cf_subscription: { status: "active", plan: "annual", lastSyncAt: 0 },
+    });
+    await ensureGrandfather(s);
+    assertEq("20b) subscriber + license -> reason=legacy_subscriber",
+      s._peek().cf_grandfathered_reason, "legacy_subscriber");
+  }
+  {
+    // license alone -> reason=license_key (unchanged from v1.4.21).
+    const s = makeStorage({
+      cleanfeed_license: { active: true, key: "ABCD-EFGH-JKMN-PQRS-TUVW-XYZ2" },
+    });
+    await ensureGrandfather(s);
+    assertEq("20c) license-only -> reason=license_key (unchanged)",
+      s._peek().cf_grandfathered_reason, "license_key");
+  }
+  {
+    // legacy_extpay + license (no subscriber) -> legacy_extpay still wins.
+    const s = makeStorage({
+      extpayPaid: true,
+      cleanfeed_license: { active: true, key: "ABCD-EFGH-JKMN-PQRS-TUVW-XYZ2" },
+    });
+    await ensureGrandfather(s);
+    assertEq("20d) extpay + license -> reason=legacy_extpay (unchanged from v1.4.21)",
+      s._peek().cf_grandfathered_reason, "legacy_extpay");
   }
 
   process.stdout.write("\n");

@@ -191,9 +191,11 @@ function renderLicensePanel() {
       : "—";
     const reasonLabel = STATE.cf_grandfathered_reason === "legacy_extpay"
       ? "legacy one-time purchase"
-      : STATE.cf_grandfathered_reason === "license_key"
-        ? "license key"
-        : "—";
+      : STATE.cf_grandfathered_reason === "legacy_subscriber"
+        ? "legacy subscriber (auto-grandfathered)"
+        : STATE.cf_grandfathered_reason === "license_key"
+          ? "license key"
+          : "—";
     // Reuse the existing partial + when fields for the grandfather display.
     const partialNode = $("cf-license-partial");
     const whenNode = $("cf-license-when");
@@ -737,11 +739,9 @@ function _formatDateOnly(ms) {
 function _openExtpayPortal() {
   chrome.runtime.sendMessage({ type: "cf:open-login" }, () => { void chrome.runtime.lastError; });
 }
-function _openExtpayPlanSwitch(targetPlan) {
-  // Route through cf:open-payment with the target plan nickname so the
-  // background validates against ("monthly"|"annual") and constructs the
-  // /choose-plan/<nickname> URL.
-  chrome.runtime.sendMessage({ type: "cf:open-payment", plan: targetPlan }, () => {
+function _openLifetimeCheckout() {
+  // v1.4.22 — single-plan world. Always opens /choose-plan/lifetime.
+  chrome.runtime.sendMessage({ type: "cf:open-payment", plan: "lifetime" }, () => {
     void chrome.runtime.lastError;
   });
 }
@@ -751,7 +751,7 @@ function renderSubscriptionPanel() {
   const body = $("cf-sub-body");
   if (!panel || !body) return;
   // Grandfathered (lifetime) users don't have a subscription. Hide the panel
-  // entirely — renderLicensePanel below shows the "Lifetime Pro" framing.
+  // entirely — renderLicensePanel above shows the "Lifetime Pro" framing.
   if (STATE.cf_grandfathered) {
     panel.hidden = true;
     return;
@@ -759,24 +759,20 @@ function renderSubscriptionPanel() {
   while (body.firstChild) body.removeChild(body.firstChild);
   const sub = STATE.cf_subscription || {};
   const status = sub.status || "none";
-  const plan = sub.plan || null;
-  const cancelAt = sub.cancelAt || null;
-  const planLabel = plan === "annual" ? "Annual ($19.99/yr)" :
-                    plan === "monthly" ? "Monthly ($1.99/mo)" :
-                    "Pro plan";
 
-  const row = (label, value) => {
-    const wrap = document.createElement("div");
-    wrap.className = "cf-sub-row";
-    const k = document.createElement("span");
-    k.className = "cf-sub-key";
-    k.textContent = label;
-    const v = document.createElement("span");
-    v.className = "cf-sub-val";
-    v.textContent = value;
-    wrap.appendChild(k); wrap.appendChild(v);
-    return wrap;
-  };
+  // v1.4.22 — pricing revert. The subscription panel is now ONLY relevant
+  // for the legacy edge cases:
+  //   active / cancellation_pending  -> legacy-subscriber notice + Switch
+  //                                     to lifetime ($0) button (no charge,
+  //                                     since v1.4.22 first boot already
+  //                                     auto-grandfathers via ensureGrandfather's
+  //                                     legacy_subscriber branch — this
+  //                                     button is the user-facing confirmation).
+  //   past_due                       -> existing Update-payment copy (unchanged).
+  //   none / canceled                -> panel hidden entirely.
+  // Free users use the popup's single Get Pro card; the options page no
+  // longer carries any upsell copy.
+
   const btnLink = (label, onclick, primary) => {
     const b = document.createElement("button");
     b.type = "button";
@@ -785,32 +781,20 @@ function renderSubscriptionPanel() {
     b.addEventListener("click", onclick);
     return b;
   };
-  const linkBtn = (label, onclick) => {
-    const a = document.createElement("button");
-    a.type = "button";
-    a.className = "cf-link";
-    a.textContent = label;
-    a.addEventListener("click", onclick);
-    return a;
-  };
 
-  if (status === "active") {
-    body.appendChild(row("Status", "Active"));
-    body.appendChild(row("Plan", planLabel));
-    body.appendChild(btnLink("Manage subscription", _openExtpayPortal));
-    const otherPlan = plan === "annual" ? "monthly" : "annual";
-    const switchLabel = otherPlan === "annual" ? "Switch to annual" : "Switch to monthly";
-    body.appendChild(linkBtn(switchLabel, () => _openExtpayPlanSwitch(otherPlan)));
-    panel.hidden = false;
-    return;
-  }
-  if (status === "cancellation_pending") {
-    body.appendChild(row("Status", "Cancels at end of period"));
-    body.appendChild(row("Plan", planLabel));
-    if (cancelAt) body.appendChild(row("Ends", _formatDateOnly(cancelAt)));
-    body.appendChild(btnLink("Resubscribe to keep Pro",
-      () => _openExtpayPlanSwitch(plan === "annual" ? "annual" : "monthly"), true));
-    body.appendChild(linkBtn("Manage subscription", _openExtpayPortal));
+  if (status === "active" || status === "cancellation_pending") {
+    const notice = document.createElement("p");
+    notice.className = "cf-help";
+    notice.textContent = "You're subscribed to the legacy monthly/annual plan. CleanFeed has switched to a one-time $4.99 model — you'll keep Pro for your current billing period, and you can switch to lifetime at no extra cost.";
+    body.appendChild(notice);
+    const switchBtn = btnLink("Switch to lifetime ($0)", _onSwitchToLifetime, true);
+    switchBtn.id = "cf-switch-to-lifetime";
+    body.appendChild(switchBtn);
+    const status_el = document.createElement("p");
+    status_el.id = "cf-switch-to-lifetime-status";
+    status_el.className = "cf-status";
+    status_el.setAttribute("aria-live", "polite");
+    body.appendChild(status_el);
     panel.hidden = false;
     return;
   }
@@ -819,29 +803,51 @@ function renderSubscriptionPanel() {
     warn.className = "cf-status cf-status-warn";
     warn.textContent = "Card needs updating to keep Pro.";
     body.appendChild(warn);
-    body.appendChild(row("Plan", planLabel));
     body.appendChild(btnLink("Update payment method", _openExtpayPortal, true));
     panel.hidden = false;
     return;
   }
-  if (status === "canceled") {
-    body.appendChild(row("Status", "Canceled"));
-    body.appendChild(row("Plan", planLabel));
-    const p = document.createElement("p");
-    p.className = "cf-help";
-    p.textContent = "Your subscription has ended. Subscribe below or use a license code to get Pro back.";
-    body.appendChild(p);
-    body.appendChild(btnLink("Subscribe monthly ($1.99/mo)",
-      () => _openExtpayPlanSwitch("monthly")));
-    body.appendChild(btnLink("Subscribe annual ($19.99/yr)",
-      () => _openExtpayPlanSwitch("annual"), true));
-    panel.hidden = false;
-    return;
-  }
-  // status === "none" — free user, no prior subscription. Don't show the
-  // panel at all; the popup carries the upsell. License code section above
-  // is enough for the options page.
+  // status === "none" / "canceled" / anything else — hide panel entirely.
   panel.hidden = true;
+}
+
+// v1.4.22 — handle "Switch to lifetime ($0)" click. ensureGrandfather has
+// almost certainly already auto-granted on the first v1.4.22 SW boot, but
+// the button still goes through the dedicated cf:legacy-sub-grandfather
+// message handler so the user gets explicit confirmation toast feedback.
+function _onSwitchToLifetime() {
+  const status_el = $("cf-switch-to-lifetime-status");
+  const btn = $("cf-switch-to-lifetime");
+  if (btn) btn.disabled = true;
+  if (status_el) {
+    status_el.className = "cf-status";
+    status_el.textContent = "Granting…";
+  }
+  chrome.runtime.sendMessage({ type: "cf:legacy-sub-grandfather" }, (resp) => {
+    if (btn) btn.disabled = false;
+    if (chrome.runtime.lastError) {
+      console.error("[CleanFeed] cf:legacy-sub-grandfather failed:", chrome.runtime.lastError.message);
+      if (status_el) {
+        status_el.className = "cf-status cf-status-warn";
+        status_el.textContent = "Could not switch. Try again in a minute.";
+      }
+      return;
+    }
+    if (resp && resp.ok && resp.granted) {
+      if (status_el) {
+        status_el.className = "cf-status cf-status-ok";
+        status_el.textContent = "Lifetime Pro granted. You're set forever.";
+      }
+      // The grandfather storage write triggers storage.onChanged → this page
+      // re-renders the license card with "Lifetime Pro · legacy_subscriber".
+    } else {
+      console.error("[CleanFeed] cf:legacy-sub-grandfather refused:", resp && resp.error);
+      if (status_el) {
+        status_el.className = "cf-status cf-status-warn";
+        status_el.textContent = "Could not grant lifetime. " + (resp && resp.error ? resp.error : "Unknown error.");
+      }
+    }
+  });
 }
 
 // ---- v1.4.21 Phase 3 — Stats dashboard ---------------------------------

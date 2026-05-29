@@ -774,9 +774,11 @@ function renderUpgrade() {
     const dateStr = _formatRenewDate(cancelAt);
     host.appendChild(el("div", { class: "cf-upgrade-state" },
       dateStr ? `Pro ends ${dateStr}` : "Pro ends at end of current period"));
+    // v1.4.22 — Resubscribe routes to the lifetime checkout. monthly/annual
+    // nicknames are deleted from ExtPay; lifetime is the only paid path.
     const btn = el("button", { type: "button", class: "cf-btn cf-btn-primary",
-      "data-plan": plan === "annual" ? "annual" : "monthly", id: "cf-resubscribe" },
-      "Resubscribe to keep Pro");
+      "data-plan": "lifetime", id: "cf-resubscribe" },
+      "Switch to Pro for life");
     btn.addEventListener("click", onResubscribeClick);
     host.appendChild(btn);
     host.hidden = false;
@@ -797,39 +799,27 @@ function renderUpgrade() {
   }
 
   // --- Case F — upsell (canceled / none, NOT grandfathered) ----------
+  // v1.4.22 — pricing revert. Single $4.99-once CTA. The Phase 3 side-by-
+  // side monthly+annual cards are gone; competitive research (Unhook 800k
+  // installs free, UnTrap subscription failure-mode, DF Tube paid clone)
+  // made subscription wrong for this product at this scale. The grandfather
+  // + cf_subscription scaffolding stays in storage for defensive reasons.
   host.classList.add("is-free");
   host.appendChild(el("h2", { class: "cf-upgrade-title" }, "Unlock all 17 blockers + Focus Lock"));
-
-  const planRow = el("div", { class: "cf-plan-row" });
-  // Monthly card
-  const monthlyCard = el("div", { class: "cf-plan cf-plan-monthly" },
-    el("div", { class: "cf-plan-name" }, "Monthly"),
-    el("div", { class: "cf-plan-price" },
-      el("span", { class: "cf-price" }, "$1.99"),
-      el("span", { class: "cf-plan-period" }, "/month")),
-    el("div", { class: "cf-plan-note" }, "Cancel anytime"),
-    el("button", { type: "button", class: "cf-btn cf-btn-ghost cf-btn-lg",
-      "data-plan": "monthly", id: "cf-subscribe-monthly" }, "Subscribe"),
-  );
-  monthlyCard.querySelector("#cf-subscribe-monthly").addEventListener("click", onSubscribeClick);
-  planRow.appendChild(monthlyCard);
-  // Annual card (pre-selected popular)
-  const annualCard = el("div", { class: "cf-plan cf-plan-annual is-popular" },
-    el("span", { class: "cf-plan-badge", "aria-label": "Most popular" }, "⭐ POPULAR"),
-    el("div", { class: "cf-plan-name" }, "Annual"),
-    el("div", { class: "cf-plan-price" },
-      el("span", { class: "cf-price" }, "$19.99"),
-      el("span", { class: "cf-plan-period" }, "/year")),
-    el("div", { class: "cf-plan-note" }, "Save $4 (16% off)"),
-    el("button", { type: "button", class: "cf-btn cf-btn-primary cf-btn-lg",
-      "data-plan": "annual", id: "cf-subscribe-annual" }, "Subscribe"),
-  );
-  annualCard.querySelector("#cf-subscribe-annual").addEventListener("click", onSubscribeClick);
-  planRow.appendChild(annualCard);
-
-  host.appendChild(planRow);
+  host.appendChild(el("div", { class: "cf-upgrade-price" },
+    el("span", { class: "cf-price" }, "$4.99"),
+    el("span", { class: "cf-upgrade-once" }, "once · yours forever"),
+  ));
+  const getProBtn = el("button", {
+    type: "button",
+    class: "cf-btn cf-btn-primary cf-btn-lg cf-upgrade-cta",
+    "data-plan": "lifetime",
+    id: "cf-get-pro",
+  }, "Get Pro");
+  getProBtn.addEventListener("click", onGetProClick);
+  host.appendChild(getProBtn);
   host.appendChild(el("p", { class: "cf-upgrade-features" },
-    "Same Pro features. All 17 blockers + Focus Lock + Pomodoro + keyword blocking + per-page rules + custom CSS."));
+    "No subscription. No upsell. No ads. One-time payment. Lifetime access."));
   // Already-paid path still routes through openLogin / extpay reactivate.
   const loginBtn = el("button", { type: "button", class: "cf-link cf-already-paid", id: "cf-login" }, "Already paid? Log in");
   loginBtn.addEventListener("click", openLogin);
@@ -838,37 +828,31 @@ function renderUpgrade() {
   host.hidden = false;
 }
 
-// v1.4.21 Phase 3 — Subscribe button handlers. Each route through
-// background.js cf:open-payment with msg.plan = "monthly" | "annual".
-// The handler validates the nickname server-side; this is just the trigger.
+// v1.4.22 — Get Pro click handler. Single CTA. Always sends plan="lifetime"
+// to background.js cf:open-payment, which routes through ExtPay's
+// openPaymentPage("lifetime"). The plan field is preserved as a
+// safety/future hedge — if a future revert re-enables multi-plan, only
+// the data-plan attribute on this button needs to flip.
 //
 // v1.4.21-fix1 — each handler sets e._cfHandled = true so the delegated
 // fallback on #cf-upgrade-card (see _attachStaticHandlers) doesn't
 // double-dispatch the same click. The delegation exists as a safety net
 // for re-render races; under normal operation these inline handlers fire
 // first and the delegated path short-circuits.
-function onSubscribeClick(e) {
-  const btn = e.currentTarget;
-  const plan = (btn && btn.dataset && btn.dataset.plan) || "";
-  if (plan !== "monthly" && plan !== "annual") {
-    // Surface what would have been a silent no-op pre-fix1. The static
-    // modal Subscribe buttons in popup.html now carry data-plan (fix1),
-    // so this branch should be unreachable in production. If it triggers,
-    // a future button was added without the attribute — log loudly.
-    console.error("[CleanFeed] onSubscribeClick fired without data-plan; id=",
-      btn && btn.id, "dataset=", btn && btn.dataset);
-    if (e) e._cfHandled = true;
-    return;
-  }
+function onGetProClick(e) {
   if (e) e._cfHandled = true;
+  // Always lifetime now. data-plan is read defensively, but coerced to
+  // "lifetime" if missing — single-plan world.
+  const btn = e && e.currentTarget;
+  const plan = (btn && btn.dataset && btn.dataset.plan === "lifetime") ? "lifetime" : "lifetime";
   _busyClickWithPayload(e, "Opening…", "cf:open-payment", { plan });
 }
 function onResubscribeClick(e) {
-  // Same wire, default to monthly if data-plan is missing.
-  const btn = e.currentTarget;
-  const plan = (btn && btn.dataset && btn.dataset.plan) === "annual" ? "annual" : "monthly";
+  // v1.4.22 — Case D (cancellation_pending) sends users to the lifetime
+  // checkout too. They keep Pro through their current billing period,
+  // and from v1.4.22 onwards the only paid path IS lifetime.
   if (e) e._cfHandled = true;
-  _busyClickWithPayload(e, "Opening…", "cf:open-payment", { plan });
+  _busyClickWithPayload(e, "Opening…", "cf:open-payment", { plan: "lifetime" });
 }
 function onManageSubscription(e) {
   // Open the Stripe customer portal — ExtPay's openLoginPage() is the
@@ -1321,10 +1305,9 @@ function openUpsellModal() {
   m.hidden = false;
   m.setAttribute("aria-hidden", "false");
   // focus the upgrade button after the slide-in animation
-  // v1.4.21 Phase 3 — focus the popular (annual) plan button after the
-  // slide-in animation. Was cf-modal-upgrade pre-Phase-3.
+  // v1.4.22 — single CTA, focus the Get Pro button after the slide-in.
   setTimeout(() => {
-    const target = $("cf-modal-subscribe-annual");
+    const target = $("cf-modal-get-pro");
     if (target) target.focus();
   }, 60);
   document.addEventListener("keydown", onModalKey, { once: false });
@@ -1400,20 +1383,16 @@ function _attachStaticHandlers() {
     upgradeHost.addEventListener("click", (e) => {
       const t = e.target && e.target.closest("button, .cf-link");
       if (!t || !upgradeHost.contains(t)) return;
-      // Prefer data-plan when present.
+      // v1.4.22 — single-plan world. data-plan should be "lifetime"; any
+      // other value coerces to "lifetime" before dispatch (the only valid
+      // payment route now). Defensive against stale state if a popup was
+      // opened from a pre-v1.4.22 snapshot.
       const planAttr = t.dataset && t.dataset.plan;
-      if (planAttr === "monthly" || planAttr === "annual") {
-        // Skip if the per-button listener is already firing this very click
-        // — we use a one-shot guard so the same click doesn't dispatch
-        // sendMessage twice. The per-button listener runs first (in order
-        // of attachment); we set a flag there to short-circuit here.
+      if (planAttr === "lifetime" || t.id === "cf-get-pro" || t.id === "cf-resubscribe") {
         if (e._cfHandled) return;
         e._cfHandled = true;
-        const ev = Object.assign({}, { currentTarget: t });
-        // Reuse onSubscribeClick semantics, but route via _busyClickWithPayload
-        // directly so we can pass `e` as-is (its currentTarget is t).
         _busyClickWithPayload({ currentTarget: t, target: t }, "Opening…",
-          "cf:open-payment", { plan: planAttr });
+          "cf:open-payment", { plan: "lifetime" });
         return;
       }
       if (t.id === "cf-manage-sub" || t.id === "cf-update-payment" || t.id === "cf-login") {
@@ -1421,13 +1400,6 @@ function _attachStaticHandlers() {
         e._cfHandled = true;
         _busyClick({ currentTarget: t, target: t }, "Opening…", "cf:open-login");
         return;
-      }
-      if (t.id === "cf-resubscribe") {
-        if (e._cfHandled) return;
-        e._cfHandled = true;
-        const plan = (t.dataset && t.dataset.plan) === "annual" ? "annual" : "monthly";
-        _busyClickWithPayload({ currentTarget: t, target: t }, "Opening…",
-          "cf:open-payment", { plan });
       }
     });
   }
@@ -1447,11 +1419,10 @@ function _attachStaticHandlers() {
   holdBtn.addEventListener("touchend", _cancelHold);
   holdBtn.addEventListener("touchcancel", _cancelHold);
 
-  // Modal buttons — v1.4.21 Phase 3: plan picker. Same data-plan route as
-  // the inline Case-F cards. The "Already paid? Log in" link is the same
+  // Modal button — v1.4.22: single Get Pro CTA (replaces the v1.4.21
+  // Phase 3 plan picker). The "Already paid? Log in" link is the same
   // openLogin → cf:open-login → ExtPay reactivate path as before.
-  $("cf-modal-subscribe-monthly").addEventListener("click", onSubscribeClick);
-  $("cf-modal-subscribe-annual").addEventListener("click", onSubscribeClick);
+  $("cf-modal-get-pro").addEventListener("click", onGetProClick);
   $("cf-modal-login").addEventListener("click", openLogin);
   document.querySelectorAll("[data-cf-close-modal]").forEach((el) => {
     el.addEventListener("click", closeUpsellModal);

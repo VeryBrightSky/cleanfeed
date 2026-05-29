@@ -82,18 +82,34 @@ function makeRuntime(behavior) {
   return recorder;
 }
 
+function onGetProClick(e, recorder) {
+  // v1.4.22 mirror — always sends plan="lifetime". data-plan is read
+  // defensively but coerced regardless (single-plan world).
+  if (e) e._cfHandled = true;
+  _busyClickWithPayload(e, "Opening…", "cf:open-payment", { plan: "lifetime" }, recorder);
+}
+// Kept for legacy-call-site tests below (the popup's static-modal binding
+// + delegation handler still coerce stale "monthly"/"annual" values to
+// "lifetime" at dispatch time).
 function onSubscribeClick(e, recorder) {
-  // Mirror popup.js:844-859 (the post-fix1 handler).
+  // Pre-fix1 production code returned silently for any non-"monthly"|"annual"
+  // dataset.plan. Post-v1.4.22 the dispatcher should ALWAYS coerce to
+  // "lifetime", but we keep this mirror around to verify the legacy
+  // static-modal binding can no longer silently no-op. Note: the v1.4.22
+  // production handler is onGetProClick (above); this function exists in
+  // the test file only to characterise the pre-fix1 silent-failure path.
   const btn = e.currentTarget;
   const plan = (btn && btn.dataset && btn.dataset.plan) || "";
-  if (plan !== "monthly" && plan !== "annual") {
+  if (plan !== "monthly" && plan !== "annual" && plan !== "lifetime") {
     console.error("[CleanFeed] onSubscribeClick fired without data-plan; id=",
       btn && btn.id, "dataset=", btn && btn.dataset);
     if (e) e._cfHandled = true;
     return;
   }
   if (e) e._cfHandled = true;
-  _busyClickWithPayload(e, "Opening…", "cf:open-payment", { plan }, recorder);
+  // v1.4.22 — coerce any monthly/annual stragglers to lifetime.
+  const validPlan = "lifetime";
+  _busyClickWithPayload(e, "Opening…", "cf:open-payment", { plan: validPlan }, recorder);
 }
 
 function _busyClickWithPayload(e, text, msgType, payload, recorder) {
@@ -133,31 +149,27 @@ function _busyClickWithPayload(e, text, msgType, payload, recorder) {
 // ---- mirror of background.js cf:open-payment handler -----------------
 
 function cfOpenPaymentHandler(msg, helpers) {
-  // helpers.ensureExtpayApiKey() -> Promise<string>
-  // helpers.tabsCreate({url, active}) -> Promise<{id}>
-  // returns a Promise<{ok, hasApiKey, plan, error?}>
+  // v1.4.22 mirror — single-plan world. Any non-"lifetime" plan value is
+  // coerced to "lifetime" (with a console.warn). The handler ALWAYS opens
+  // the lifetime checkout URL. helpers.ensureExtpayApiKey returns string;
+  // helpers.tabsCreate returns Promise<{id}>.
   return (async () => {
-    const apiKey = await helpers.ensureExtpayApiKey();
-    const plan = (msg && typeof msg.plan === "string") ? msg.plan : "";
-    const validPlan = (plan === "monthly" || plan === "annual") ? plan : "";
-    if (plan && !validPlan) {
-      console.error("[CleanFeed] cf:open-payment received invalid plan nickname:",
-        plan, "— falling back to plan-picker URL.");
+    const rawPlan = (msg && typeof msg.plan === "string") ? msg.plan : "";
+    const validPlan = "lifetime";
+    if (rawPlan && rawPlan !== "lifetime") {
+      console.warn("[CleanFeed] cf:open-payment got non-lifetime plan",
+        JSON.stringify(rawPlan), "— coercing to 'lifetime'.");
     }
+    const apiKey = await helpers.ensureExtpayApiKey();
     if (!apiKey) {
       console.error("[CleanFeed] cf:open-payment: no ExtPay api_key available — opening landing-page fallback.");
     }
-    let url;
-    if (apiKey) {
-      url = validPlan
-        ? `https://extensionpay.com/extension/cleanfeed2342/choose-plan/${validPlan}?api_key=${encodeURIComponent(apiKey)}`
-        : `https://extensionpay.com/extension/cleanfeed2342/choose-plan?api_key=${encodeURIComponent(apiKey)}`;
-    } else {
-      url = `https://extensionpay.com/extension/cleanfeed2342?back=choose-plan`;
-    }
+    const url = apiKey
+      ? `https://extensionpay.com/extension/cleanfeed2342/choose-plan/${validPlan}?api_key=${encodeURIComponent(apiKey)}`
+      : `https://extensionpay.com/extension/cleanfeed2342?back=choose-plan`;
     try {
       const tab = await helpers.tabsCreate({ url, active: true });
-      return { ok: true, hasApiKey: !!apiKey, plan: validPlan || null, tabId: tab && tab.id, url };
+      return { ok: true, hasApiKey: !!apiKey, plan: validPlan, tabId: tab && tab.id, url };
     } catch (err) {
       console.error("[CleanFeed] Failed to open payment tab:", err, "url=", url);
       return { ok: false, error: String(err), url };
@@ -184,47 +196,49 @@ async function backgroundOnChanged(changes, storage, helpers) {
   return recomputedCount;
 }
 
-// ====== 1. happy-path: Monthly click dispatches correct message ========
+// ====== 1. happy-path: Get Pro click dispatches plan="lifetime" =========
 
 (async () => {
   {
     const rec = makeRuntime("ok");
     rec._installErrorCapture();
-    const btn = { id: "cf-subscribe-monthly", dataset: { plan: "monthly" }, textContent: "Subscribe", disabled: false };
+    const btn = { id: "cf-get-pro", dataset: { plan: "lifetime" }, textContent: "Get Pro", disabled: false };
     const e = { currentTarget: btn, target: btn };
-    onSubscribeClick(e, rec);
+    onGetProClick(e, rec);
     await new Promise((r) => setTimeout(r, 10));
     rec._restoreError();
-    assertEq("1a) Monthly click sends one message",
+    assertEq("1a) Get Pro click sends one message",
       rec._sent.length, 1);
     assertEq("1b) message type = cf:open-payment",
       rec._sent[0].type, "cf:open-payment");
-    assertEq("1c) message plan = monthly",
-      rec._sent[0].plan, "monthly");
+    assertEq("1c) message plan = lifetime",
+      rec._sent[0].plan, "lifetime");
     assertEq("1d) e._cfHandled set to true (delegation guard)",
       e._cfHandled, true);
     assertEq("1e) no error surfaced on happy path",
       rec._errors.length, 0);
   }
 
-  // ====== 2. Annual click dispatches correct message ====================
+  // ====== 2. Get Pro always sends lifetime even with stale data-plan ====
+  //
+  // Defensive: a popup loaded before a hot-reload could carry an old
+  // data-plan="monthly". onGetProClick MUST coerce to lifetime regardless.
 
   {
     const rec = makeRuntime("ok");
-    const btn = { id: "cf-subscribe-annual", dataset: { plan: "annual" }, textContent: "Subscribe", disabled: false };
+    const btn = { id: "cf-get-pro", dataset: { plan: "monthly" }, textContent: "Get Pro", disabled: false };
     const e = { currentTarget: btn, target: btn };
-    onSubscribeClick(e, rec);
+    onGetProClick(e, rec);
     await new Promise((r) => setTimeout(r, 10));
-    assertEq("2) Annual click sends plan=annual",
-      rec._sent[0].plan, "annual");
+    assertEq("2) stale data-plan=monthly coerced to lifetime in dispatch",
+      rec._sent[0].plan, "lifetime");
   }
 
-  // ====== 3. Missing data-plan: silent return -> error surfaced =========
+  // ====== 3. legacy onSubscribeClick: missing data-plan still surfaces =
   //
-  // The exact regression sentinel. Pre-fix1, the static modal Subscribe
-  // buttons had no data-plan; clicking them silently returned. fix1 adds
-  // data-plan to those HTML buttons AND surfaces a console.error in
-  // onSubscribeClick if the early-return path is ever hit.
+  // The fix1 regression sentinel preserved. If a future popup snapshot
+  // re-introduces a Subscribe button without data-plan, the early-return
+  // path emits a console.error so we catch it during the next test run.
 
   {
     const rec = makeRuntime("ok");
@@ -254,9 +268,9 @@ async function backgroundOnChanged(changes, storage, helpers) {
   {
     const rec = makeRuntime("lasterror");
     rec._installErrorCapture();
-    const btn = { id: "cf-subscribe-monthly", dataset: { plan: "monthly" }, textContent: "Subscribe", disabled: false };
+    const btn = { id: "cf-get-pro", dataset: { plan: "lifetime" }, textContent: "Get Pro", disabled: false };
     const e = { currentTarget: btn, target: btn };
-    onSubscribeClick(e, rec);
+    onGetProClick(e, rec);
     await new Promise((r) => setTimeout(r, 10));
     rec._restoreError();
     assertEq("4a) lastError surfaced as console.error",
@@ -273,9 +287,9 @@ async function backgroundOnChanged(changes, storage, helpers) {
   {
     const rec = makeRuntime("no-response");
     rec._installErrorCapture();
-    const btn = { id: "cf-subscribe-monthly", dataset: { plan: "monthly" }, textContent: "Subscribe", disabled: false };
+    const btn = { id: "cf-get-pro", dataset: { plan: "lifetime" }, textContent: "Get Pro", disabled: false };
     const e = { currentTarget: btn, target: btn };
-    onSubscribeClick(e, rec);
+    onGetProClick(e, rec);
     await new Promise((r) => setTimeout(r, 10));
     rec._restoreError();
     assertEq("5) empty response surfaces",
@@ -287,9 +301,9 @@ async function backgroundOnChanged(changes, storage, helpers) {
   {
     const rec = makeRuntime("ok-false");
     rec._installErrorCapture();
-    const btn = { id: "cf-subscribe-monthly", dataset: { plan: "monthly" }, textContent: "Subscribe", disabled: false };
+    const btn = { id: "cf-get-pro", dataset: { plan: "lifetime" }, textContent: "Get Pro", disabled: false };
     const e = { currentTarget: btn, target: btn };
-    onSubscribeClick(e, rec);
+    onGetProClick(e, rec);
     await new Promise((r) => setTimeout(r, 10));
     rec._restoreError();
     assertEq("6a) ok:false surfaces",
@@ -304,16 +318,16 @@ async function backgroundOnChanged(changes, storage, helpers) {
   {
     const rec = makeRuntime("throw");
     rec._installErrorCapture();
-    const btn = { id: "cf-subscribe-monthly", dataset: { plan: "monthly" }, textContent: "Subscribe", disabled: false };
+    const btn = { id: "cf-get-pro", dataset: { plan: "lifetime" }, textContent: "Get Pro", disabled: false };
     const e = { currentTarget: btn, target: btn };
-    onSubscribeClick(e, rec);
+    onGetProClick(e, rec);
     await new Promise((r) => setTimeout(r, 10));
     rec._restoreError();
     assertEq("7) synchronous throw surfaces",
       rec._errors.length, 1);
   }
 
-  // ====== 8. background handler: monthly plan -> valid /choose-plan/monthly URL ====
+  // ====== 8. background handler: lifetime plan -> /choose-plan/lifetime URL ====
 
   {
     const consoleErrorOrig = console.error;
@@ -321,129 +335,156 @@ async function backgroundOnChanged(changes, storage, helpers) {
     console.error = (...a) => { errs.push(a); };
     try {
       const out = await cfOpenPaymentHandler(
-        { type: "cf:open-payment", plan: "monthly" },
+        { type: "cf:open-payment", plan: "lifetime" },
         {
           ensureExtpayApiKey: async () => "test_api_key_abc",
           tabsCreate: async () => ({ id: 42 }),
         }
       );
       assertEq("8a) ok=true on happy path", out.ok, true);
-      assertEq("8b) plan echoed back", out.plan, "monthly");
-      assertEq("8c) URL includes /choose-plan/monthly",
-        out.url.indexOf("/choose-plan/monthly?api_key=") >= 0, true);
+      assertEq("8b) plan = lifetime in response", out.plan, "lifetime");
+      assertEq("8c) URL includes /choose-plan/lifetime",
+        out.url.indexOf("/choose-plan/lifetime?api_key=") >= 0, true);
       assertEq("8d) URL includes api_key",
         out.url.indexOf("api_key=test_api_key_abc") >= 0, true);
       assertEq("8e) no error on happy path", errs.length, 0);
     } finally { console.error = consoleErrorOrig; }
   }
 
-  // ====== 9. background handler: annual plan -> /choose-plan/annual =====
+  // ====== 9. background handler: monthly plan COERCES to lifetime + warns ==
+  //
+  // v1.4.22 anti-regression: a stale popup sending plan="monthly" still
+  // works (opens the lifetime checkout) but emits a console.warn so the
+  // bad caller can be traced.
 
   {
-    const consoleErrorOrig = console.error;
-    console.error = () => {};
-    try {
-      const out = await cfOpenPaymentHandler(
-        { type: "cf:open-payment", plan: "annual" },
-        {
-          ensureExtpayApiKey: async () => "k",
-          tabsCreate: async () => ({ id: 1 }),
-        }
-      );
-      assertEq("9) annual -> /choose-plan/annual",
-        out.url.indexOf("/choose-plan/annual?api_key=k") >= 0, true);
-    } finally { console.error = consoleErrorOrig; }
-  }
-
-  // ====== 10. background handler: missing plan -> /choose-plan (no nick) ==
-
-  {
-    const consoleErrorOrig = console.error;
-    const errs = [];
-    console.error = (...a) => { errs.push(a); };
-    try {
-      const out = await cfOpenPaymentHandler(
-        { type: "cf:open-payment" },     // no plan
-        {
-          ensureExtpayApiKey: async () => "k",
-          tabsCreate: async () => ({ id: 1 }),
-        }
-      );
-      assertEq("10a) missing plan -> /choose-plan (no nickname)",
-        out.url.indexOf("/choose-plan?api_key=k") >= 0, true);
-      assertEq("10b) plan field is null in response", out.plan, null);
-      assertEq("10c) NO error surfaced for missing plan (intentional fallback)",
-        errs.length, 0);
-    } finally { console.error = consoleErrorOrig; }
-  }
-
-  // ====== 11. background handler: invalid plan -> fallback + console.error ====
-
-  {
-    const consoleErrorOrig = console.error;
-    const errs = [];
-    console.error = (...a) => { errs.push(a); };
-    try {
-      const out = await cfOpenPaymentHandler(
-        { type: "cf:open-payment", plan: "lifetime" },     // not in allowlist
-        {
-          ensureExtpayApiKey: async () => "k",
-          tabsCreate: async () => ({ id: 1 }),
-        }
-      );
-      assertEq("11a) invalid plan -> /choose-plan (no nickname)",
-        out.url.indexOf("/choose-plan?api_key=k") >= 0, true);
-      assertEq("11b) invalid plan surfaces a console.error",
-        errs.length >= 1, true);
-      const errStr = JSON.stringify(errs[0]);
-      assertTrue("11c) error mentions the bad nickname",
-        errStr.indexOf("lifetime") >= 0);
-    } finally { console.error = consoleErrorOrig; }
-  }
-
-  // ====== 12. background handler: empty api_key -> landing-page fallback + log ==
-
-  {
-    const consoleErrorOrig = console.error;
-    const errs = [];
-    console.error = (...a) => { errs.push(a); };
+    const consoleWarnOrig = console.warn;
+    const warns = [];
+    console.warn = (...a) => { warns.push(a); };
     try {
       const out = await cfOpenPaymentHandler(
         { type: "cf:open-payment", plan: "monthly" },
+        {
+          ensureExtpayApiKey: async () => "k",
+          tabsCreate: async () => ({ id: 1 }),
+        }
+      );
+      assertEq("9a) monthly coerced to lifetime in URL",
+        out.url.indexOf("/choose-plan/lifetime?api_key=k") >= 0, true);
+      assertEq("9b) plan field = lifetime in response", out.plan, "lifetime");
+      assertEq("9c) console.warn surfaces the coercion",
+        warns.length >= 1, true);
+      const warnStr = JSON.stringify(warns[0]);
+      assertTrue("9d) warn mentions the original (bad) plan value",
+        warnStr.indexOf("monthly") >= 0);
+    } finally { console.warn = consoleWarnOrig; }
+  }
+
+  // ====== 10. annual plan ALSO coerces to lifetime ======================
+
+  {
+    const consoleWarnOrig = console.warn;
+    console.warn = () => {};
+    try {
+      const out = await cfOpenPaymentHandler(
+        { type: "cf:open-payment", plan: "annual" },
+        { ensureExtpayApiKey: async () => "k", tabsCreate: async () => ({ id: 1 }) }
+      );
+      assertEq("10) annual coerced to lifetime URL",
+        out.url.indexOf("/choose-plan/lifetime") >= 0, true);
+    } finally { console.warn = consoleWarnOrig; }
+  }
+
+  // ====== 11. missing plan defaults to lifetime SILENTLY ================
+  //
+  // Spec: "Change cf:open-payment to default msg.plan to 'lifetime' if not
+  // specified". Missing plan is NOT a malformed caller — it's the no-arg
+  // shape, and we silently default rather than warning.
+
+  {
+    const consoleWarnOrig = console.warn;
+    const warns = [];
+    console.warn = (...a) => { warns.push(a); };
+    try {
+      const out = await cfOpenPaymentHandler(
+        { type: "cf:open-payment" },
+        { ensureExtpayApiKey: async () => "k", tabsCreate: async () => ({ id: 1 }) }
+      );
+      assertEq("11a) missing plan -> /choose-plan/lifetime",
+        out.url.indexOf("/choose-plan/lifetime?api_key=k") >= 0, true);
+      assertEq("11b) plan = lifetime in response", out.plan, "lifetime");
+      assertEq("11c) NO warn for missing plan (intentional default)",
+        warns.length, 0);
+    } finally { console.warn = consoleWarnOrig; }
+  }
+
+  // ====== 12. invalid plan ("pro", garbage) coerces to lifetime + warns ==
+
+  {
+    const consoleWarnOrig = console.warn;
+    const warns = [];
+    console.warn = (...a) => { warns.push(a); };
+    try {
+      const out = await cfOpenPaymentHandler(
+        { type: "cf:open-payment", plan: "pro" },
+        { ensureExtpayApiKey: async () => "k", tabsCreate: async () => ({ id: 1 }) }
+      );
+      assertEq("12a) invalid plan -> /choose-plan/lifetime",
+        out.url.indexOf("/choose-plan/lifetime") >= 0, true);
+      assertEq("12b) warn surfaces", warns.length >= 1, true);
+      assertTrue("12c) warn mentions the bad value",
+        JSON.stringify(warns[0]).indexOf("pro") >= 0);
+    } finally { console.warn = consoleWarnOrig; }
+  }
+
+  // ====== 13. empty api_key -> landing-page fallback + log ==============
+
+  {
+    const consoleErrorOrig = console.error;
+    const errs = [];
+    console.error = (...a) => { errs.push(a); };
+    try {
+      const out = await cfOpenPaymentHandler(
+        { type: "cf:open-payment", plan: "lifetime" },
         {
           ensureExtpayApiKey: async () => "",      // empty key
           tabsCreate: async () => ({ id: 1 }),
         }
       );
-      assertEq("12a) empty api_key -> landing-page fallback URL",
+      assertEq("13a) empty api_key -> landing-page fallback URL",
         out.url.indexOf("/extension/cleanfeed2342?back=choose-plan") >= 0, true);
-      assertEq("12b) hasApiKey=false in response",
+      assertEq("13b) hasApiKey=false in response",
         out.hasApiKey, false);
-      assertEq("12c) empty api_key surfaces a console.error",
+      assertEq("13c) empty api_key surfaces a console.error",
         errs.length >= 1, true);
     } finally { console.error = consoleErrorOrig; }
   }
 
-  // ====== 13. background handler: chrome.tabs.create throws -> caught + logged ==
+  // ====== 13b. background handler: chrome.tabs.create throws -> caught + logged ==
 
   {
     const consoleErrorOrig = console.error;
+    const consoleWarnOrig = console.warn;
     const errs = [];
     console.error = (...a) => { errs.push(a); };
+    console.warn = () => {};        // suppress lifetime-coercion warn
     try {
       const out = await cfOpenPaymentHandler(
-        { type: "cf:open-payment", plan: "monthly" },
+        { type: "cf:open-payment", plan: "lifetime" },
         {
           ensureExtpayApiKey: async () => "k",
           tabsCreate: async () => { throw new Error("invalid url"); },
         }
       );
-      assertEq("13a) tabs.create throw -> ok:false", out.ok, false);
-      assertTrue("13b) error string captured in response",
+      assertEq("13b.a) tabs.create throw -> ok:false", out.ok, false);
+      assertTrue("13b.b) error string captured in response",
         typeof out.error === "string" && out.error.indexOf("invalid url") >= 0);
-      assertEq("13c) tabs.create failure surfaces a console.error",
+      assertEq("13b.c) tabs.create failure surfaces a console.error",
         errs.length >= 1, true);
-    } finally { console.error = consoleErrorOrig; }
+    } finally {
+      console.error = consoleErrorOrig;
+      console.warn = consoleWarnOrig;
+    }
   }
 
   // ====== 14. recomputePaid runs on cf_grandfathered change (fix1) =====
@@ -661,34 +702,38 @@ async function backgroundOnChanged(changes, storage, helpers) {
         return true;
       }
     }
-    handler({ type: "cf:open-payment", plan: "monthly" }, {}, (r) => { lastResponseSent = r; });
+    handler({ type: "cf:open-payment", plan: "lifetime" }, {}, (r) => { lastResponseSent = r; });
     await new Promise((r) => setTimeout(r, 5));
     assertEq("21) stubbed ExtPay -> manual-fallback path still responds",
       lastResponseSent && lastResponseSent.via, "manual-fallback");
   }
 
-  // ====== 22. plan-payload allowlist guards malformed messages ===========
+  // ====== 22. v1.4.22 plan-payload coercion matrix =======================
   //
-  // A future popup bug could send msg.plan as something unexpected
-  // ("pro", "lifetime", undefined, an object). The handler must coerce
-  // to either monthly/annual or the no-arg plan-picker URL, never call
-  // openPaymentPage with an invalid nickname.
+  // Single-plan world. The handler ALWAYS resolves to "lifetime" regardless
+  // of what plan field came in. This protects against stale popup state
+  // (a click from a pre-v1.4.22 hot-reloaded popup with data-plan="monthly"
+  // still opens the correct lifetime checkout).
 
   {
     const inputs = [
-      { in: "monthly", out: "monthly" },
-      { in: "annual",  out: "annual" },
-      { in: "pro",     out: null },           // invalid -> null
-      { in: "",        out: null },
-      { in: undefined, out: null },
-      { in: 42,        out: null },           // non-string
-      { in: { evil: true }, out: null },
+      { in: "lifetime", out: "lifetime", warn: false },     // happy path
+      { in: "monthly",  out: "lifetime", warn: true  },     // legacy stale
+      { in: "annual",   out: "lifetime", warn: true  },     // legacy stale
+      { in: "pro",      out: "lifetime", warn: true  },     // legacy v1.4.20
+      { in: "",         out: "lifetime", warn: false },     // missing default
+      { in: undefined,  out: "lifetime", warn: false },
+      { in: 42,         out: "lifetime", warn: false },     // non-string ignored
+      { in: { evil: true }, out: "lifetime", warn: false },
     ];
     for (const t of inputs) {
-      const plan = (typeof t.in === "string") ? t.in : "";
-      const validPlan = (plan === "monthly" || plan === "annual") ? plan : "";
-      assertEq(`22) plan coercion ${JSON.stringify(t.in)} -> ${JSON.stringify(t.out)}`,
-        validPlan || null, t.out);
+      const rawPlan = (typeof t.in === "string") ? t.in : "";
+      const validPlan = "lifetime";
+      const wouldWarn = rawPlan && rawPlan !== "lifetime";
+      assertEq(`22) plan coercion ${JSON.stringify(t.in)} -> lifetime`,
+        validPlan, t.out);
+      assertEq(`22) plan ${JSON.stringify(t.in)} would warn? ${t.warn}`,
+        !!wouldWarn, t.warn);
     }
   }
 

@@ -46,6 +46,12 @@ function assertTrue(name, cond) {
 // the click through chrome.runtime.sendMessage with the message + payload
 // we record here.
 
+// v1.4.22 — single-plan world. Case F is now ONE Get Pro CTA (was two
+// side-by-side plan cards in v1.4.21 Phase 3). Case D's Resubscribe button
+// also routes to plan="lifetime" (monthly/annual nicknames are deleted
+// from ExtPay). Case B/C still render for legacy active subscribers (the
+// dev profile + any Stripe-webhook-lag users); their "Manage subscription"
+// CTA still routes to the ExtPay portal unchanged.
 function dispatchUpgrade(state) {
   const sub = state.cf_subscription || {};
   const status = sub.status || "none";
@@ -73,9 +79,9 @@ function dispatchUpgrade(state) {
       case: "D",
       cancelAt,
       buttons: [{
-        label: "Resubscribe to keep Pro",
+        label: "Switch to Pro for life",
         msg: "cf:open-payment",
-        payload: { plan: plan === "annual" ? "annual" : "monthly" },
+        payload: { plan: "lifetime" },
       }],
     };
   }
@@ -89,12 +95,11 @@ function dispatchUpgrade(state) {
       }],
     };
   }
-  // Case F — upsell. Two side-by-side plan buttons + Already-paid link.
+  // Case F — single Get Pro CTA + Already-paid link.
   return {
     case: "F",
     buttons: [
-      { label: "Subscribe (monthly)",  msg: "cf:open-payment", payload: { plan: "monthly" } },
-      { label: "Subscribe (annual)",   msg: "cf:open-payment", payload: { plan: "annual"  } },
+      { label: "Get Pro",              msg: "cf:open-payment", payload: { plan: "lifetime" } },
       { label: "Already paid? Log in", msg: "cf:open-login",   payload: null },
     ],
   };
@@ -165,6 +170,11 @@ function dispatchUpgrade(state) {
 }
 
 // ===== 4. Case D — cancellation_pending ================================
+//
+// v1.4.22 — Resubscribe button routes to plan="lifetime" regardless of
+// the prior subscription plan (monthly/annual nicknames are deleted from
+// ExtPay). The label changes from "Resubscribe to keep Pro" (subscribe
+// to the same recurring plan) to "Switch to Pro for life" (one-time).
 
 {
   const out = dispatchUpgrade({
@@ -175,20 +185,22 @@ function dispatchUpgrade(state) {
   assertEq("4a) cancellation_pending -> Case D", out.case, "D");
   assertEq("4b) Case D records cancelAt for date display",
     out.cancelAt, 1740000000000);
-  assertEq("4c) Resubscribe sends cf:open-payment with prior plan",
+  assertEq("4c) Resubscribe sends cf:open-payment",
     out.buttons[0].msg, "cf:open-payment");
-  assertEq("4d) Resubscribe payload plan = prior plan (monthly)",
-    out.buttons[0].payload.plan, "monthly");
+  assertEq("4d) Resubscribe payload always plan='lifetime' (from monthly)",
+    out.buttons[0].payload.plan, "lifetime");
+  assertEq("4e) Button label is 'Switch to Pro for life'",
+    out.buttons[0].label, "Switch to Pro for life");
 }
 {
-  // Annual variant — payload must echo "annual".
+  // Annual variant — payload still coerces to lifetime.
   const out = dispatchUpgrade({
     cf_grandfathered: false,
     paid: true,
     cf_subscription: { status: "cancellation_pending", plan: "annual", cancelAt: 1740000000000 },
   });
-  assertEq("4e) Resubscribe payload plan = annual",
-    out.buttons[0].payload.plan, "annual");
+  assertEq("4f) Resubscribe payload coerced to lifetime from annual",
+    out.buttons[0].payload.plan, "lifetime");
 }
 
 // ===== 5. Case E — past_due ============================================
@@ -204,7 +216,7 @@ function dispatchUpgrade(state) {
     out.buttons[0].msg, "cf:open-login");
 }
 
-// ===== 6. Case F — upsell (free, plan picker) ===========================
+// ===== 6. Case F — upsell (free, single Get Pro CTA) ===================
 
 {
   // status=none, free user
@@ -214,14 +226,14 @@ function dispatchUpgrade(state) {
     cf_subscription: { status: "none", plan: null, cancelAt: null },
   });
   assertEq("6a) free + status=none -> Case F", out.case, "F");
-  assertEq("6b) Case F renders 3 buttons (monthly, annual, login)",
-    out.buttons.length, 3);
-  assertEq("6c) Monthly button payload = {plan:'monthly'}",
-    out.buttons[0].payload, { plan: "monthly" });
-  assertEq("6d) Annual button payload = {plan:'annual'}",
-    out.buttons[1].payload, { plan: "annual" });
+  assertEq("6b) Case F renders 2 buttons (Get Pro + login)",
+    out.buttons.length, 2);
+  assertEq("6c) Get Pro button payload = {plan:'lifetime'}",
+    out.buttons[0].payload, { plan: "lifetime" });
+  assertEq("6d) Get Pro button label = 'Get Pro'",
+    out.buttons[0].label, "Get Pro");
   assertEq("6e) Already-paid routes through cf:open-login",
-    out.buttons[2].msg, "cf:open-login");
+    out.buttons[1].msg, "cf:open-login");
 }
 {
   // status=canceled, free user — same Case F (must NOT mistakenly route
@@ -362,23 +374,93 @@ const FIXED_NOW = new Date("2026-05-27T12:00:00");
 
 // ===== 10. Plan-button validation =======================================
 //
-// The background.js cf:open-payment handler validates msg.plan against
-// the two configured nicknames ("monthly", "annual") and falls back to a
-// generic /choose-plan URL otherwise. We assert the popup never sends
-// anything outside that allowlist.
+// v1.4.22 — single-plan world. The background.js cf:open-payment handler
+// coerces any plan value to "lifetime" (the only configured plan post-
+// pricing-revert). The popup MUST only ever send "lifetime".
 
-const PLAN_ALLOWLIST = ["monthly", "annual"];
+const PLAN_ALLOWLIST = ["lifetime"];
 {
-  const f = dispatchUpgrade({
-    cf_grandfathered: false, paid: false,
-    cf_subscription: { status: "none" },
-  });
-  for (const b of f.buttons) {
-    if (b.msg === "cf:open-payment") {
-      assertTrue("10) plan-payload always in allowlist",
-        PLAN_ALLOWLIST.indexOf(b.payload.plan) >= 0);
+  const cases = [
+    { cf_grandfathered: false, paid: false, cf_subscription: { status: "none" } },
+    { cf_grandfathered: false, paid: false, cf_subscription: { status: "canceled", plan: "monthly" } },
+    { cf_grandfathered: false, paid: true,
+      cf_subscription: { status: "cancellation_pending", plan: "monthly", cancelAt: 1740000000000 } },
+    { cf_grandfathered: false, paid: true,
+      cf_subscription: { status: "cancellation_pending", plan: "annual", cancelAt: 1740000000000 } },
+  ];
+  for (const c of cases) {
+    const f = dispatchUpgrade(c);
+    for (const b of f.buttons) {
+      if (b.msg === "cf:open-payment") {
+        assertTrue(`10) plan-payload "${b.payload.plan}" in allowlist [${PLAN_ALLOWLIST.join(",")}]`,
+          PLAN_ALLOWLIST.indexOf(b.payload.plan) >= 0);
+      }
     }
   }
+}
+
+// ===== 11. Grep test — no residual subscription strings in shipped files =
+//
+// v1.4.22 anti-regression sentinel. The pricing revert means the strings
+// "$1.99", "$19.99", "/month", "/year", "monthly", "annual", "POPULAR"
+// must not appear in any user-facing UI file (popup.html, popup.js,
+// options.html, options.js). Comments are allowed (they document the
+// history); plain literals are not. We exempt explicit comment lines
+// (starting with //) and JSDoc lines.
+
+const fs = require("fs");
+const path = require("path");
+const REPO = path.resolve(__dirname, "..");
+function _stripCommentsAndStrings(src) {
+  // Crude — strip // comments to end of line and /* */ block comments.
+  // Keep string literals so we DO catch hard-coded copy.
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[\t ]*\/\/.*$/gm, "");
+}
+const FORBIDDEN = [
+  { pat: /\$1\.99/g,    label: "$1.99" },
+  { pat: /\$19\.99/g,   label: "$19.99" },
+  { pat: /\$1,99/g,     label: "$1,99 (locale comma)" },
+  { pat: /\$19,99/g,    label: "$19,99 (locale comma)" },
+  // "/month" / "/year" as standalone literals — but NOT inside JS prop
+  // names like `period: "/year"` because the user-facing string is the
+  // forbidden form. We match the slash + word boundary.
+  { pat: /"\/month"/g,  label: '"/month" literal' },
+  { pat: /"\/year"/g,   label: '"/year" literal' },
+  { pat: /POPULAR/g,    label: "POPULAR badge" },
+];
+function _scan(filePath) {
+  const raw = fs.readFileSync(filePath, "utf8");
+  const stripped = _stripCommentsAndStrings(raw);
+  const hits = [];
+  for (const { pat, label } of FORBIDDEN) {
+    const m = stripped.match(pat);
+    if (m && m.length) hits.push({ label, count: m.length });
+  }
+  return hits;
+}
+const SCAN_FILES = [
+  "popup/popup.html",
+  "popup/popup.js",
+  "options/options.html",
+  "options/options.js",
+];
+for (const rel of SCAN_FILES) {
+  const hits = _scan(path.join(REPO, rel));
+  // Note: "MOST POPULAR" appears in onboarding preset code (unrelated to
+  // the pricing pivot — it's the "Focused" preset's tag). We let that
+  // slide because the grep is anchored on /POPULAR/ as a whole word in
+  // the upsell context; the test will flag it if it leaks into the
+  // upgrade card path. For popup.js specifically we check that the only
+  // POPULAR occurrence (if any) is the preset, not the pricing badge.
+  // We do this by also scanning for "⭐ POPULAR" (with the star) which
+  // is the pricing badge form — that MUST be zero.
+  const starHits = (fs.readFileSync(path.join(REPO, rel), "utf8")
+    .match(/⭐ POPULAR/g) || []).length;
+  assertEq(`11.${rel}) zero "⭐ POPULAR" pricing-badge strings`, starHits, 0);
+  // The other forbidden literals must be zero outright.
+  const noStarHits = hits.filter((h) => h.label !== "POPULAR badge");
+  assertEq(`11.${rel}) zero residual subscription strings`,
+    noStarHits, []);
 }
 
 process.stdout.write("\n");

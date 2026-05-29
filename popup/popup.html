@@ -128,25 +128,15 @@
           <span>Per-page rules, channel whitelist + blocklist, custom CSS</span>
         </li>
       </ul>
-      <!-- v1.4.21 Phase 3 — side-by-side plan picker. Annual is the
-           "popular" pre-selected card per the spec. Buttons route through
-           background.js cf:open-payment with msg.plan="monthly"|"annual"
-           which maps to ExtPay's openPaymentPage(nickname). -->
-      <div class="cf-plan-row">
-        <div class="cf-plan cf-plan-monthly">
-          <div class="cf-plan-name">Monthly</div>
-          <div class="cf-plan-price"><span class="cf-price">$1.99</span><span class="cf-plan-period">/month</span></div>
-          <div class="cf-plan-note">Cancel anytime</div>
-          <button id="cf-modal-subscribe-monthly" type="button" class="cf-btn cf-btn-ghost cf-btn-lg" data-plan="monthly">Subscribe</button>
-        </div>
-        <div class="cf-plan cf-plan-annual is-popular">
-          <span class="cf-plan-badge" aria-label="Most popular">⭐ POPULAR</span>
-          <div class="cf-plan-name">Annual</div>
-          <div class="cf-plan-price"><span class="cf-price">$19.99</span><span class="cf-plan-period">/year</span></div>
-          <div class="cf-plan-note">Save $4 (16% off)</div>
-          <button id="cf-modal-subscribe-annual" type="button" class="cf-btn cf-btn-primary cf-btn-lg" data-plan="annual">Subscribe</button>
-        </div>
+      <!-- v1.4.22 — pricing revert. Single Get Pro CTA, $4.99 lifetime.
+           Click routes through background.js cf:open-payment with
+           msg.plan="lifetime" which maps to extpay.openPaymentPage("lifetime"). -->
+      <div class="cf-modal-price">
+        <span class="cf-price">$4.99</span>
+        <span class="cf-price-sub">once · yours forever</span>
       </div>
+      <button id="cf-modal-get-pro" type="button" class="cf-btn cf-btn-primary cf-btn-lg" data-plan="lifetime">Get Pro</button>
+      <p class="cf-modal-fine">No subscription. No upsell. No ads. One-time payment.</p>
       <button id="cf-modal-login" type="button" class="cf-link cf-modal-login">Already paid? Log in</button>
     </div>
   </div>
