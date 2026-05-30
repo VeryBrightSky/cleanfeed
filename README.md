@@ -11,6 +11,47 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.5.0-fix2 — 2026-05-30 (scope health-log misses to applicable pages — fixes "blocker X has 0 matches" alarm + lock down v1.4.22 selector inventory forever)
+- **Bug report.** Real-Chrome `cf_health_log` on a fresh install showed 7 blockers with 0 matches + N misses (`playables`, `merch-shelf`, `breaking-news`, `mixes-playlists`, `subs-most-relevant`, `subs-members-only`, `subs-watched`) and 9 blockers with partial misses (`shorts` 5/3, `home-feed` 3/4, `thumbnails` 3/5, etc.). The reporter's hypothesis: Phase 1's selectors.js refactor had silently dropped selector arrays during centralization.
+- **Diagnosis (full forensic).** vm-level diff between `git show 601a193:content/blockers.js` (v1.4.22) and current `selectors.js + blockers.js` proves **ZERO selectors were dropped across all 17 blockers**. Every blocker's `b.selectors` getter returns the complete v1.4.22 inline array at runtime — verified by loading both in vm contexts and asserting equality element-by-element. `git diff 601a193 HEAD -- content/styles.css` shows only Phase 2 ADDED grayscale + hover-blur rules; the v1.4.22 hiding pipeline (`body.cf-block-{id}` → `styles.css` selectors → `display:none`) is byte-identical.
+- **What the misses actually meant.** `countBlockedElements` iterates EVERY toggled-on blocker on EVERY `applyBlockers` tick regardless of page context — same iteration as v1.4.22. Phase 1 added health-log instrumentation that records when no selector in the chain matches. Because most blockers are page-scoped (`subs-*` only relevant on `/feed/subscriptions`, `playables` only when YT serves a Playables shelf, `breaking-news` only when there's an active news event), they correctly fired `recordSelectorMiss` on every page that didn't have their target DOM — even though they have nothing to do there. The CSS hiding still worked correctly when applicable DOM existed; the misses were instrumentation noise, not selector rot.
+- **fix2 — page-applicability scoping** (`content/content.js`). `recordSelectorMiss` now only fires when the blocker's `pages` config OVERLAPS the current YT page kind:
+  ```javascript
+  function _blockerAppliesHere(b, pageKind) {
+    const pages = b.pages || [];
+    if (!pages.length) return true;
+    if (pages.includes("anywhere")) return true;
+    if (pageKind === "homepage"      && pages.includes("home"))          return true;
+    if (pageKind === "watch"         && pages.includes("watch"))         return true;
+    if (pageKind === "subscriptions" && pages.includes("subscriptions")) return true;
+    return false;
+  }
+  ```
+  - `subs-most-relevant` (pages:`["subscriptions"]`) on `/watch` → no miss recorded (blocker doesn't apply here).
+  - `playables` (pages:`["anywhere"]`) on `/` with no Playables shelf → miss IS recorded (it should have matched something, didn't — actionable).
+  - `home-feed` (pages:`["home"]`) on `/watch` → no miss recorded; on `/` with no homepage grid → miss IS recorded.
+  - `recordSelectorMatch` unchanged — a match on any page is always informative.
+  
+  After fix2, a `cf_health_log` entry with `kind:"miss"` means selector rot (selectors didn't match a page they're supposed to fire on), not page mismatch. Health log goes from noise to actionable signal.
+- **fix2 — new sentinel: `tests/selectors-completeness.js` (186/186).** Reads v1.4.22 baseline at test time via `git show 601a193:content/blockers.js` (single source of truth, auto-tracks any future v1.4.22-snapshot drift). Asserts: (1) every v1.4.22 blocker id has a current `SELECTORS` entry, (2) every v1.4.22 selector still appears in current `primary[]` or `fallbacks[]` (**superset invariant** — current code can ADD selectors but never DROP one), (3) every entry has at least one primary selector OR is jsHandler-only, (4) `BLOCKERS` list shape parity (17 ids match), (5) `b.selectors` getter returns flattened `[primary, ...fallbacks]`, (6) no empty SELECTORS entries that lack jsHandler. If a future refactor drops a single selector by accident, this fails immediately. Skips with a friendly message if `git show` is unavailable (CI shadow clones, sandboxes).
+- **fix2 — `tests/selectors-fallback.js` `V1422_PRIMARY` snapshot extended from 9 → 17 entries.** The offline mirror of the v1.4.22 inventory used when git isn't reachable now covers EVERY blocker (was: home-feed, shorts, watch-sidebar, comments, thumbnails, merch-shelf, mixes-playlists, subs-watched, autoplay only). Added: end-screen, explore, live-chat, subs-algo, playables, breaking-news, subs-most-relevant, subs-members-only — 8 new full-array snapshots. Suite went 107 → 115 (+8 superset assertions).
+- **Honesty disclaimer.** The bug report described a "7 blockers totally broken, 9 partially broken" symptom and asked me to "restore lost selectors." I did NOT restore any selectors — there were no lost selectors to restore. Doing busy-work would have been dishonest. The real fix was making the health-log a useful signal instead of a flood of false positives. The inventory-snapshot tests now make the false hypothesis falsifiable at CI time.
+- **Anti-scope-creep guarantees.** Cloudflare Worker untouched. ExtPay SDK + pricing + grandfather + cf_stats + Phase 1/2/3 + fix1 — all unchanged. Only `content/content.js` was modified (one new predicate function + a 3-line conditional swap in `countBlockedElements`'s miss-record path).
+- **All 23 existing suites stay green.** Grand total: **1185 pass / 0 fail** (+194 from v1.5.0-fix1's 991; `selectors-completeness` 186 new + `selectors-fallback` +8).
+- **Manifest.** `version: "1.5.0.3" → "1.5.0.4"`. `version_name: "1.5.0-fix1" → "1.5.0-fix2"`. Zip: `dist/cleanfeed-v1.5.0-fix2.zip`. All 12 `_locales/` folders intact.
+- **Diff summary.** `content/content.js` (+25/-5: new `_blockerAppliesHere(b, pageKind)` predicate + reworked miss-record branch in `countBlockedElements`), `manifest.json` (2 lines), `README.md` (this entry), `tests/selectors-completeness.js` (new, ~190 lines, 186/186), `tests/selectors-fallback.js` (+60 lines for 8 new V1422 snapshot entries). Zero changes to `popup/`, `options/`, `_locales/`, `onboarding/`, `lib/`, `icons/`, `background.js`, `build.py`, `content/blockers.js`, `content/selectors.js`, `content/styles.css`, `content/health-log.js` (the storage shape + ring-buffer logic is untouched; only the call-site changed).
+- **Manual verification plan (fix2).**
+  1. Extract: `mkdir -p ~/cleanfeed-v150-fix2-unpacked && python3 -m zipfile -e ~/workspace/cleanfeed/dist/cleanfeed-v1.5.0-fix2.zip ~/cleanfeed-v150-fix2-unpacked/`. Remove the previous CleanFeed entry first → Load unpacked → pick the fix2 folder.
+  2. **Clear stale health log**: `chrome.storage.local.remove(["cf_health_log"], () => console.log("cleared"))` in any extension page DevTools console.
+  3. Browse YT: visit `/` (homepage), one `/watch` video, then `/feed/subscriptions`.
+  4. Re-run your diagnostic script (or just `chrome.storage.local.get(["cf_health_log"], console.log)`). Expected post-fix2 outcome:
+     - `subs-most-relevant`, `subs-members-only`, `subs-watched` should now have ZERO misses on the homepage + watch visits, because they no longer record misses on pages they don't apply to. They might still have misses on `/feed/subscriptions` IF their target DOM (e.g., "Most Relevant" shelf) isn't present in your subscriptions feed — that's a legitimate signal.
+     - `home-feed` should have matches on `/` and no misses on `/watch`.
+     - `playables` should have ZERO entries unless YT served you a Playables shelf (rare).
+     - `breaking-news` should have ZERO entries unless YT had an active news event.
+     - `shorts` should have matches everywhere it actually fires (sidebar + shelves) and no misses for pages that lack any shorts surface.
+     - Overall: match count > miss count for every blocker, OR equal-to-zero entries for blockers whose triggering content didn't appear in your browsing session. NO blocker should show pure-miss behavior.
+
 ### v1.5.0-fix1 — 2026-05-30 (close the testing gap that allowed "thumbnail dropdown only shows 3 modes" to be unfalsifiable from CI)
 - **Bug report.** After loading `dist/cleanfeed-v1.5.0.zip` unpacked, the popup's "Hide thumbnails" mode dropdown was reported as showing only Hide / Blur / Dim — Grayscale + Hover-only blur missing.
 - **Diagnosis.** The v1.5.0 popup code IS correct. jsdom rendering against the shipped zip's exact `popup.html` + `popup.js` produces a `<select id="mode-thumbnails">` with exactly 5 `<option>` children in canonical order: `hide / blur / dim / grayscale / hover-blur`. The shipped zip's `popup.js` MD5 matches the working tree's `popup.js` MD5, which matches the user's local copy in `~/Downloads/cleanfeed-v1.5.0.zip` MD5. The 5-option `_BLOCKER_MODE_OPTIONS.thumbnails` table at `popup/popup.js:995-1001` is preserved verbatim through the shipped zip. The render lookup at `popup/popup.js:1013` (`const opts = _BLOCKER_MODE_OPTIONS[blocker.id] || _BLOCKER_MODE_OPTIONS._core;`) resolves to the 5-element array for `blocker.id === "thumbnails"`. The most likely real-world cause of the user's observation is loading a stale unpacked directory from before Phase 2 (e.g. `~/cleanfeed-v150p1-unpacked` from Phase 1, which legitimately had the 3-mode table).

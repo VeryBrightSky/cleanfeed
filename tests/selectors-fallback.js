@@ -137,6 +137,11 @@ const VALID_BLOCKER_IDS = [
 // Inlined snapshot from v1.4.22 content/blockers.js. Mismatch = behaviour
 // regression on healthy YT pages.
 
+// v1.5.0-fix2 — EXPANDED to cover all 17 blockers (was 9 in fix1).
+// tests/selectors-completeness.js reads v1.4.22 baseline via `git show
+// 601a193:content/blockers.js` so the comparison auto-tracks; this
+// snapshot is the offline mirror used when git isn't reachable (CI
+// shadow-clone, sandboxed runs).
 const V1422_PRIMARY = {
   "home-feed": [
     'ytd-browse[page-subtype="home"] ytd-rich-grid-renderer',
@@ -163,28 +168,79 @@ const V1422_PRIMARY = {
     "#related.ytd-watch-flexy",
     "ytd-compact-video-renderer",
   ],
+  "end-screen": [
+    ".ytp-ce-element",
+    ".ytp-ce-covering-overlay",
+    ".ytp-ce-element-show",
+    ".ytp-endscreen-content",
+    ".html5-endscreen",
+    ".ytp-pause-overlay",
+    ".ytp-scroll-min.ytp-pause-overlay",
+  ],
   "comments": [
     "ytd-comments#comments",
     "#comments.ytd-watch-flexy",
     "ytd-comments-header-renderer",
   ],
+  "explore": [
+    'ytd-guide-section-renderer:has(#guide-section-title yt-formatted-string[title="Explore"])',
+    'ytd-guide-entry-renderer:has(a[title="Trending"])',
+    'ytd-guide-entry-renderer:has(a[title="Music"])',
+    'ytd-guide-entry-renderer:has(a[title="Gaming"])',
+    'ytd-guide-entry-renderer:has(a[title="News"])',
+    'ytd-guide-entry-renderer:has(a[title="Sports"])',
+    'ytd-guide-entry-renderer:has(a[title="Learning"])',
+    'ytd-guide-entry-renderer:has(a[title="Fashion & Beauty"])',
+    'ytd-mini-guide-entry-renderer:has(a[title="Trending"])',
+  ],
+  "live-chat": [
+    "ytd-live-chat-frame",
+    "#chat-container",
+    "#chat.ytd-watch-flexy",
+    "ytd-watch-flexy[is-two-columns_] #secondary-inner ytd-live-chat-frame",
+  ],
+  "autoplay": [],          // JS-only blocker, no DOM selectors
   "thumbnails": [
     "ytd-thumbnail img",
     "yt-image img",
     ".yt-thumbnail-view-model img",
   ],
+  "subs-algo": [
+    'ytd-browse[page-subtype="subscriptions"] ytd-shelf-renderer',
+    'ytd-browse[page-subtype="subscriptions"] ytd-rich-shelf-renderer',
+    'ytd-browse[page-subtype="subscriptions"] ytd-rich-section-renderer',
+  ],
+  "playables": [
+    'ytd-rich-shelf-renderer:has(#title yt-formatted-string[title="Playables"])',
+    'ytd-rich-shelf-renderer:has(#title yt-formatted-string[title="Mini-games"])',
+    "ytd-playable-shelf-renderer",
+  ],
   "merch-shelf": [
     "ytd-merch-shelf-renderer",
     "yt-merch-shelf-renderer",
+  ],
+  "breaking-news": [
+    'ytd-rich-section-renderer:has(yt-formatted-string[title="Breaking news"])',
+    'ytd-rich-section-renderer:has(yt-formatted-string[title="News"])',
+    'ytd-rich-shelf-renderer:has(yt-formatted-string[title="Breaking news"])',
   ],
   "mixes-playlists": [
     "ytd-radio-renderer",
     "ytd-compact-radio-renderer",
   ],
+  "subs-most-relevant": [
+    'ytd-browse[page-subtype="subscriptions"] ytd-rich-section-renderer:has(yt-formatted-string[title="Most Relevant"])',
+    'ytd-browse[page-subtype="subscriptions"] ytd-rich-section-renderer:has(yt-formatted-string[title="For you"])',
+    'ytd-browse[page-subtype="subscriptions"] ytd-rich-shelf-renderer:has(yt-formatted-string[title="Most Relevant"])',
+    'ytd-browse[page-subtype="subscriptions"] ytd-rich-shelf-renderer:has(yt-formatted-string[title="For you"])',
+  ],
+  "subs-members-only": [
+    'ytd-rich-item-renderer:has(ytd-badge-supported-renderer[aria-label="Members only"])',
+    'ytd-rich-item-renderer:has([aria-label*="Members only"])',
+  ],
   "subs-watched": [
     'ytd-browse[page-subtype="subscriptions"] ytd-rich-item-renderer[data-cf-watched="1"]',
   ],
-  "autoplay": [],          // JS-only blocker, no DOM selectors
 };
 
 {

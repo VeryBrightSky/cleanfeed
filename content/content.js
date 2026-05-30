@@ -895,6 +895,29 @@
     markPageNav: function () {},
   };
 
+  // v1.5.0-fix2 — page-applicability predicate for the health-log miss
+  // path. Pre-fix2, recordSelectorMiss fired on EVERY applyBlockers tick
+  // for EVERY enabled blocker whose chain didn't match — including
+  // blockers whose `pages` config explicitly says they only apply on
+  // /feed/subscriptions while the user is on /watch. The result was a
+  // flood of "miss" entries that misleadingly looked like selector rot
+  // when in fact the blocker just had nothing to do on the current page.
+  //
+  // After fix2: recordSelectorMiss only fires when the blocker's `pages`
+  // config OVERLAPS the current YT page kind. recordSelectorMatch is
+  // unaffected — a match on a "non-applicable" page is still informative
+  // (e.g. the shorts blocker has pages: ["anywhere"] and DOES legitimately
+  // match the shorts shelf on a watch-page sidebar).
+  function _blockerAppliesHere(b, pageKind) {
+    const pages = Array.isArray(b.pages) ? b.pages : [];
+    if (!pages.length) return true;       // permissive default for blockers without a pages config
+    if (pages.indexOf("anywhere") >= 0) return true;
+    if (pageKind === "homepage"      && pages.indexOf("home") >= 0)          return true;
+    if (pageKind === "watch"         && pages.indexOf("watch") >= 0)         return true;
+    if (pageKind === "subscriptions" && pages.indexOf("subscriptions") >= 0) return true;
+    return false;
+  }
+
   function countBlockedElements(active) {
     let totalAdded = 0;
     for (const b of active) {
@@ -936,20 +959,25 @@
       STATE.counts.perBlocker[b.id] =
         (STATE.counts.perBlocker[b.id] || 0) + found;
       totalAdded += found;
-      // v1.5.0-phase1 — health-log. Two cases:
+      // v1.5.0-phase1 — health-log. Three cases (v1.5.0-fix2):
       //   - chain matched: record the first-hit selector index + count
-      //     (idempotent per page-nav inside health-log.js).
-      //   - chain didn't match AND the blocker has a non-empty selector
-      //     chain: record a miss (also idempotent per page-nav).
+      //     (idempotent per page-nav inside health-log.js). Always fires
+      //     regardless of page applicability — a match is always useful.
+      //   - chain didn't match AND blocker applies to current page:
+      //     record a miss (actionable signal — possible selector rot).
+      //   - chain didn't match AND blocker does NOT apply here (e.g.
+      //     subs-most-relevant on /watch): skip. Pre-fix2 these fired
+      //     too, flooding the log with non-actionable noise.
       // We skip both records when the chain is empty (autoplay) — that
       // blocker has no DOM presence by design and shouldn't generate
       // health-log entries every tick.
       if (chain.length > 0) {
         if (chainMatched) {
           _hl.recordSelectorMatch(b.id, firstHitIndex, firstHitCount);
-        } else {
+        } else if (_blockerAppliesHere(b, _currentPageKey())) {
           _hl.recordSelectorMiss(b.id);
         }
+        // else: blocker is enabled but not relevant on this page; skip.
       }
     }
     STATE.counts.total += totalAdded;
