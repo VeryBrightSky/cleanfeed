@@ -1011,6 +1011,18 @@ function renderModeDropdown(blocker, locked) {
     : "How to hide this — fully (Hide), blurred (Blur), or dimmed (Dim).";
   const cur = _effectiveModeFor(blocker.id);
   const opts = _BLOCKER_MODE_OPTIONS[blocker.id] || _BLOCKER_MODE_OPTIONS._core;
+  // v1.5.0-fix1 — expose the option count on the element itself so a
+  // future DevTools quick-check can confirm the dropdown is populated
+  // correctly without having to open it. `data-options-count` is read
+  // by tests/popup-mode-render.js as the structural assertion; it also
+  // makes "the dropdown only shows 3 options" reports falsifiable —
+  // user can run `document.getElementById("mode-thumbnails").dataset
+  // .optionsCount` in popup DevTools and see "5".
+  sel.setAttribute("data-options-count", String(opts.length));
+  sel.setAttribute("aria-label",
+    blocker.id === "thumbnails"
+      ? "Thumbnail render mode (5 options)"
+      : "Render mode (3 options)");
   for (const opt of opts) {
     const o = document.createElement("option");
     o.value = opt.v;

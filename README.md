@@ -11,6 +11,35 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.5.0-fix1 — 2026-05-30 (close the testing gap that allowed "thumbnail dropdown only shows 3 modes" to be unfalsifiable from CI)
+- **Bug report.** After loading `dist/cleanfeed-v1.5.0.zip` unpacked, the popup's "Hide thumbnails" mode dropdown was reported as showing only Hide / Blur / Dim — Grayscale + Hover-only blur missing.
+- **Diagnosis.** The v1.5.0 popup code IS correct. jsdom rendering against the shipped zip's exact `popup.html` + `popup.js` produces a `<select id="mode-thumbnails">` with exactly 5 `<option>` children in canonical order: `hide / blur / dim / grayscale / hover-blur`. The shipped zip's `popup.js` MD5 matches the working tree's `popup.js` MD5, which matches the user's local copy in `~/Downloads/cleanfeed-v1.5.0.zip` MD5. The 5-option `_BLOCKER_MODE_OPTIONS.thumbnails` table at `popup/popup.js:995-1001` is preserved verbatim through the shipped zip. The render lookup at `popup/popup.js:1013` (`const opts = _BLOCKER_MODE_OPTIONS[blocker.id] || _BLOCKER_MODE_OPTIONS._core;`) resolves to the 5-element array for `blocker.id === "thumbnails"`. The most likely real-world cause of the user's observation is loading a stale unpacked directory from before Phase 2 (e.g. `~/cleanfeed-v150p1-unpacked` from Phase 1, which legitimately had the 3-mode table).
+- **The real bug**: `tests/thumbnail-variants.js` (Phase 2's regression sentinel) asserted the storage shape, `_effectiveModeFor()` coercion, and the `_BLOCKER_MODE_OPTIONS` table values — but NEVER confirmed that `renderModeDropdown` actually emits the right number of `<option>` elements into the real DOM tree. The "popup only shows 3 modes" report was unfalsifiable from CI; the existing test would have passed even if `renderModeDropdown` had been silently broken. fix1 closes that gap with a jsdom-driven shipping-render test that asserts the actual rendered DOM.
+- **fix1 — `data-options-count` attribute** on the rendered `<select>` (`popup/popup.js:1015-1019`). Sets `data-options-count="5"` for thumbnails and `data-options-count="3"` for every other blocker. Also rewrites `aria-label` to mention the count. Effect: a user (or anyone) can now run `document.getElementById("mode-thumbnails").dataset.optionsCount` in the popup DevTools console and instantly see whether the dropdown has all 5 — without having to open it. Makes "the dropdown only shows 3 options" claims falsifiable in the field.
+- **fix1 — new shipping-render test: `tests/popup-mode-render.js` (90/90).** Boots `popup/popup.html` in jsdom with the production `popup.js` against a synthetic chrome.* shim + a Pro storage seed, waits for `init()` to resolve, and asserts:
+  1. Popup initialises + every expected `<select id="mode-{blockerId}">` is in the DOM (16 selects — every blocker except autoplay).
+  2. `mode-thumbnails` has EXACTLY 5 `<option>` children with values `["hide","blur","dim","grayscale","hover-blur"]` AND labels `["Hide","Blur","Dim","Grayscale","Hover-only blur"]`. `data-options-count="5"`. aria-label = "Thumbnail render mode (5 options)".
+  3. Every OTHER blocker dropdown has EXACTLY 3 options `["hide","blur","dim"]`. `data-options-count="3"`. (Sentinel against grayscale/hover-blur leaking into unrelated blockers.)
+  4. Pre-selection survives the render — booting with `blockerModes={thumbnails:"blur"}` (and `"dim"`, `"grayscale"`, `"hover-blur"`) gives `sel.value === <expected>` after init.
+  5. Locked thumbnails dropdown (free user, Pro blocker) keeps 5 options + `disabled=true` — locking doesn't truncate the option list.
+- **Anti-scope-creep guarantees.** No UI changes beyond the two `setAttribute` calls. `<select>` element + label texts + click handlers unchanged. Cloudflare Worker, ExtPay SDK, pricing model, grandfather logic, cf_stats — all unchanged. Phase 1 + Phase 2 + v1.5.0 functionality unchanged.
+- **All 22 existing suites stay green.** Grand total: **991 pass / 0 fail** (+90 from v1.5.0's 901).
+- **Manifest.** `version: "1.5.0.2" → "1.5.0.3"`. `version_name: "1.5.0" → "1.5.0-fix1"`. Zip: `dist/cleanfeed-v1.5.0-fix1.zip`. All 12 `_locales/` folders intact.
+- **Diff summary.** `popup/popup.js` (+10 lines: `data-options-count` + `aria-label` attributes on the rendered `<select>` + explanatory comment), `manifest.json` (2 lines), `README.md` (this entry), `tests/popup-mode-render.js` (new, ~200 lines, 90/90). Zero changes to `popup/popup.html`, `popup/popup.css`, `content/`, `options/`, `_locales/`, `onboarding/`, `lib/`, `icons/`, `background.js`, `build.py`.
+- **Manual verification plan (fix1).**
+  1. Extract: `mkdir -p ~/cleanfeed-v150-fix1-unpacked && python3 -m zipfile -e ~/workspace/cleanfeed/dist/cleanfeed-v1.5.0-fix1.zip ~/cleanfeed-v150-fix1-unpacked/`. Remove the previous CleanFeed entry → Load unpacked → pick the fix1 folder.
+  2. **Diagnostic check (no UI interaction needed).** Open the popup, then right-click popup → Inspect → Console. Run:
+     ```javascript
+     document.getElementById("mode-thumbnails").dataset.optionsCount
+     // Expected: "5"
+     document.getElementById("mode-home-feed").dataset.optionsCount
+     // Expected: "3"
+     Array.from(document.getElementById("mode-thumbnails").options).map(o => o.value)
+     // Expected: ["hide","blur","dim","grayscale","hover-blur"]
+     ```
+  3. **Open the dropdown.** Click the "Hide thumbnails" row's mode `<select>` element. Native Chrome will render a dropdown menu with five entries: Hide, Blur, Dim, Grayscale, Hover-only blur. Picking Grayscale → thumbnails desaturate (Phase 2 verified). Picking Hover-only blur → thumbnails blur until :hover.
+  4. **If the dropdown STILL appears to show only 3:** the most likely cause is Chrome still has a stale unpacked dir loaded. Verify in `chrome://extensions` that the "Source" path for the active CleanFeed entry is the fix1 folder you just loaded. Use the `document.getElementById("mode-thumbnails").dataset.optionsCount` console probe — it will return the truthful answer regardless of perceived UI.
+
 ### v1.5.0 — 2026-05-30 (self-healing selectors + thumbnail variants + homepage destinations + regex blocking + diagnostic log)
 - **Final v1.5.0 ship.** Phase 3 polishes the 12-locale store-listing copy + onboarding Pro features list and locks in the residual-subscription-string grep sentinel across `_locales/` and `onboarding/`. The Phase 1 + Phase 2 surfaces (`content/selectors.js`, `content/health-log.js`, options "Diagnostic info" section, thumbnail Grayscale + Hover-only blur variants, Library / History / playlist / channel / blank homepage destinations, regex matching for hidden keywords + blocked channels) are unchanged from Phase 2 — only copy + the grep sentinel changed in Phase 3.
 - **12-locale `extDescription` rewritten.** Each locale's store description now mentions "regex" + "custom homepage" alongside the v1.4.22 $4.99-once framing. `extName` unchanged in every locale (preserves SEO). Per-locale char counts (`extName`/75, `extDescription`/132):
