@@ -11,6 +11,36 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.5.0 — 2026-05-30 (self-healing selectors + thumbnail variants + homepage destinations + regex blocking + diagnostic log)
+- **Final v1.5.0 ship.** Phase 3 polishes the 12-locale store-listing copy + onboarding Pro features list and locks in the residual-subscription-string grep sentinel across `_locales/` and `onboarding/`. The Phase 1 + Phase 2 surfaces (`content/selectors.js`, `content/health-log.js`, options "Diagnostic info" section, thumbnail Grayscale + Hover-only blur variants, Library / History / playlist / channel / blank homepage destinations, regex matching for hidden keywords + blocked channels) are unchanged from Phase 2 — only copy + the grep sentinel changed in Phase 3.
+- **12-locale `extDescription` rewritten.** Each locale's store description now mentions "regex" + "custom homepage" alongside the v1.4.22 $4.99-once framing. `extName` unchanged in every locale (preserves SEO). Per-locale char counts (`extName`/75, `extDescription`/132):
+  | Locale | extName | extDescription |
+  |---|---|---|
+  | en | 69 | 124 |
+  | de | 70 | 132 |
+  | es | 71 | 129 |
+  | fr | 70 | 118 |
+  | hi | 53 | 115 |
+  | id | 55 | 123 |
+  | it | 66 | 127 |
+  | ja | 57 | 82 |
+  | pl | 68 | 115 |
+  | pt_BR | 70 | 121 |
+  | ru | 72 | 125 |
+  | tr | 74 | 130 |
+  All under store limits. English copy: "Hide YouTube distractions. 17 blockers + Focus Lock + Pomodoro + regex + custom homepage. $4.99 once. Yours forever. No sub."
+- **Onboarding welcome page updated** (`onboarding/welcome.html`). Pro features list gains one bullet: "Regex keyword & channel blocking, custom homepage destinations, thumbnail anti-clickbait variants."
+- **Grep sentinel extended** (`tests/upgrade-card-states.js`). Previously scanned `popup/popup.html`, `popup/popup.js`, `options/options.html`, `options/options.js` for residual subscription strings ($1.99, $19.99, /month, /year, ⭐ POPULAR). Phase 3 adds `onboarding/welcome.html` AND every locale's `messages.json` (extName + extDescription combined) to the scan — and asserts each locale's extDescription DOES mention the $4.99 lifetime price (catches a future update that accidentally drops it).
+- **Anti-scope-creep guarantees.** No Watch Time Caps, no Schedule Blocking, no Settings Sync, no Settings Backup. Cloudflare Worker untouched. ExtPay SDK + boot logging unchanged. Pricing model + grandfather logic + cf_stats analytics unchanged. Phase 1's `selectors.js`/`health-log.js` + Diagnostic info UI unchanged. Phase 2's thumbnail variants + homepage destinations + regex blocking unchanged. The 17 blockers' selector arrays still match v1.4.22 byte-for-byte (`tests/selectors-fallback.js`'s V1422_PRIMARY snapshot continues to pass).
+- **Tests.** All 22 suites stay green. The Phase 3-extended `tests/upgrade-card-states.js` grew from 47 → 85 (+38: 12 locales × 2 assertions per locale (zero subscription strings, $4.99 mentioned) + zero "⭐ POPULAR" in each + the existing onboarding welcome scan). Grand total: **901 pass / 0 fail** (+38 from v1.5.0-phase2's 863).
+- **Manifest.** `version: "1.5.0.1" → "1.5.0.2"`. `version_name: "1.5.0-phase2" → "1.5.0"`. Zip: `dist/cleanfeed-v1.5.0.zip`. All 12 `_locales/` folders intact.
+- **Diff summary (Phase 3 only).** `_locales/{12 locales}/messages.json` (extDescription only, one line each), `onboarding/welcome.html` (+1 line for the new Pro features bullet), `tests/upgrade-card-states.js` (+45 lines: locale scan loop + onboarding/welcome.html added to SCAN_FILES + $4.99 mention sanity check), `manifest.json` (2 lines), `README.md` (this entry). Zero changes to `popup/`, `options/`, `content/`, `background.js`, `lib/`, `icons/`, `build.py`.
+- **Manual repro plan (v1.5.0).**
+  1. Extract: `mkdir -p ~/cleanfeed-v150-unpacked && python3 -m zipfile -e ~/workspace/cleanfeed/dist/cleanfeed-v1.5.0.zip ~/cleanfeed-v150-unpacked/`. Remove old extension → Load unpacked.
+  2. **All Phase 1 + Phase 2 surfaces** still behave as verified previously: dashboard, Diagnostic info, thumbnail Grayscale + Hover-only blur, homepage Library / History / playlist / channel / blank destinations, regex keywords, regex channels.
+  3. **Store-listing copy.** chrome://extensions → CleanFeed details → confirm the listed description mentions "regex" + "custom homepage" alongside "$4.99 once. Yours forever."
+  4. **Onboarding welcome page.** Open the welcome tab (`chrome.tabs.create({url: chrome.runtime.getURL("onboarding/welcome.html")})` in any extension page console, or trigger via the "Help" link in the popup footer). Confirm the Pro features list now includes the regex + custom homepage + thumbnail variants line.
+
 ### v1.5.0-phase2 — 2026-05-30 (thumbnail anti-clickbait variants + homepage redirect destinations + regex matching for keywords & channels)
 - **Phase 2 of v1.5.0.** Three user-visible feature additions, all extensions of existing surfaces. No new permissions, no new content scripts beyond Phase 1's selectors.js + health-log.js, no pricing or grandfather changes.
 - **Thumbnail anti-clickbait variants** (`content/styles.css` + `popup/popup.js` + `content/content.js`). The PRO "Hide thumbnails" blocker's mode dropdown gains two new options on top of the v1.4.19 hide/blur/dim trio:

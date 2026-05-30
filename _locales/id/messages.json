@@ -1,6 +1,6 @@
 {
   "extName": { "message": "CleanFeed — Sembunyikan Gangguan YouTube | 17 Pemblokir" },
-  "extDescription": { "message": "Sembunyikan gangguan YouTube. Gratis: 2. Pro: 17 pemblokir + Focus Lock + Pomodoro. $4,99 sekali bayar. Selamanya. Tanpa langganan." },
+  "extDescription": { "message": "Sembunyikan gangguan YouTube. 17 pemblokir + Focus Lock + Pomodoro + regex + beranda kustom. $4,99 sekali bayar. Selamanya." },
 
   "ytMusicPausedTitle":  { "message": "CleanFeed is paused on YouTube Music" },
   "ytMusicPausedDesc":   { "message": "We don't apply blockers, badges, or time tracking here — it's a music app, not a feed." },

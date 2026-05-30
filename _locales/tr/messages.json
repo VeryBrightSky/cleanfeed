@@ -1,6 +1,6 @@
 {
   "extName": { "message": "CleanFeed – YouTube Shorts'u engelle, akış ve önerileri kapat | Focus Lock" },
-  "extDescription": { "message": "YouTube dikkat dağıtıcılarını gizle. Ücretsiz: 2. Pro: 17 + Focus Lock + Pomodoro. $4,99 tek seferlik. Sonsuza dek. Abonelik yok." },
+  "extDescription": { "message": "YouTube dikkat dağıtıcılarını gizle. 17 engelleyici + Focus Lock + Pomodoro + regex + özel ana sayfa. $4,99 tek seferlik. Sonsuza." },
 
   "ytMusicPausedTitle":  { "message": "CleanFeed YouTube Music'te duraklatıldı" },
   "ytMusicPausedDesc":   { "message": "Burada engelleyici, rozet veya süre takibi uygulanmaz — bu bir akış değil, müzik uygulaması." },

@@ -443,6 +443,9 @@ const SCAN_FILES = [
   "popup/popup.js",
   "options/options.html",
   "options/options.js",
+  // v1.5.0 phase 3 — onboarding welcome page added to grep coverage so
+  // any future copy that re-introduces subscription pricing is caught.
+  "onboarding/welcome.html",
 ];
 for (const rel of SCAN_FILES) {
   const hits = _scan(path.join(REPO, rel));
@@ -461,6 +464,40 @@ for (const rel of SCAN_FILES) {
   const noStarHits = hits.filter((h) => h.label !== "POPULAR badge");
   assertEq(`11.${rel}) zero residual subscription strings`,
     noStarHits, []);
+}
+
+// v1.5.0 phase 3 — also scan each locale's extDescription for the same
+// forbidden price-period strings. The 12-locale store-listing copy is the
+// most visible place a stale subscription pivot would surface; the
+// pricing-revert grep would have been incomplete without it.
+const LOCALES = ["en", "de", "es", "fr", "hi", "id", "it", "ja", "pl", "pt_BR", "ru", "tr"];
+for (const loc of LOCALES) {
+  const p = path.join(REPO, "_locales", loc, "messages.json");
+  const raw = fs.readFileSync(p, "utf8");
+  const json = JSON.parse(raw);
+  const desc = (json.extDescription && json.extDescription.message) || "";
+  const name = (json.extName && json.extName.message) || "";
+  const combined = name + " || " + desc;
+  const hits = [];
+  for (const { pat, label } of FORBIDDEN) {
+    const m = combined.match(pat);
+    if (m && m.length) hits.push({ label, count: m.length });
+  }
+  // POPULAR could legitimately appear inside a locale's prose; only the
+  // pricing-badge marker (⭐ POPULAR) is forbidden.
+  const noStarHits = hits.filter((h) => h.label !== "POPULAR badge");
+  const starHits = (combined.match(/⭐ POPULAR/g) || []).length;
+  assertEq(`11.${loc}.messages.json) zero residual subscription strings in extName/extDescription`,
+    noStarHits, []);
+  assertEq(`11.${loc}.messages.json) zero "⭐ POPULAR" badge string`,
+    starHits, 0);
+  // Sanity: extDescription mentions the current pricing model. We accept
+  // "$4.99" / "$4,99" / "4,99 $" (French places the $ after the number).
+  // Without this, a future locale update that drops the price entirely
+  // would pass silently.
+  const mentionsPrice = /\$4\.99|\$4,99|4,99 \$/.test(desc);
+  assertEq(`11.${loc}.messages.json) extDescription mentions $4.99 lifetime price`,
+    mentionsPrice, true);
 }
 
 process.stdout.write("\n");

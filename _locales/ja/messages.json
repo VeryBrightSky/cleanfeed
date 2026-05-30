@@ -1,6 +1,6 @@
 {
   "extName": { "message": "CleanFeed — YouTubeの気が散る要素を非表示 | 17個のブロッカー、フォーカスロック、ポモドーロ" },
-  "extDescription": { "message": "YouTubeの気が散る要素を非表示。無料: 2個。Pro: 17個 + Focus Lock + ポモドーロ。$4.99 一回限り。永久版。サブスクなし。" },
+  "extDescription": { "message": "YouTubeの気が散る要素を非表示。17個のブロッカー + Focus Lock + ポモドーロ + 正規表現 + カスタムホーム。$4.99 一回限り。永久版。" },
 
   "ytMusicPausedTitle":  { "message": "CleanFeed is paused on YouTube Music" },
   "ytMusicPausedDesc":   { "message": "We don't apply blockers, badges, or time tracking here — it's a music app, not a feed." },

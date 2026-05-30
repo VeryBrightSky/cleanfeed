@@ -1,6 +1,6 @@
 {
   "extName": { "message": "CleanFeed – Блокируйте YouTube Shorts, ленту и рекомендации | Focus Lock" },
-  "extDescription": { "message": "Скрывайте отвлекающие элементы YouTube. Бесплатно: 2. Pro: все 17 + Focus Lock + Pomodoro. $4,99 разово. Навсегда. Без подписки." },
+  "extDescription": { "message": "Скрывайте отвлекающие элементы YouTube. 17 блокировок + Focus Lock + Pomodoro + regex + своя главная. $4,99 разово. Навсегда." },
 
   "ytMusicPausedTitle":  { "message": "CleanFeed приостановлен на YouTube Music" },
   "ytMusicPausedDesc":   { "message": "Здесь не применяются блокировщики, бейджи и учёт времени — это музыкальное приложение, а не лента." },

@@ -1,6 +1,6 @@
 {
   "extName": { "message": "CleanFeed – Bloqueie YouTube Shorts, Feed & Recomendações | Focus Lock" },
-  "extDescription": { "message": "Esconda as distrações do YouTube. Grátis: 2. Pro: todos os 17 + Focus Lock + Pomodoro. $4,99 uma vez. Para sempre. Sem assinatura." },
+  "extDescription": { "message": "Esconda distrações do YouTube. 17 bloqueios + Focus Lock + Pomodoro + regex + página inicial. $4,99 uma vez. Para sempre." },
 
   "ytMusicPausedTitle":  { "message": "CleanFeed está pausado no YouTube Music" },
   "ytMusicPausedDesc":   { "message": "Aqui não aplicamos bloqueadores, selos ou rastreio de tempo — é um app de música, não um feed." },
