@@ -728,16 +728,35 @@
   // content script's IIFE is unloaded (tab close, navigation away).
   const _perBlockerCounted = new Map();   // blockerId -> WeakSet
 
+  // v1.5.0-phase1 — selector health-log hook. Resolved once at module
+  // scope so we don't pay the window lookup on every applyBlockers tick.
+  // Falls back to no-op stubs if health-log.js failed to load (defensive).
+  const _hl = (typeof window !== "undefined" && window.__cleanfeed_healthlog) || {
+    recordSelectorMatch: function () {},
+    recordSelectorMiss: function () {},
+    markPageNav: function () {},
+  };
+
   function countBlockedElements(active) {
     let totalAdded = 0;
     for (const b of active) {
       let found = 0;
       let perBlockerNew = 0;
+      let chainMatched = false;       // v1.5.0-phase1 — at least one selector hit?
+      let firstHitIndex = -1;
+      let firstHitCount = 0;
       if (!_perBlockerCounted.has(b.id)) _perBlockerCounted.set(b.id, new WeakSet());
       const blockerSet = _perBlockerCounted.get(b.id);
-      for (const sel of b.selectors) {
+      const chain = b.selectors;       // selectorsFor(id) — primary + fallbacks flat
+      for (let i = 0; i < chain.length; i++) {
+        const sel = chain[i];
         try {
           const els = document.querySelectorAll(sel);
+          if (els.length > 0 && !chainMatched) {
+            chainMatched = true;
+            firstHitIndex = i;
+            firstHitCount = els.length;
+          }
           for (const el of els) {
             // v1.4.20-alpha — per-blocker counter (cf_stats.blocked).
             // Uses the per-blocker WeakSet so overlapping selectors still
@@ -759,6 +778,21 @@
       STATE.counts.perBlocker[b.id] =
         (STATE.counts.perBlocker[b.id] || 0) + found;
       totalAdded += found;
+      // v1.5.0-phase1 — health-log. Two cases:
+      //   - chain matched: record the first-hit selector index + count
+      //     (idempotent per page-nav inside health-log.js).
+      //   - chain didn't match AND the blocker has a non-empty selector
+      //     chain: record a miss (also idempotent per page-nav).
+      // We skip both records when the chain is empty (autoplay) — that
+      // blocker has no DOM presence by design and shouldn't generate
+      // health-log entries every tick.
+      if (chain.length > 0) {
+        if (chainMatched) {
+          _hl.recordSelectorMatch(b.id, firstHitIndex, firstHitCount);
+        } else {
+          _hl.recordSelectorMiss(b.id);
+        }
+      }
     }
     STATE.counts.total += totalAdded;
     if (totalAdded > 0) persistStats();
@@ -1099,6 +1133,9 @@
       STATE.commentsManuallyShown = false;
       if (document.body) document.body.classList.remove("cf-comments-shown");
       clearCommentsManualReveal();   // v1.4.14 — also tear down inline reveal
+      // v1.5.0-phase1 — reset health-log per-nav dedupe so the next page
+      // gets fresh match/miss records for each blocker.
+      _hl.markPageNav();
       return true;
     }
 

@@ -1003,6 +1003,89 @@ function renderStatsDashboard() {
   totalsHost.textContent = `All-time: ${allTimeBlocked} ${allTimeBlocked === 1 ? "video" : "videos"} blocked, ${hours} ${hours === 1 ? "hour" : "hours"} saved, ${allTimeAutoplay} autoplay ${allTimeAutoplay === 1 ? "chain" : "chains"} avoided.`;
 }
 
+// ---- v1.5.0-phase1 — Diagnostic info (selector health log) -------------
+//
+// Read-only viewer for chrome.storage.local.cf_health_log. The content
+// script writes via window.__cleanfeed_healthlog.record* on every
+// applyBlockers tick (throttled to once-per-page-nav per blocker). This
+// page just displays + copies + clears. No internet calls; the log
+// never leaves the device unless the user explicitly copies it into
+// a bug report.
+
+const DIAG_LOG_KEY = "cf_health_log";
+
+function loadDiagnosticLog() {
+  const ta = $("cf-diag-log");
+  const status = $("cf-diag-status");
+  if (!ta) return;
+  if (status) status.textContent = "";
+  try {
+    chrome.storage.local.get([DIAG_LOG_KEY], (data) => {
+      const arr = (data && Array.isArray(data[DIAG_LOG_KEY])) ? data[DIAG_LOG_KEY] : [];
+      // Newest first so users see the most recent miss / match at the top
+      // when they copy. Keep the original storage order untouched on disk;
+      // this is a render-time sort only.
+      const sorted = arr.slice().reverse();
+      ta.value = JSON.stringify(sorted, null, 2);
+      if (status) {
+        status.className = "cf-status";
+        status.textContent = arr.length === 0
+          ? "No entries yet."
+          : `${arr.length} entr${arr.length === 1 ? "y" : "ies"} (max 50, newest first).`;
+      }
+    });
+  } catch (err) {
+    if (status) {
+      status.className = "cf-status cf-status-warn";
+      status.textContent = "Could not read diagnostic log: " + String(err);
+    }
+  }
+}
+
+async function copyDiagnosticLog() {
+  const ta = $("cf-diag-log");
+  const status = $("cf-diag-status");
+  if (!ta) return;
+  // Make sure we have the freshest snapshot before copying.
+  loadDiagnosticLog();
+  try {
+    // Wait one tick so loadDiagnosticLog's storage callback populates ta.value
+    await new Promise((r) => setTimeout(r, 50));
+    const text = ta.value || "[]";
+    await navigator.clipboard.writeText(text);
+    if (status) {
+      status.className = "cf-status cf-status-ok";
+      status.textContent = "Copied to clipboard.";
+    }
+  } catch (err) {
+    if (status) {
+      status.className = "cf-status cf-status-warn";
+      status.textContent = "Couldn't copy — select the text and Ctrl+C instead.";
+    }
+  }
+}
+
+function clearDiagnosticLog() {
+  const status = $("cf-diag-status");
+  if (!confirm("Clear the diagnostic log? This won't affect any blocker or setting — just the health history.")) {
+    return;
+  }
+  try {
+    chrome.storage.local.remove([DIAG_LOG_KEY], () => {
+      loadDiagnosticLog();
+      if (status) {
+        status.className = "cf-status cf-status-ok";
+        status.textContent = "Cleared.";
+      }
+    });
+  } catch (err) {
+    if (status) {
+      status.className = "cf-status cf-status-warn";
+      status.textContent = "Could not clear: " + String(err);
+    }
+  }
+}
+
 async function init() {
   try {
     $("cf-version").textContent = "v" + chrome.runtime.getManifest().version;
@@ -1047,6 +1130,20 @@ async function init() {
   $("cf-license-input").addEventListener("keydown", (e) => {
     if (e.key === "Enter") onLicenseRedeem();
   });
+
+  // v1.5.0-phase1 — Diagnostic info wiring. Load lazily on <details> open
+  // so we don't pay the storage round-trip for the 99% of users who never
+  // open this section.
+  const diagDetails = $("cf-diag-details");
+  if (diagDetails) {
+    diagDetails.addEventListener("toggle", () => {
+      if (diagDetails.open) loadDiagnosticLog();
+    });
+  }
+  const diagCopy = $("cf-diag-copy");
+  if (diagCopy) diagCopy.addEventListener("click", copyDiagnosticLog);
+  const diagClear = $("cf-diag-clear");
+  if (diagClear) diagClear.addEventListener("click", clearDiagnosticLog);
 
   // re-render every minute so time-tracker stays fresh
   setInterval(() => renderTimeTracker(), 60 * 1000);

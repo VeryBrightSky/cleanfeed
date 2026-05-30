@@ -365,6 +365,26 @@ input:disabled, textarea:disabled {
   accent-color: var(--accent);
 }
 
+/* v1.5.0-phase1 — Diagnostic info expandable section */
+#cf-diag-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 15px;
+  padding: 4px 0;
+  user-select: none;
+  color: var(--text);
+}
+#cf-diag-details[open] summary {
+  margin-bottom: 8px;
+}
+#cf-diag-log {
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  color: var(--text-dim);
+}
+
 /* ===== v1.4.21 Phase 3 — Subscription panel ===== */
 .cf-sub-row {
   display: flex;

@@ -213,6 +213,22 @@
       <button id="cf-reset-all" class="cf-btn cf-btn-warn" type="button">Reset all settings</button>
     </section>
 
+    <!-- v1.5.0-phase1 — Diagnostic info for bug reports. Pure local; no
+         analytics. Expandable so it doesn't clutter the page unless the
+         user explicitly opens it (and ~99% of users never will). -->
+    <section class="cf-panel">
+      <details id="cf-diag-details">
+        <summary>Diagnostic info (for bug reports)</summary>
+        <p class="cf-help">If a blocker stopped working, expand this and paste the contents into a bug report. The log is stored only on this device — nothing is sent over the network.</p>
+        <textarea id="cf-diag-log" rows="10" readonly placeholder="No diagnostic entries yet. Browse YouTube with the blockers you're debugging enabled, then return here."></textarea>
+        <div class="cf-row-actions">
+          <button id="cf-diag-copy" class="cf-btn cf-btn-primary" type="button">Copy to clipboard</button>
+          <button id="cf-diag-clear" class="cf-btn cf-btn-warn" type="button">Clear log</button>
+          <span id="cf-diag-status" class="cf-status" aria-live="polite"></span>
+        </div>
+      </details>
+    </section>
+
     <footer class="cf-page-foot">
       <span>CleanFeed <span id="cf-version">v1.0.0</span></span>
       <span><a href="https://extensionpay.com/extension/cleanfeed2342" target="_blank" rel="noopener noreferrer">Manage subscription</a></span>

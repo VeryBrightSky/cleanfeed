@@ -5,18 +5,22 @@
  *   label     — human-readable name
  *   description — one-liner shown in popup tooltip
  *   tier      — "free" | "pro"
- *   selectors — array of CSS selectors that match the elements to hide
+ *   selectors — derived getter: returns the active selector chain
+ *               for this blocker. v1.5.0-phase1 sources this from
+ *               window.__cleanfeed_selectors (content/selectors.js).
+ *               Behaviour for the runtime counting pass is unchanged
+ *               from v1.4.22: callers still iterate `b.selectors` and
+ *               run document.querySelectorAll on each entry. What
+ *               changes is the SOURCE of truth — selectors live in
+ *               one file now, with primary+fallback shape ready for
+ *               self-healing once health-log data surfaces YT churn.
  *   pages     — optional array of YT page types where this applies
  *               (anything | home | watch | shorts | results | channel | trending)
  *
- * Hiding strategy is CSS-first: we toggle <body class="cf-block-{id}"> and a
- * <style> sheet (styles.css) maps that class to the selectors with display:none.
+ * Hiding strategy is still CSS-first via styles.css's body.cf-block-{id}
+ * rules — this file just declares which blockers exist + their metadata.
  *
- * Why CSS-first? It runs before any layout work happens — much faster than
- * removing DOM nodes after the fact, and YouTube's SPA can't "re-create"
- * something we've hidden via stylesheet.
- *
- * YouTube DOM is fragile — to keep these selectors working we prefer:
+ * Selector-hygiene rules (preserved):
  *   • semantic tag names (ytd-*-renderer)
  *   • aria-label and title attributes (stable, user-facing)
  *   • page-subtype attributes
@@ -24,6 +28,34 @@
  */
 (function () {
   "use strict";
+
+  // v1.5.0-phase1 — selectors centralised in content/selectors.js. The
+  // global is set by an earlier content-script load step. Defensive:
+  // fall back to an empty object if selectors.js failed to load (e.g.
+  // someone reordered manifest content_scripts), so we don't crash
+  // every blocker at runtime.
+  const SEL = (typeof window !== "undefined" && window.__cleanfeed_selectors) || {};
+
+  // v1.5.0-phase1 — return the FLATTENED selector chain for a given
+  // blocker (primary first, fallbacks concatenated after). The counting
+  // pass in content.js iterates this array and treats each entry as a
+  // querySelectorAll target; behaviour for the healthy YT-markup case is
+  // identical to v1.4.22 since fallbacks are empty across all 17
+  // blockers at v1.5.0-phase1. health-log.js's recordSelectorMiss fires
+  // when EVERY selector across the whole chain yields zero hits.
+  function selectorsFor(id) {
+    const entry = SEL[id];
+    if (!entry) return [];
+    const out = (entry.primary || []).slice();
+    if (Array.isArray(entry.fallbacks)) {
+      for (const group of entry.fallbacks) {
+        if (Array.isArray(group)) {
+          for (const s of group) out.push(s);
+        }
+      }
+    }
+    return out;
+  }
 
   // shared on window to allow content.js to read
   const BLOCKERS = [
@@ -33,15 +65,7 @@
       description: "Hides the endless recommendation grid on youtube.com",
       tier: "free",
       pages: ["home"],
-      // The homepage's main grid:
-      //   ytd-browse[page-subtype="home"] ytd-rich-grid-renderer
-      // We also wipe the chip row that filters by topic on home.
-      selectors: [
-        'ytd-browse[page-subtype="home"] ytd-rich-grid-renderer',
-        'ytd-browse[page-subtype="home"] #header.ytd-rich-grid-renderer',
-        'ytd-browse[page-subtype="home"] #contents.ytd-rich-grid-renderer',
-        'ytd-browse[page-subtype="home"] ytd-feed-filter-chip-bar-renderer',
-      ],
+      get selectors() { return selectorsFor("home-feed"); },
     },
     {
       id: "shorts",
@@ -49,22 +73,7 @@
       description: "Hides Shorts shelves on the homepage, in search, and the Shorts left-nav entry",
       tier: "free",
       pages: ["anywhere"],
-      selectors: [
-        // Homepage / channel "Shorts" shelves
-        "ytd-rich-shelf-renderer[is-shorts]",
-        "ytd-reel-shelf-renderer",
-        "ytd-reel-item-renderer",
-        "ytd-shorts",
-        "ytd-rich-section-renderer:has(ytd-rich-shelf-renderer[is-shorts])",
-        // Left sidebar "Shorts" entries
-        'ytd-guide-entry-renderer:has(a[title="Shorts"])',
-        'ytd-mini-guide-entry-renderer:has(a[title="Shorts"])',
-        'ytd-guide-entry-renderer:has(yt-formatted-string[title="Shorts"])',
-        // Search results "Shorts" shelves
-        'grid-shelf-view-model:has([title="Shorts"])',
-        "ytd-reel-shelf-renderer",
-        // Block direct /shorts/ navigation route — covered by content.js redirect
-      ],
+      get selectors() { return selectorsFor("shorts"); },
     },
     {
       id: "watch-sidebar",
@@ -72,14 +81,7 @@
       description: "Hides the recommendations rail on the right of every watch page",
       tier: "pro",
       pages: ["watch"],
-      selectors: [
-        // Container that wraps related videos on a watch page
-        "ytd-watch-flexy #secondary",
-        "ytd-watch-flexy #secondary-inner",
-        "ytd-watch-next-secondary-results-renderer",
-        "#related.ytd-watch-flexy",
-        "ytd-compact-video-renderer",
-      ],
+      get selectors() { return selectorsFor("watch-sidebar"); },
     },
     {
       id: "end-screen",
@@ -87,18 +89,7 @@
       description: "Hides those overlay cards that pop up in the last 20 seconds of every video",
       tier: "pro",
       pages: ["watch"],
-      selectors: [
-        // The end-screen cards (small clickable thumbnails)
-        ".ytp-ce-element",
-        ".ytp-ce-covering-overlay",
-        ".ytp-ce-element-show",
-        // The grid that takes over the player at video end
-        ".ytp-endscreen-content",
-        ".html5-endscreen",
-        // "More videos" pause overlay
-        ".ytp-pause-overlay",
-        ".ytp-scroll-min.ytp-pause-overlay",
-      ],
+      get selectors() { return selectorsFor("end-screen"); },
     },
     {
       id: "comments",
@@ -106,12 +97,7 @@
       description: "Hides comments on watch pages. A small button restores them on demand.",
       tier: "pro",
       pages: ["watch"],
-      selectors: [
-        "ytd-comments#comments",
-        "#comments.ytd-watch-flexy",
-        // Comments teaser counter at top
-        "ytd-comments-header-renderer",
-      ],
+      get selectors() { return selectorsFor("comments"); },
     },
     {
       id: "explore",
@@ -119,20 +105,7 @@
       description: "Hides Trending, Music, Gaming, News, Sports — the algorithm-driven Explore menu",
       tier: "pro",
       pages: ["anywhere"],
-      selectors: [
-        // Whole "Explore" section in the left guide
-        'ytd-guide-section-renderer:has(#guide-section-title yt-formatted-string[title="Explore"])',
-        // Or individual entries by title
-        'ytd-guide-entry-renderer:has(a[title="Trending"])',
-        'ytd-guide-entry-renderer:has(a[title="Music"])',
-        'ytd-guide-entry-renderer:has(a[title="Gaming"])',
-        'ytd-guide-entry-renderer:has(a[title="News"])',
-        'ytd-guide-entry-renderer:has(a[title="Sports"])',
-        'ytd-guide-entry-renderer:has(a[title="Learning"])',
-        'ytd-guide-entry-renderer:has(a[title="Fashion & Beauty"])',
-        // Mini-guide collapsed variant
-        'ytd-mini-guide-entry-renderer:has(a[title="Trending"])',
-      ],
+      get selectors() { return selectorsFor("explore"); },
     },
     {
       id: "live-chat",
@@ -140,14 +113,7 @@
       description: "Hides the live chat panel and replay-chat on streams",
       tier: "pro",
       pages: ["watch"],
-      selectors: [
-        // Top-level chat iframe + chat container
-        "ytd-live-chat-frame",
-        "#chat-container",
-        "#chat.ytd-watch-flexy",
-        // Replay chat (premiered videos) too
-        "ytd-watch-flexy[is-two-columns_] #secondary-inner ytd-live-chat-frame",
-      ],
+      get selectors() { return selectorsFor("live-chat"); },
     },
     {
       id: "autoplay",
@@ -155,10 +121,7 @@
       description: "Automatically turns off autoplay on every video — the player won't queue the next clip",
       tier: "pro",
       pages: ["watch"],
-      // Autoplay isn't really "hidden" — content.js detects the autoplay
-      // toggle and clicks it OFF if it's on. We keep an empty selector list
-      // so the CSS pass is a no-op; the JS handler in content.js does the work.
-      selectors: [],
+      get selectors() { return selectorsFor("autoplay"); },
       jsHandler: "autoplay",   // marker for content.js
     },
     {
@@ -167,13 +130,7 @@
       description: "Replaces every video thumbnail with a neutral placeholder. Hover to peek.",
       tier: "pro",
       pages: ["anywhere"],
-      // Selectors targeted in styles.css under body.cf-block-thumbnails —
-      // the image fades to opacity 0 and the parent's grey background shows.
-      selectors: [
-        "ytd-thumbnail img",
-        "yt-image img",
-        ".yt-thumbnail-view-model img",
-      ],
+      get selectors() { return selectorsFor("thumbnails"); },
     },
     {
       id: "subs-algo",
@@ -181,12 +138,7 @@
       description: "On /feed/subscriptions, hides 'For you' / 'Most relevant' shelves — only your chronological feed remains",
       tier: "pro",
       pages: ["subscriptions"],
-      selectors: [
-        // Algorithmic shelves on the subscriptions page
-        'ytd-browse[page-subtype="subscriptions"] ytd-shelf-renderer',
-        'ytd-browse[page-subtype="subscriptions"] ytd-rich-shelf-renderer',
-        'ytd-browse[page-subtype="subscriptions"] ytd-rich-section-renderer',
-      ],
+      get selectors() { return selectorsFor("subs-algo"); },
     },
     // v1.4.0 — four new blockers (F5)
     {
@@ -195,12 +147,7 @@
       description: "Hides the games shelf YouTube shows in some regions",
       tier: "pro",
       pages: ["anywhere"],
-      selectors: [
-        // ytd-rich-shelf-renderer with header text "Playables"
-        'ytd-rich-shelf-renderer:has(#title yt-formatted-string[title="Playables"])',
-        'ytd-rich-shelf-renderer:has(#title yt-formatted-string[title="Mini-games"])',
-        "ytd-playable-shelf-renderer",
-      ],
+      get selectors() { return selectorsFor("playables"); },
     },
     {
       id: "merch-shelf",
@@ -208,10 +155,7 @@
       description: "Hides the merchandise shelves under videos",
       tier: "free",
       pages: ["watch"],
-      selectors: [
-        "ytd-merch-shelf-renderer",
-        "yt-merch-shelf-renderer",
-      ],
+      get selectors() { return selectorsFor("merch-shelf"); },
     },
     {
       id: "breaking-news",
@@ -219,11 +163,7 @@
       description: "Hides the breaking-news shelf at the top of the homepage",
       tier: "free",
       pages: ["home"],
-      selectors: [
-        'ytd-rich-section-renderer:has(yt-formatted-string[title="Breaking news"])',
-        'ytd-rich-section-renderer:has(yt-formatted-string[title="News"])',
-        'ytd-rich-shelf-renderer:has(yt-formatted-string[title="Breaking news"])',
-      ],
+      get selectors() { return selectorsFor("breaking-news"); },
     },
     {
       id: "mixes-playlists",
@@ -231,10 +171,7 @@
       description: "Hides 'Mix' radios and algorithmic playlist suggestions",
       tier: "pro",
       pages: ["anywhere"],
-      selectors: [
-        "ytd-radio-renderer",
-        "ytd-compact-radio-renderer",
-      ],
+      get selectors() { return selectorsFor("mixes-playlists"); },
     },
     // v1.4.19 — three new Pro blockers for the Subscriptions feed.
     {
@@ -243,12 +180,7 @@
       description: "On /feed/subscriptions, removes the algorithmic 'Most Relevant' insertion",
       tier: "pro",
       pages: ["subscriptions"],
-      selectors: [
-        'ytd-browse[page-subtype="subscriptions"] ytd-rich-section-renderer:has(yt-formatted-string[title="Most Relevant"])',
-        'ytd-browse[page-subtype="subscriptions"] ytd-rich-section-renderer:has(yt-formatted-string[title="For you"])',
-        'ytd-browse[page-subtype="subscriptions"] ytd-rich-shelf-renderer:has(yt-formatted-string[title="Most Relevant"])',
-        'ytd-browse[page-subtype="subscriptions"] ytd-rich-shelf-renderer:has(yt-formatted-string[title="For you"])',
-      ],
+      get selectors() { return selectorsFor("subs-most-relevant"); },
     },
     {
       id: "subs-members-only",
@@ -256,10 +188,7 @@
       description: "Hides subscription videos with a 'members only' badge",
       tier: "pro",
       pages: ["anywhere"],
-      selectors: [
-        'ytd-rich-item-renderer:has(ytd-badge-supported-renderer[aria-label="Members only"])',
-        'ytd-rich-item-renderer:has([aria-label*="Members only"])',
-      ],
+      get selectors() { return selectorsFor("subs-members-only"); },
     },
     {
       id: "subs-watched",
@@ -267,12 +196,7 @@
       description: "On /feed/subscriptions, hides videos whose progress bar is past 95%",
       tier: "pro",
       pages: ["subscriptions"],
-      // Selectors are no-ops at the CSS layer — JS sweep (applyWatchedSweep
-      // in content.js) tags qualifying cards with data-cf-watched="1" so the
-      // CSS rule body.cf-block-subs-watched [data-cf-watched="1"] hides them.
-      selectors: [
-        'ytd-browse[page-subtype="subscriptions"] ytd-rich-item-renderer[data-cf-watched="1"]',
-      ],
+      get selectors() { return selectorsFor("subs-watched"); },
       jsHandler: "subs-watched",
     },
   ];
