@@ -135,9 +135,14 @@
         sidebar, search, subscriptions, channel pages. One keyword per line.
         Case-insensitive substring match. Max 200 entries.
       </p>
-      <textarea id="cf-keywords" rows="6" placeholder="reaction&#10;drama&#10;clickbait"></textarea>
+      <!-- v1.5.0 phase 2 — per-row regex checkbox. Each row is one
+           keyword: pattern input, "regex" checkbox, invalid-regex warning,
+           remove button. Substring is the default (matches v1.4.0 F1
+           behaviour); flipping the regex checkbox compiles the pattern
+           with the `i` flag. -->
+      <div id="cf-keywords-list" class="cf-keyword-list"></div>
       <div class="cf-row-actions">
-        <button id="cf-keywords-save" class="cf-btn cf-btn-primary" type="button">Save keywords</button>
+        <button id="cf-keywords-add" class="cf-btn" type="button">+ Add keyword</button>
         <span id="cf-keywords-status" class="cf-status" aria-live="polite"></span>
       </div>
     </section>
@@ -176,6 +181,32 @@
         <input id="cf-perpage-enable" type="checkbox" />
         <span>Enable per-page rules</span>
       </label>
+    </section>
+
+    <!-- v1.5.0 phase 2 — Homepage destination -->
+    <section class="cf-panel">
+      <h2>Homepage destination</h2>
+      <p class="cf-help">When "Open YouTube on a calmer page" is enabled in the popup, this is where bare youtube.com lands. Default: Subscriptions feed.</p>
+      <div class="cf-row-actions">
+        <label for="cf-home-dest">Redirect to:</label>
+        <select id="cf-home-dest" class="cf-mode-select">
+          <option value="subscriptions">Subscriptions feed</option>
+          <option value="library">Library</option>
+          <option value="history">History</option>
+          <option value="playlist">A specific playlist…</option>
+          <option value="channel">A specific channel…</option>
+          <option value="blank">A blank page (CleanFeed prompt)</option>
+        </select>
+      </div>
+      <div id="cf-home-dest-playlist" hidden>
+        <input id="cf-home-dest-playlist-url" type="text" placeholder="https://www.youtube.com/playlist?list=PL…" autocomplete="off" />
+        <p class="cf-help">Paste the full playlist URL.</p>
+      </div>
+      <div id="cf-home-dest-channel" hidden>
+        <input id="cf-home-dest-channel-handle" type="text" placeholder="@somechannel or https://www.youtube.com/@somechannel" autocomplete="off" />
+        <p class="cf-help">Channel handle or full URL.</p>
+      </div>
+      <p id="cf-home-dest-status" class="cf-status" aria-live="polite"></p>
     </section>
 
     <section class="cf-panel">

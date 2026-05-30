@@ -52,6 +52,14 @@
     customStyleEl: null,
     statsFlushTimer: 0,
     redirectHomeToSubs: false,    // v1.4.19 F2
+    // v1.5.0 phase 2 — where the redirect lands. "subscriptions" (default,
+    // matches v1.4.19 behaviour) | "library" | "history" | "blank" |
+    // { type:"playlist", url } | { type:"channel", handle }
+    cf_homepage_destination: "subscriptions",
+    // v1.5.0 phase 2 — one-shot bypass set by blank.html's "Continue to
+    // YouTube" button so the user can override their own redirect for
+    // exactly one nav.
+    cf_skip_next_homepage_redirect: false,
     blockerModes: {},             // v1.4.19 F3 — per-blocker render mode
     pausedUntil: 0,        // unix ms; 0 = not paused
     // v1.4.14 — per-page-view manual reveal of the comments section.
@@ -81,7 +89,9 @@
          "pausedUntil", "blockedChannels", "focusLock",
          "hiddenKeywords", "perPageEnabled", "perPageSettings",
          // v1.4.19
-         "redirectHomeToSubs", "blockerModes"],
+         "redirectHomeToSubs", "blockerModes",
+         // v1.5.0 phase 2 — homepage destination + one-shot bypass
+         "cf_homepage_destination", "cf_skip_next_homepage_redirect"],
         (data) => {
           // default — only home-feed + shorts are on by default for new users
           const defaults = {};
@@ -99,6 +109,10 @@
           STATE.perPageEnabled = !!data.perPageEnabled;
           STATE.perPageSettings = data.perPageSettings || { homepage: {}, watch: {}, subscriptions: {} };
           STATE.redirectHomeToSubs = !!data.redirectHomeToSubs;
+          STATE.cf_homepage_destination = (typeof data.cf_homepage_destination === "string"
+            || (data.cf_homepage_destination && typeof data.cf_homepage_destination === "object"))
+            ? data.cf_homepage_destination : "subscriptions";
+          STATE.cf_skip_next_homepage_redirect = !!data.cf_skip_next_homepage_redirect;
           STATE.blockerModes = (data.blockerModes && typeof data.blockerModes === "object") ? data.blockerModes : {};
           // session stats reset on page nav by default — caller decides
           resolve();
@@ -132,16 +146,67 @@
     if (p !== "/" && p !== "") return false;
     const h = location.hash || "";
     if (h && h.length > 1 && h.charAt(1) !== "?") return false;
+    // v1.5.0 phase 2 — explicit URL bypass for the blank-page "Continue"
+    // fallback path (used when chrome.storage.local.set fails). Also
+    // gives power users a stable URL-level escape hatch ("?cf_bypass=1").
+    const s = location.search || "";
+    if (s.indexOf("cf_bypass=1") >= 0) return false;
     return true;
+  }
+  // v1.5.0 phase 2 — resolve the configured destination to a URL the
+  // tab can navigate to. Returns null when the configured destination
+  // is malformed (empty playlist URL, empty channel handle) so the
+  // caller falls back to /feed/subscriptions.
+  function _resolveHomepageDestinationURL() {
+    const d = STATE.cf_homepage_destination;
+    if (d === "library")  return "/feed/library";
+    if (d === "history")  return "/feed/history";
+    if (d === "blank") {
+      try { return chrome.runtime.getURL("onboarding/blank.html"); }
+      catch (_) { return null; }
+    }
+    if (d && typeof d === "object") {
+      if (d.type === "playlist") {
+        const u = String(d.url || "").trim();
+        if (u) return u;       // raw URL pass-through; we trust the user.
+        return null;
+      }
+      if (d.type === "channel") {
+        const h = String(d.handle || "").trim();
+        if (!h) return null;
+        // Full URL: pass through.
+        if (/^https?:\/\//i.test(h)) return h;
+        // "@handle" -> "/@handle"; "handle" -> "/@handle".
+        if (h.charAt(0) === "@") return "/" + h;
+        if (h.charAt(0) === "/") return h;       // already a path
+        return "/@" + h;
+      }
+    }
+    // "subscriptions" + default + unknown string -> v1.4.19 baseline.
+    return "/feed/subscriptions";
   }
   function maybeRedirectHomeToSubs() {
     if (!STATE.redirectHomeToSubs) return false;
     if (!_isBareHomepage()) return false;
-    // Already on /feed/subscriptions? (shouldn't be possible past the path
-    // check but belt-and-suspenders against future logic changes.)
-    if (location.pathname.indexOf("/feed/subscriptions") === 0) return false;
+    // v1.5.0 phase 2 — one-shot bypass set by the blank page's "Continue
+    // to YouTube" button. Clear the flag synchronously (best-effort; the
+    // storage write is async, but we mutate STATE so a second nav within
+    // the same content-script lifetime also sees the cleared value).
+    if (STATE.cf_skip_next_homepage_redirect) {
+      STATE.cf_skip_next_homepage_redirect = false;
+      try { chrome.storage.local.set({ cf_skip_next_homepage_redirect: false }); } catch (_) {}
+      return false;
+    }
+    const target = _resolveHomepageDestinationURL() || "/feed/subscriptions";
+    // Don't redirect-loop: if the resolved target is on this same
+    // YouTube origin AND matches the bare-home definition, skip. For
+    // extension-page targets ("blank"), this never triggers.
+    if (target === "/" || target === "") return false;
+    // Avoid the obvious cycle of trying to redirect /feed/subscriptions
+    // to /feed/subscriptions when YouTube is already there.
+    if (location.pathname && location.pathname.indexOf(target) === 0) return false;
     try {
-      location.replace("/feed/subscriptions");
+      location.replace(target);
     } catch (_) { /* about:blank or sandbox — skip */ }
     return true;
   }
@@ -231,10 +296,24 @@
   // v1.4.19 F3 — read the user's render-mode choice for a given blocker.
   // Missing entries (unmigrated users, blockers never touched in the popup)
   // fall back to "hide" — zero behaviour change from pre-v1.4.19.
+  // v1.5.0 phase 2 — thumbnails blocker gets two additional variants
+  // ("grayscale" + "hover-blur") because grayscale/hover-blur only make
+  // sense for image content. Other blockers stay restricted to the
+  // hide/blur/dim trio.
   function _effectiveModeFor(id) {
     const m = STATE.blockerModes && STATE.blockerModes[id];
+    if (id === "thumbnails") {
+      if (m === "blur" || m === "dim" || m === "grayscale" || m === "hover-blur") return m;
+      return "hide";
+    }
     return (m === "blur" || m === "dim") ? m : "hide";
   }
+  // v1.5.0 phase 2 — full enumeration of every mode class we might apply.
+  // applyBlockers iterates this list when tearing down stale classes so
+  // switching modes (grayscale → hover-blur, etc.) doesn't leave a stale
+  // class on body. The "core" trio applies to every blocker; thumbnails-
+  // only variants are appended.
+  const _ALL_MODES = ["hide", "blur", "dim", "grayscale", "hover-blur"];
 
   function applyBlockers() {
     if (!document.body) return;       // very early frame
@@ -242,9 +321,10 @@
     for (const b of BLOCKERS) {
       document.body.classList.remove("cf-block-" + b.id);
       // v1.4.19 F3 — also remove any prior mode class for this blocker.
-      document.body.classList.remove("cf-mode-" + b.id + "-hide");
-      document.body.classList.remove("cf-mode-" + b.id + "-blur");
-      document.body.classList.remove("cf-mode-" + b.id + "-dim");
+      // v1.5.0 phase 2 — also clear grayscale + hover-blur if previously set.
+      for (const m of _ALL_MODES) {
+        document.body.classList.remove("cf-mode-" + b.id + "-" + m);
+      }
     }
     document.body.classList.remove("cf-paused");
     // v1.4.14 — cf-comments-shown body class and the inline-style reveal are
@@ -391,10 +471,56 @@
     });
   }
 
+  // v1.5.0 phase 2 — keyword entries are now {pattern, isRegex} objects.
+  // Legacy storage shape was an array of lowercase substrings; we
+  // normalize either shape on every read so the matcher logic only
+  // sees the new form. Migration to the new shape happens lazily — the
+  // first user edit in options.js writes back the object form.
+  function _normalizeKwEntry(raw) {
+    if (raw == null) return null;
+    if (typeof raw === "string") {
+      const t = raw.trim();
+      if (!t) return null;
+      return { pattern: t, isRegex: false };
+    }
+    if (typeof raw === "object") {
+      const p = String(raw.pattern || "").trim();
+      if (!p) return null;
+      return { pattern: p, isRegex: !!raw.isRegex };
+    }
+    return null;
+  }
+  function _normalizedKwList() {
+    const src = Array.isArray(STATE.hiddenKeywords) ? STATE.hiddenKeywords : [];
+    const out = [];
+    for (let i = 0; i < src.length; i++) {
+      const n = _normalizeKwEntry(src[i]);
+      if (n) out.push(n);
+    }
+    return out;
+  }
+  // Cache compiled regexes by pattern string. Rebuilt on every storage
+  // change to hiddenKeywords; otherwise reused across applyBlockers ticks.
+  let _kwMatcherCache = null;
+  function _rebuildKwMatcherCache() {
+    const m = new Map();
+    for (const k of _normalizedKwList()) {
+      if (k.isRegex) {
+        try { m.set(k.pattern, { rx: new RegExp(k.pattern, "i") }); }
+        catch (_) { m.set(k.pattern, { invalid: true }); }
+      } else {
+        m.set(k.pattern, { lit: k.pattern.toLowerCase() });
+      }
+    }
+    _kwMatcherCache = m;
+  }
+
   // F1 — keyword block sweep. No-op if hiddenKeywords is empty (zero CPU).
-  // Substring match, case-insensitive. Match against video title link text.
+  // Substring match by default; regex match when {isRegex:true}. Invalid
+  // regex patterns are silently skipped (options.js surfaces a warning).
   function applyKeywordBlocks() {
-    if (!STATE.paid || !STATE.hiddenKeywords || !STATE.hiddenKeywords.length) {
+    const kws = _normalizedKwList();
+    if (!STATE.paid || kws.length === 0) {
       // also un-hide anything we hid previously if the user just cleared
       // their keyword list
       document.querySelectorAll('[data-cf-keyword="1"]').forEach((el) => {
@@ -402,20 +528,28 @@
       });
       return;
     }
+    if (!_kwMatcherCache) _rebuildKwMatcherCache();
     const cards = document.querySelectorAll(
       "ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer," +
       " ytd-compact-video-renderer, ytd-rich-grid-media, ytd-playlist-renderer"
     );
-    const kws = STATE.hiddenKeywords;
     cards.forEach((card) => {
       // Find the title — YT video cards use #video-title or yt-formatted-string#video-title-link
       const tEl = card.querySelector("#video-title, a#video-title-link, yt-formatted-string#video-title");
       if (!tEl) return;
-      const title = (tEl.getAttribute("title") || tEl.textContent || "").toLowerCase();
-      if (!title) return;
+      const titleRaw = (tEl.getAttribute("title") || tEl.textContent || "");
+      if (!titleRaw) return;
+      const titleLower = titleRaw.toLowerCase();
       let hide = false;
       for (var i = 0; i < kws.length; i++) {
-        if (kws[i] && title.indexOf(kws[i]) !== -1) { hide = true; break; }
+        const k = kws[i];
+        const entry = _kwMatcherCache.get(k.pattern);
+        if (!entry || entry.invalid) continue;
+        if (entry.rx) {
+          if (entry.rx.test(titleRaw)) { hide = true; break; }
+        } else if (entry.lit && titleLower.indexOf(entry.lit) !== -1) {
+          hide = true; break;
+        }
       }
       if (hide) {
         if (card.dataset.cfKeyword !== "1") {
@@ -458,13 +592,37 @@
     return { handle: _normalizeHandle(handle), name };
   }
 
-  function _isCardBlocked(info) {
-    if (!info) return false;
-    return STATE.blockedChannels.some((b) => {
-      if (!b) return false;
+  // v1.5.0 phase 2 — channel entries gain an optional isRegex flag.
+  // When isRegex, BOTH the handle and the name are tested against the
+  // pattern (with `i` flag). Invalid regex patterns are silently
+  // skipped — options.js surfaces a warning indicator next to the row.
+  // Compiled regexes are cached on the entry object for the lifetime
+  // of STATE.blockedChannels (rebuilt by storage.onChanged).
+  function _channelMatcher(b) {
+    if (!b) return null;
+    if (b.isRegex) {
+      if (b.__rx === undefined) {
+        // First call after a fresh STATE.blockedChannels — compile.
+        const pat = String(b.handle || b.name || "").trim();
+        if (!pat) { b.__rx = null; return null; }
+        try { b.__rx = new RegExp(pat, "i"); }
+        catch (_) { b.__rx = null; }       // invalid — never matches
+      }
+      const rx = b.__rx;
+      if (!rx) return null;
+      return (info) => rx.test(info.handle || "") || rx.test(info.name || "");
+    }
+    return (info) => {
       if (b.handle && info.handle && _normalizeHandle(b.handle) === info.handle) return true;
       if (b.name && info.name && b.name.toLowerCase() === info.name.toLowerCase()) return true;
       return false;
+    };
+  }
+  function _isCardBlocked(info) {
+    if (!info) return false;
+    return STATE.blockedChannels.some((b) => {
+      const fn = _channelMatcher(b);
+      return fn ? fn(info) : false;
     });
   }
 
@@ -1225,6 +1383,7 @@
       }
       if (changes.hiddenKeywords) {
         STATE.hiddenKeywords = Array.isArray(changes.hiddenKeywords.newValue) ? changes.hiddenKeywords.newValue : [];
+        _kwMatcherCache = null;       // v1.5.0 phase 2 — invalidate
         applyBlockers();
       }
       if (changes.perPageEnabled) {
@@ -1242,6 +1401,16 @@
       if (changes.redirectHomeToSubs) {
         STATE.redirectHomeToSubs = !!changes.redirectHomeToSubs.newValue;
         maybeRedirectHomeToSubs();
+      }
+      // v1.5.0 phase 2 — destination change also re-evaluates the redirect.
+      // If the user is on the bare homepage and switches from "subscriptions"
+      // to "library", they should land on library immediately.
+      if (changes.cf_homepage_destination) {
+        STATE.cf_homepage_destination = changes.cf_homepage_destination.newValue || "subscriptions";
+        maybeRedirectHomeToSubs();
+      }
+      if (changes.cf_skip_next_homepage_redirect) {
+        STATE.cf_skip_next_homepage_redirect = !!changes.cf_skip_next_homepage_redirect.newValue;
       }
       // v1.4.19 F3 — react to blocker-mode changes. Just re-apply blockers;
       // applyBlockers reads STATE.blockerModes and emits cf-mode-*-* body

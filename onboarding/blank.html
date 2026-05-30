@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CleanFeed — What did you come here to do?</title>
+  <!-- v1.5.0 phase 2 — minimal calm-prompt page served as the "blank"
+       homepage destination. Inline styles only so it works even if
+       CSP forbids cross-resource loads on the extension page. No
+       analytics, no fonts, no images. -->
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #0f1722;
+      --text: #e6edf6;
+      --text-dim: #93a0b3;
+      --accent: #3cc8c8;
+      --border: #233346;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f7f8fa;
+        --text: #14202f;
+        --text-dim: #4a5566;
+        --border: #d3d8e0;
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+    }
+    main {
+      max-width: 480px;
+      width: 100%;
+      padding: 48px 32px;
+      text-align: center;
+    }
+    h1 {
+      font-size: 26px;
+      font-weight: 600;
+      margin: 0 0 24px;
+      letter-spacing: 0.2px;
+    }
+    p.cf-sub {
+      color: var(--text-dim);
+      font-size: 14px;
+      line-height: 1.6;
+      margin: 0 0 28px;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 12px 14px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font: inherit;
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+    input[type="text"]:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(60, 200, 200, 0.25);
+    }
+    .cf-row {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+    button {
+      padding: 10px 18px;
+      border-radius: 8px;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      transition: background 150ms ease;
+    }
+    button:hover { background: rgba(60, 200, 200, 0.10); }
+    button#cf-blank-continue {
+      background: var(--accent);
+      color: #0b1828;
+      border-color: var(--accent);
+    }
+    button#cf-blank-continue:hover { filter: brightness(1.06); }
+    footer {
+      margin-top: 32px;
+      font-size: 11px;
+      color: var(--text-dim);
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>What did you come here to do?</h1>
+    <p class="cf-sub">A moment to name your intent before YouTube does it for you.</p>
+    <input id="cf-blank-intent" type="text" autocomplete="off" autofocus
+      placeholder="e.g. find the Kurzgesagt video on antibiotics" />
+    <div class="cf-row">
+      <button id="cf-blank-continue" type="button">Continue to YouTube</button>
+      <button id="cf-blank-close" type="button">Close tab</button>
+    </div>
+    <footer>CleanFeed — your CleanFeed homepage redirect lands here.</footer>
+  </main>
+  <script src="blank.js"></script>
+</body>
+</html>

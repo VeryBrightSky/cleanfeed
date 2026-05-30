@@ -365,6 +365,47 @@ input:disabled, textarea:disabled {
   accent-color: var(--accent);
 }
 
+/* v1.5.0 phase 2 — keyword-row UI (replaces v1.4.0 textarea) */
+.cf-keyword-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.cf-kw-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+.cf-kw-row input[type="text"] {
+  flex: 1;
+  min-width: 0;
+}
+.cf-kw-regex {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  user-select: none;
+  white-space: nowrap;
+}
+.cf-kw-regex input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+  margin: 0;
+}
+.cf-kw-warn {
+  font-size: 11.5px;
+  color: var(--warn);
+  white-space: nowrap;
+}
+.cf-kw-remove {
+  font-size: 12px;
+}
+
 /* v1.5.0-phase1 — Diagnostic info expandable section */
 #cf-diag-details summary {
   cursor: pointer;

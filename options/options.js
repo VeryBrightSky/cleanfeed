@@ -18,6 +18,8 @@ const STATE = {
   // v1.4.0
   hiddenKeywords: [],
   perPageEnabled: false,
+  // v1.5.0 phase 2 — homepage redirect destination
+  cf_homepage_destination: "subscriptions",
   // v1.4.17 — license code Pro path
   cleanfeed_license: null,
   installId: "",
@@ -91,7 +93,9 @@ async function load() {
        "cleanfeed_license", "installId",
        // v1.4.21 Phase 3
        "cf_grandfathered", "cf_grandfathered_at", "cf_grandfathered_reason",
-       "cf_subscription", "cf_stats"],
+       "cf_subscription", "cf_stats",
+       // v1.5.0 phase 2 — homepage destination
+       "cf_homepage_destination"],
       (data) => {
         STATE.paid = !!data.paid;
         STATE.whitelistedChannels = data.whitelistedChannels || [];
@@ -104,6 +108,12 @@ async function load() {
         STATE.timeTracking = data.timeTracking || {};
         STATE.hiddenKeywords = Array.isArray(data.hiddenKeywords) ? data.hiddenKeywords : [];
         STATE.perPageEnabled = !!data.perPageEnabled;
+        // v1.5.0 phase 2 — homepage destination. Strings or objects are
+        // both valid; fall back to "subscriptions" for missing/garbage.
+        STATE.cf_homepage_destination =
+          (typeof data.cf_homepage_destination === "string"
+           || (data.cf_homepage_destination && typeof data.cf_homepage_destination === "object"))
+          ? data.cf_homepage_destination : "subscriptions";
         STATE.cleanfeed_license = data.cleanfeed_license || null;
         STATE.installId = data.installId || "";
         STATE.cf_grandfathered = data.cf_grandfathered === true;
@@ -400,17 +410,56 @@ function renderBlockedList() {
     list.appendChild(li);
     return;
   }
-  for (const ch of STATE.blockedChannels) {
+  for (let i = 0; i < STATE.blockedChannels.length; i++) {
+    const ch = STATE.blockedChannels[i];
     const li = document.createElement("li");
     const span = document.createElement("span");
     span.textContent = ch.name || ("@" + (ch.handle || "unknown"));
+    li.appendChild(span);
+
+    // v1.5.0 phase 2 — per-row regex toggle. When checked, content.js
+    // treats handle + name as RegExp patterns (case-insensitive) instead
+    // of exact-string matches. Invalid regex shows a "⚠" indicator;
+    // matching is silently skipped for invalid entries.
+    const rxLabel = document.createElement("label");
+    rxLabel.className = "cf-kw-regex";
+    const rxCb = document.createElement("input");
+    rxCb.type = "checkbox";
+    rxCb.checked = !!ch.isRegex;
+    rxLabel.appendChild(rxCb);
+    const rxText = document.createElement("span");
+    rxText.textContent = "regex";
+    rxLabel.appendChild(rxText);
+    li.appendChild(rxLabel);
+
+    const warn = document.createElement("span");
+    warn.className = "cf-kw-warn";
+    warn.title = "Invalid regular expression — this channel is skipped at match time.";
+    warn.textContent = "⚠";
+    warn.hidden = !(ch.isRegex && !_isValidRegex(ch.handle || ch.name || ""));
+    li.appendChild(warn);
+
+    rxCb.addEventListener("change", () => toggleChannelRegex(i, rxCb.checked, warn));
+
     const btn = document.createElement("button");
     btn.type = "button";
     btn.textContent = "remove";
     btn.addEventListener("click", () => removeBlockedChannel(ch));
-    li.appendChild(span);
     li.appendChild(btn);
     list.appendChild(li);
+  }
+}
+
+async function toggleChannelRegex(idx, isRegex, warnNode) {
+  const next = (STATE.blockedChannels || []).slice();
+  if (idx < 0 || idx >= next.length) return;
+  // Clone the entry so we don't mutate the storage snapshot in place.
+  next[idx] = Object.assign({}, next[idx], { isRegex: !!isRegex });
+  STATE.blockedChannels = next;
+  await chrome.storage.local.set({ blockedChannels: next });
+  if (warnNode) {
+    const ch = next[idx];
+    warnNode.hidden = !(ch.isRegex && !_isValidRegex(ch.handle || ch.name || ""));
   }
 }
 
@@ -597,37 +646,175 @@ async function resetAll() {
 
 // ---- bootstrap ----------------------------------------------------------
 
-// ---- v1.4.0 F1 — keyword block list -------------------------------------
+// ---- v1.4.0 F1 / v1.5.0 phase 2 — keyword block list -------------------
+//
+// Each keyword is stored as { pattern, isRegex }. The legacy shape (an
+// array of lowercase strings) is migrated on first save — _normalizeKws
+// accepts either form and returns the canonical objects. Substring is
+// the default; the per-row "regex" checkbox flips matching to
+// new RegExp(pattern, "i"). Invalid regex strings show a "⚠" indicator
+// next to the row and are silently skipped at match time (content.js
+// tries-and-catches the RegExp constructor).
 
-function renderKeywords() {
-  const ta = $("cf-keywords");
-  if (!ta) return;
-  ta.value = (STATE.hiddenKeywords || []).join("\n");
-  ta.disabled = !STATE.paid;
-  const btn = $("cf-keywords-save");
-  if (btn) btn.disabled = !STATE.paid;
+function _normalizeKws(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const entry of raw) {
+    let pat, rx;
+    if (typeof entry === "string") {
+      pat = entry.trim();
+      rx = false;
+    } else if (entry && typeof entry === "object") {
+      pat = String(entry.pattern || "").trim();
+      rx = !!entry.isRegex;
+    } else { continue; }
+    if (!pat) continue;
+    // Dedupe on (pattern, isRegex) — substring "react" and regex "react"
+    // are conceptually different so both can coexist.
+    const key = (rx ? "rx:" : "lit:") + pat.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ pattern: pat, isRegex: rx });
+    if (out.length >= 200) break;
+  }
+  return out;
 }
 
-async function saveKeywords() {
-  if (!STATE.paid) return;
-  const raw = ($("cf-keywords").value || "").split(/\r?\n/);
-  const seen = new Set();
-  const cleaned = [];
-  for (const line of raw) {
-    const t = line.trim().toLowerCase();
-    if (!t) continue;
-    if (seen.has(t)) continue;
-    seen.add(t);
-    cleaned.push(t);
-    if (cleaned.length >= 200) break;
+function _isValidRegex(pat) {
+  try { new RegExp(pat, "i"); return true; }
+  catch (_) { return false; }
+}
+
+function renderKeywords() {
+  const host = $("cf-keywords-list");
+  const addBtn = $("cf-keywords-add");
+  if (!host) return;
+  while (host.firstChild) host.removeChild(host.firstChild);
+  const norm = _normalizeKws(STATE.hiddenKeywords);
+  if (norm.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "cf-help";
+    empty.textContent = STATE.paid
+      ? "No keywords yet. Click \"+ Add keyword\" to start."
+      : "Upgrade to Pro to block keywords.";
+    host.appendChild(empty);
+  } else {
+    norm.forEach((k, idx) => {
+      host.appendChild(_renderKeywordRow(k, idx));
+    });
   }
+  if (addBtn) addBtn.disabled = !STATE.paid;
+}
+
+function _renderKeywordRow(kw, idx) {
+  const row = document.createElement("div");
+  row.className = "cf-kw-row";
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.value = kw.pattern;
+  input.placeholder = kw.isRegex ? "^reaction(s)?$" : "reaction";
+  input.disabled = !STATE.paid;
+  input.dataset.idx = String(idx);
+  row.appendChild(input);
+
+  const rxLabel = document.createElement("label");
+  rxLabel.className = "cf-kw-regex";
+  const rxCb = document.createElement("input");
+  rxCb.type = "checkbox";
+  rxCb.checked = !!kw.isRegex;
+  rxCb.disabled = !STATE.paid;
+  rxLabel.appendChild(rxCb);
+  const rxText = document.createElement("span");
+  rxText.textContent = "regex";
+  rxLabel.appendChild(rxText);
+  row.appendChild(rxLabel);
+
+  // Invalid-regex warning. Visible only when isRegex AND pattern doesn't
+  // compile. We refresh this whenever the input or checkbox changes.
+  const warn = document.createElement("span");
+  warn.className = "cf-kw-warn";
+  warn.title = "Invalid regular expression — this row is skipped at match time.";
+  warn.textContent = "⚠ invalid";
+  warn.hidden = !(kw.isRegex && !_isValidRegex(kw.pattern));
+  row.appendChild(warn);
+
+  const rm = document.createElement("button");
+  rm.type = "button";
+  rm.className = "cf-link cf-kw-remove";
+  rm.textContent = "remove";
+  rm.disabled = !STATE.paid;
+  row.appendChild(rm);
+
+  // Wiring — onBlur of input + checkbox change + remove click.
+  const refreshWarn = () => {
+    warn.hidden = !(rxCb.checked && !_isValidRegex(input.value));
+  };
+  input.addEventListener("input", refreshWarn);
+  rxCb.addEventListener("change", () => { refreshWarn(); saveKeywordRow(idx, input.value, rxCb.checked); });
+  input.addEventListener("blur", () => saveKeywordRow(idx, input.value, rxCb.checked));
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); saveKeywordRow(idx, input.value, rxCb.checked); input.blur(); }
+  });
+  rm.addEventListener("click", () => removeKeywordRow(idx));
+
+  return row;
+}
+
+async function saveKeywordRow(idx, pattern, isRegex) {
+  if (!STATE.paid) return;
+  const current = _normalizeKws(STATE.hiddenKeywords);
+  const p = String(pattern || "").trim();
+  if (!p) {
+    // Empty pattern collapses to a remove.
+    return removeKeywordRow(idx);
+  }
+  // Build a new array with the row updated. If the row doesn't exist
+  // yet (e.g. a fresh Add-row that hasn't persisted), append.
+  const next = current.slice();
+  while (next.length <= idx) next.push({ pattern: "", isRegex: false });
+  next[idx] = { pattern: p, isRegex: !!isRegex };
+  // Re-normalize to drop empties + dedupe.
+  const cleaned = _normalizeKws(next);
   STATE.hiddenKeywords = cleaned;
   await chrome.storage.local.set({ hiddenKeywords: cleaned });
+  // Don't re-render — that would steal focus from the input. The status
+  // line below confirms the write.
   const s = $("cf-keywords-status");
   if (s) {
     s.textContent = `Saved ${cleaned.length} keyword${cleaned.length === 1 ? "" : "s"}.`;
-    setTimeout(() => { s.textContent = ""; }, 2000);
+    setTimeout(() => { if (s.textContent.indexOf("Saved") === 0) s.textContent = ""; }, 1500);
   }
+}
+
+async function removeKeywordRow(idx) {
+  if (!STATE.paid) return;
+  const current = _normalizeKws(STATE.hiddenKeywords);
+  const next = current.slice();
+  next.splice(idx, 1);
+  STATE.hiddenKeywords = next;
+  await chrome.storage.local.set({ hiddenKeywords: next });
+  renderKeywords();
+}
+
+async function addKeywordRow() {
+  if (!STATE.paid) return;
+  const current = _normalizeKws(STATE.hiddenKeywords);
+  // Append an empty row; the user fills it in then onBlur saves. We
+  // need to actually render a row, but the row's pattern is "" so
+  // saveKeywordRow won't persist until the user types. Easier: render
+  // a synthetic empty row inline without touching storage.
+  const host = $("cf-keywords-list");
+  if (!host) return;
+  // Clear the "No keywords yet" empty state if visible.
+  if (host.firstChild && host.firstChild.tagName === "P") {
+    while (host.firstChild) host.removeChild(host.firstChild);
+  }
+  const row = _renderKeywordRow({ pattern: "", isRegex: false }, current.length);
+  host.appendChild(row);
+  const input = row.querySelector('input[type="text"]');
+  if (input) input.focus();
 }
 
 // ---- v1.4.0 F4 — Pomodoro UI --------------------------------------------
@@ -706,6 +893,68 @@ function renderPerPage() {
   if (!cb) return;
   cb.checked = !!STATE.perPageEnabled;
   cb.disabled = !STATE.paid;
+}
+
+// ---- v1.5.0 phase 2 — Homepage destination ----------------------------
+//
+// Reads chrome.storage.local.cf_homepage_destination and renders the
+// dropdown + the conditional URL/handle text input. Save fires on every
+// change so the user never wonders if their pick took.
+
+function renderHomepageDestination() {
+  const sel = $("cf-home-dest");
+  if (!sel) return;
+  const d = STATE.cf_homepage_destination;
+  let pick = "subscriptions";
+  if (d === "library" || d === "history" || d === "blank") {
+    pick = d;
+  } else if (d && typeof d === "object") {
+    if (d.type === "playlist") pick = "playlist";
+    else if (d.type === "channel") pick = "channel";
+  }
+  sel.value = pick;
+  // Conditional inputs.
+  const playlistBox = $("cf-home-dest-playlist");
+  const channelBox  = $("cf-home-dest-channel");
+  if (playlistBox) playlistBox.hidden = (pick !== "playlist");
+  if (channelBox)  channelBox.hidden  = (pick !== "channel");
+  // Populate values when present.
+  const purl  = $("cf-home-dest-playlist-url");
+  const chand = $("cf-home-dest-channel-handle");
+  if (purl  && d && typeof d === "object" && d.type === "playlist") purl.value  = d.url || "";
+  if (chand && d && typeof d === "object" && d.type === "channel")  chand.value = d.handle || "";
+}
+
+async function onHomepageDestinationChange() {
+  const sel = $("cf-home-dest");
+  const status = $("cf-home-dest-status");
+  if (!sel) return;
+  const pick = sel.value;
+  let next;
+  if (pick === "library" || pick === "history" || pick === "blank") {
+    next = pick;
+  } else if (pick === "playlist") {
+    const u = ($("cf-home-dest-playlist-url").value || "").trim();
+    next = { type: "playlist", url: u };
+  } else if (pick === "channel") {
+    const h = ($("cf-home-dest-channel-handle").value || "").trim();
+    next = { type: "channel", handle: h };
+  } else {
+    next = "subscriptions";
+  }
+  STATE.cf_homepage_destination = next;
+  await chrome.storage.local.set({ cf_homepage_destination: next });
+  // Show/hide the conditional rows on dropdown change.
+  const playlistBox = $("cf-home-dest-playlist");
+  const channelBox  = $("cf-home-dest-channel");
+  if (playlistBox) playlistBox.hidden = (pick !== "playlist");
+  if (channelBox)  channelBox.hidden  = (pick !== "channel");
+  if (status) {
+    status.className = "cf-status cf-status-ok";
+    status.textContent = "Saved.";
+    // Soft-clear the status after a beat so it doesn't linger.
+    setTimeout(() => { if (status.textContent === "Saved.") status.textContent = ""; }, 1500);
+  }
 }
 
 async function onPerPageToggle() {
@@ -1107,6 +1356,8 @@ async function init() {
   renderKeywords();
   renderPomodoro();
   renderPerPage();
+  // v1.5.0 phase 2 — homepage destination
+  renderHomepageDestination();
 
   $("cf-whitelist-add").addEventListener("click", addChannel);
   $("cf-whitelist-new").addEventListener("keydown", (e) => {
@@ -1121,10 +1372,28 @@ async function init() {
     b.addEventListener("click", () => selectDuration(b));
   });
   // v1.4.0 wiring
-  $("cf-keywords-save").addEventListener("click", saveKeywords);
+  // v1.5.0 phase 2 — keywords are now row-edited; an "Add" button
+  // appends an empty row that persists on first blur.
+  const kwAdd = $("cf-keywords-add");
+  if (kwAdd) kwAdd.addEventListener("click", addKeywordRow);
   $("cf-pomo-start").addEventListener("click", startPomodoro);
   $("cf-pomo-cancel").addEventListener("click", cancelPomodoro);
   $("cf-perpage-enable").addEventListener("change", onPerPageToggle);
+  // v1.5.0 phase 2 — homepage destination wiring. The dropdown fires
+  // onHomepageDestinationChange directly; the playlist URL + channel
+  // handle text inputs fire the same handler on blur/Enter so the user
+  // doesn't need a separate "Save" button.
+  const destSel = $("cf-home-dest");
+  if (destSel) destSel.addEventListener("change", onHomepageDestinationChange);
+  for (const id of ["cf-home-dest-playlist-url", "cf-home-dest-channel-handle"]) {
+    const el = $(id);
+    if (el) {
+      el.addEventListener("blur", onHomepageDestinationChange);
+      el.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); onHomepageDestinationChange(); }
+      });
+    }
+  }
   // v1.4.17 — license redemption
   $("cf-license-redeem").addEventListener("click", onLicenseRedeem);
   $("cf-license-input").addEventListener("keydown", (e) => {
@@ -1158,6 +1427,12 @@ async function init() {
     if (changes.timeTracking) { STATE.timeTracking = changes.timeTracking.newValue || {}; renderTimeTracker(); }
     if (changes.hiddenKeywords) { STATE.hiddenKeywords = changes.hiddenKeywords.newValue || []; renderKeywords(); }
     if (changes.perPageEnabled) { STATE.perPageEnabled = !!changes.perPageEnabled.newValue; renderPerPage(); }
+    // v1.5.0 phase 2 — homepage destination from elsewhere (popup, another
+    // options tab) is reflected back into this page's controls.
+    if (changes.cf_homepage_destination) {
+      STATE.cf_homepage_destination = changes.cf_homepage_destination.newValue || "subscriptions";
+      renderHomepageDestination();
+    }
     // v1.4.17 — license redemption updates from another tab / background's
     // /verify cycle should re-render the License panel.
     if (changes.cleanfeed_license) {

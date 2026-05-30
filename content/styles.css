@@ -463,6 +463,53 @@ body.cf-block-thumbnails.cf-mode-thumbnails-dim .yt-thumbnail-view-model img {
   opacity: 0.15 !important;
 }
 
+/* v1.5.0 phase 2 — anti-clickbait variants. Both layer on top of the base
+ * cf-block-thumbnails rule (opacity:0). Specificity wins because of the
+ * two-class selector + !important — the base rule's opacity:0 gets
+ * overridden back to 1 so the thumbnail is visible, then we apply the
+ * variant's filter. */
+
+/* Grayscale — desaturates without obscuring. Lets you still see what the
+ * thumbnail is OF without the engagement-bait colour pop. */
+body.cf-block-thumbnails.cf-mode-thumbnails-grayscale ytd-thumbnail img,
+body.cf-block-thumbnails.cf-mode-thumbnails-grayscale yt-image img,
+body.cf-block-thumbnails.cf-mode-thumbnails-grayscale .yt-thumbnail-view-model img {
+  opacity: 1 !important;
+  filter: grayscale(100%) !important;
+}
+body.cf-block-thumbnails.cf-mode-thumbnails-grayscale ytmusic-thumbnail-renderer img,
+body.cf-block-thumbnails.cf-mode-thumbnails-grayscale yt-img-shadow img {
+  opacity: 1 !important;
+  filter: grayscale(100%) !important;
+}
+
+/* Hover-only blur — sharp default (so you can browse normally) but blurs
+ * thumbnails the instant your mouse leaves them. Different from regular
+ * Blur (always blurred until hover); useful for users who want a soft
+ * disincentive rather than a hard occlusion. */
+body.cf-block-thumbnails.cf-mode-thumbnails-hover-blur ytd-thumbnail img,
+body.cf-block-thumbnails.cf-mode-thumbnails-hover-blur yt-image img,
+body.cf-block-thumbnails.cf-mode-thumbnails-hover-blur .yt-thumbnail-view-model img {
+  opacity: 1 !important;
+  filter: blur(8px) !important;
+  transition: filter 150ms ease;
+}
+body.cf-block-thumbnails.cf-mode-thumbnails-hover-blur ytd-thumbnail:hover img,
+body.cf-block-thumbnails.cf-mode-thumbnails-hover-blur yt-image:hover img,
+body.cf-block-thumbnails.cf-mode-thumbnails-hover-blur .yt-thumbnail-view-model:hover img {
+  filter: none !important;
+}
+body.cf-block-thumbnails.cf-mode-thumbnails-hover-blur ytmusic-thumbnail-renderer img,
+body.cf-block-thumbnails.cf-mode-thumbnails-hover-blur yt-img-shadow img {
+  opacity: 1 !important;
+  filter: blur(8px) !important;
+  transition: filter 150ms ease;
+}
+body.cf-block-thumbnails.cf-mode-thumbnails-hover-blur ytmusic-thumbnail-renderer:hover img,
+body.cf-block-thumbnails.cf-mode-thumbnails-hover-blur yt-img-shadow:hover img {
+  filter: none !important;
+}
+
 /* --- subs-algo --- */
 body.cf-block-subs-algo.cf-mode-subs-algo-blur ytd-browse[page-subtype="subscriptions"] ytd-shelf-renderer,
 body.cf-block-subs-algo.cf-mode-subs-algo-blur ytd-browse[page-subtype="subscriptions"] ytd-rich-shelf-renderer,

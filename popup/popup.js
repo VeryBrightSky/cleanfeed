@@ -969,23 +969,49 @@ function renderBlockers() {
 }
 
 // ---- v1.4.19 F3 — per-blocker render-mode dropdown (Hide / Blur / Dim) ----
+// v1.5.0 phase 2 — thumbnails blocker gets two extra options: Grayscale
+// (filter:grayscale(100%)) and Hover-blur (blurred until :hover). Other
+// blockers keep the original three options because grayscale/hover-blur
+// only make sense for image content. The allowlist in _effectiveModeFor
+// mirrors the same id-conditional logic in content/content.js.
 function _effectiveModeFor(id) {
   const m = STATE.blockerModes && STATE.blockerModes[id];
+  if (id === "thumbnails") {
+    if (m === "blur" || m === "dim" || m === "grayscale" || m === "hover-blur") return m;
+    return "hide";
+  }
   return (m === "blur" || m === "dim") ? m : "hide";
 }
+
+// v1.5.0 phase 2 — option lists per blocker. The core trio is shared;
+// thumbnails-only variants come after so the original three appear at
+// the top of the dropdown for muscle memory.
+const _BLOCKER_MODE_OPTIONS = {
+  _core: [
+    { v: "hide", label: "Hide" },
+    { v: "blur", label: "Blur" },
+    { v: "dim",  label: "Dim"  },
+  ],
+  thumbnails: [
+    { v: "hide",       label: "Hide" },
+    { v: "blur",       label: "Blur" },
+    { v: "dim",        label: "Dim"  },
+    { v: "grayscale",  label: "Grayscale" },
+    { v: "hover-blur", label: "Hover-only blur" },
+  ],
+};
 
 function renderModeDropdown(blocker, locked) {
   const sel = document.createElement("select");
   sel.className = "cf-mode-select";
   sel.id = "mode-" + blocker.id;
   sel.disabled = !!locked;
-  sel.title = "How to hide this — fully (Hide), blurred (Blur), or dimmed (Dim).";
+  sel.title = blocker.id === "thumbnails"
+    ? "How to alter thumbnails — Hide / Blur / Dim / Grayscale / Hover-only blur."
+    : "How to hide this — fully (Hide), blurred (Blur), or dimmed (Dim).";
   const cur = _effectiveModeFor(blocker.id);
-  for (const opt of [
-    { v: "hide", label: "Hide" },
-    { v: "blur", label: "Blur" },
-    { v: "dim",  label: "Dim"  },
-  ]) {
+  const opts = _BLOCKER_MODE_OPTIONS[blocker.id] || _BLOCKER_MODE_OPTIONS._core;
+  for (const opt of opts) {
     const o = document.createElement("option");
     o.value = opt.v;
     o.textContent = opt.label;
@@ -1019,9 +1045,12 @@ async function _writeBlockerMode(id, mode) {
 function renderHomeRedirectRow() {
   const row = el("div", { class: "cf-row" });
   const text = el("div", { class: "cf-row-text" });
-  text.appendChild(el("div", { class: "cf-row-label" }, "Open YouTube on Subscriptions"));
+  // v1.5.0 phase 2 — label now mentions the configurable destination.
+  // The actual destination is picked in options.html (defaults to
+  // Subscriptions feed for backward compat with v1.4.19).
+  text.appendChild(el("div", { class: "cf-row-label" }, "Open YouTube on a calmer page"));
   text.appendChild(el("div", { class: "cf-row-desc" },
-    "Auto-redirect youtube.com to /feed/subscriptions. Doesn't touch /watch, /results, /shorts, etc."));
+    "Auto-redirect youtube.com to Subscriptions, Library, History, a playlist, a channel, or a blank prompt. Pick the destination in Options. Doesn't touch /watch, /results, /shorts, etc."));
   row.appendChild(text);
 
   const sw = el("label", { class: "cf-switch" });

@@ -518,6 +518,12 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       cleanfeed_license: null,
       // v1.4.19 — Homepage→Subs redirect (F2) + per-blocker render modes (F3).
       redirectHomeToSubs: false,
+      // v1.5.0 phase 2 — homepage redirect destination + one-shot bypass.
+      // Default "subscriptions" matches v1.4.19 behaviour for the new
+      // toggle. Users who enable redirectHomeToSubs keep landing on /feed/
+      // subscriptions unless they pick a different destination.
+      cf_homepage_destination: "subscriptions",
+      cf_skip_next_homepage_redirect: false,
       blockerModes: {},
       // v1.4.20-alpha — analytics dashboard Phase 1 instrumentation.
       // Schema (also documented in content/content.js _flushStats):
@@ -609,6 +615,9 @@ async function _migrateForV140() {
   }
   // v1.4.19 — homepage→subs redirect + per-blocker render modes.
   if (typeof data.redirectHomeToSubs === "undefined") patch.redirectHomeToSubs = false;
+  // v1.5.0 phase 2 — homepage destination + one-shot bypass migrations.
+  if (typeof data.cf_homepage_destination === "undefined") patch.cf_homepage_destination = "subscriptions";
+  if (typeof data.cf_skip_next_homepage_redirect === "undefined") patch.cf_skip_next_homepage_redirect = false;
   if (typeof data.blockerModes === "undefined" || data.blockerModes === null ||
       typeof data.blockerModes !== "object") {
     patch.blockerModes = {};
