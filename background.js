@@ -408,6 +408,16 @@ function _ensureExtpaySyncAlarm() {
 
 chrome.runtime.onInstalled.addListener((details) => {
   _eagerlyMintApiKey("install/update (" + details.reason + ")");
+  // v1.4.23 — uninstall feedback form. setUninstallURL persists across
+  // service-worker restarts; calling it again on every onInstalled is
+  // safe + idempotent. Wrapped in try/catch so a malformed URL or a
+  // missing chrome.i18n never breaks SW boot.
+  try {
+    const formUrl = "https://forms.gle/qngTc41kCvNSZCCX7";
+    const version = chrome.runtime.getManifest().version;
+    const locale = chrome.i18n.getUILanguage();
+    chrome.runtime.setUninstallURL(formUrl + "?v=" + version + "&locale=" + locale);
+  } catch (_) { /* never fatal */ }
   // v1.4.17 — seed install id + reconcile paid + re-verify license.
   ensureInstallId().catch(() => {});
   // v1.4.20-beta — seed cf_stats here, OUTSIDE the reason==="update" gate

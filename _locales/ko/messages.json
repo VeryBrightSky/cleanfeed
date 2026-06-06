@@ -1,0 +1,26 @@
+{
+
+  "extName": { "message": "CleanFeed – YouTube Shorts·피드·추천 차단 | Focus Lock" },
+  "extDescription": { "message": "YouTube의 산만함을 숨기세요. 무료: 2개 차단기. Pro: 전체 17개 + Focus Lock + Pomodoro. $4.99 한 번 결제. 평생." },
+
+  "ytMusicPausedTitle":  { "message": "CleanFeed가 YouTube Music에서 일시정지되었습니다" },
+  "ytMusicPausedDesc":   { "message": "여기서는 차단기, 배지, 시간 추적을 적용하지 않습니다 — 음악 앱이지 피드가 아닙니다." },
+
+  "redirectHomeLabel":   { "message": "YouTube를 구독 피드로 열기" },
+  "redirectHomeDesc":    { "message": "youtube.com을 /feed/subscriptions로 자동 리디렉션합니다. /watch, /results, /shorts 등은 건드리지 않습니다." },
+
+  "modeHide":            { "message": "숨기기" },
+  "modeBlur":            { "message": "흐림" },
+  "modeDim":             { "message": "어둡게" },
+
+  "blockerSubsMostRelevantLabel": { "message": "'가장 관련 있는' 추천 숨기기" },
+  "blockerSubsMostRelevantDesc":  { "message": "/feed/subscriptions에서 알고리즘이 끼워 넣는 '가장 관련 있는' 항목을 제거합니다" },
+  "blockerSubsMembersOnlyLabel":  { "message": "멤버 전용 동영상 숨기기" },
+  "blockerSubsMembersOnlyDesc":   { "message": "'멤버 전용' 배지가 있는 구독 동영상을 숨깁니다" },
+  "blockerSubsWatchedLabel":      { "message": "이미 본 동영상 숨기기 (진행률 > 95%)" },
+  "blockerSubsWatchedDesc":       { "message": "/feed/subscriptions에서 진행률 막대가 95%를 넘은 동영상을 숨깁니다" },
+
+  "upsellTitle":         { "message": "17개 차단기 + Focus Lock 모두 잠금 해제" },
+  "upsellBody":          { "message": "Pro는 17개 차단기 전체, 키워드 차단, Pomodoro Focus Lock, 페이지별 규칙, 채널 화이트리스트/블록리스트, 사용자 정의 CSS를 잠금 해제합니다. 한 번 결제." },
+  "upsellAllBlockers":   { "message": "17개 차단기 전체 — 사이드바, 댓글, 썸네일, 믹스 등" }
+}

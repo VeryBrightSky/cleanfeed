@@ -1,0 +1,26 @@
+{
+
+  "extName": { "message": "CleanFeed – 封鎖 YouTube Shorts、首頁推薦 | Focus Lock" },
+  "extDescription": { "message": "封鎖 YouTube 干擾元素。免費：2 個封鎖器。Pro：全部 17 個 + Focus Lock + Pomodoro。$4.99 一次付費。永久使用。" },
+
+  "ytMusicPausedTitle":  { "message": "CleanFeed 已在 YouTube Music 上暫停" },
+  "ytMusicPausedDesc":   { "message": "這裡不套用封鎖器、徽章或時間追蹤 — 它是音樂應用程式，不是動態消息。" },
+
+  "redirectHomeLabel":   { "message": "開啟 YouTube 時直接到訂閱頁" },
+  "redirectHomeDesc":    { "message": "自動將 youtube.com 導向 /feed/subscriptions。不影響 /watch、/results、/shorts 等。" },
+
+  "modeHide":            { "message": "隱藏" },
+  "modeBlur":            { "message": "模糊" },
+  "modeDim":             { "message": "變暗" },
+
+  "blockerSubsMostRelevantLabel": { "message": "隱藏「最相關」推薦" },
+  "blockerSubsMostRelevantDesc":  { "message": "在 /feed/subscriptions 上移除演算法插入的「最相關」內容" },
+  "blockerSubsMembersOnlyLabel":  { "message": "隱藏會員專屬影片" },
+  "blockerSubsMembersOnlyDesc":   { "message": "隱藏帶有「僅限會員」徽章的訂閱影片" },
+  "blockerSubsWatchedLabel":      { "message": "隱藏已觀看（進度 > 95%）" },
+  "blockerSubsWatchedDesc":       { "message": "在 /feed/subscriptions 上隱藏進度條超過 95% 的影片" },
+
+  "upsellTitle":         { "message": "解鎖全部 17 個封鎖器 + Focus Lock" },
+  "upsellBody":          { "message": "Pro 解鎖全部 17 個封鎖器、關鍵字封鎖、Pomodoro Focus Lock、依頁面規則、頻道白名單與封鎖名單，以及自訂 CSS。一次付款。" },
+  "upsellAllBlockers":   { "message": "全部 17 個封鎖器 — 側邊欄、留言、縮圖、混音列表等" }
+}

@@ -1,0 +1,26 @@
+{
+
+  "extName": { "message": "CleanFeed – 屏蔽 YouTube Shorts、首页推荐 | Focus Lock" },
+  "extDescription": { "message": "屏蔽 YouTube 干扰元素。免费：2 个屏蔽器。Pro：全部 17 个 + Focus Lock + Pomodoro。$4.99 一次付费。永久使用。" },
+
+  "ytMusicPausedTitle":  { "message": "CleanFeed 已在 YouTube Music 上暂停" },
+  "ytMusicPausedDesc":   { "message": "这里不应用屏蔽器、徽章或时长统计 — 它是音乐应用，不是信息流。" },
+
+  "redirectHomeLabel":   { "message": "打开 YouTube 时直接到订阅页" },
+  "redirectHomeDesc":    { "message": "自动把 youtube.com 重定向到 /feed/subscriptions。不影响 /watch、/results、/shorts 等。" },
+
+  "modeHide":            { "message": "隐藏" },
+  "modeBlur":            { "message": "模糊" },
+  "modeDim":             { "message": "变暗" },
+
+  "blockerSubsMostRelevantLabel": { "message": "隐藏「最相关」推荐" },
+  "blockerSubsMostRelevantDesc":  { "message": "在 /feed/subscriptions 上移除算法插入的「最相关」内容" },
+  "blockerSubsMembersOnlyLabel":  { "message": "隐藏会员专享视频" },
+  "blockerSubsMembersOnlyDesc":   { "message": "隐藏带「会员专享」徽章的订阅视频" },
+  "blockerSubsWatchedLabel":      { "message": "隐藏已观看（进度 > 95%）" },
+  "blockerSubsWatchedDesc":       { "message": "在 /feed/subscriptions 上隐藏进度条超过 95% 的视频" },
+
+  "upsellTitle":         { "message": "解锁全部 17 个屏蔽器 + Focus Lock" },
+  "upsellBody":          { "message": "Pro 解锁全部 17 个屏蔽器、关键词屏蔽、Pomodoro Focus Lock、按页规则、频道白名单与黑名单以及自定义 CSS。一次付款。" },
+  "upsellAllBlockers":   { "message": "全部 17 个屏蔽器 — 侧边栏、评论、缩略图、混合列表等" }
+}

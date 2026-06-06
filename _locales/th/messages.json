@@ -1,0 +1,26 @@
+{
+
+  "extName": { "message": "CleanFeed – บล็อก YouTube Shorts ฟีด และคำแนะนำ | Focus Lock" },
+  "extDescription": { "message": "ซ่อนสิ่งรบกวนบน YouTube ฟรี: 2 ตัวบล็อก โปร: ครบทั้ง 17 + Focus Lock + Pomodoro จ่าย $4.99 ครั้งเดียว ใช้ตลอดชีพ" },
+
+  "ytMusicPausedTitle":  { "message": "CleanFeed หยุดทำงานบน YouTube Music" },
+  "ytMusicPausedDesc":   { "message": "ที่นี่เราไม่ใช้ตัวบล็อก ป้าย หรือการนับเวลา — เป็นแอปฟังเพลง ไม่ใช่ฟีด" },
+
+  "redirectHomeLabel":   { "message": "เปิด YouTube ที่หน้าการสมัครสมาชิก" },
+  "redirectHomeDesc":    { "message": "เปลี่ยนเส้นทาง youtube.com ไปยัง /feed/subscriptions อัตโนมัติ ไม่ยุ่งกับ /watch, /results, /shorts ฯลฯ" },
+
+  "modeHide":            { "message": "ซ่อน" },
+  "modeBlur":            { "message": "เบลอ" },
+  "modeDim":             { "message": "หรี่แสง" },
+
+  "blockerSubsMostRelevantLabel": { "message": "ซ่อนคำแนะนำ 'ตรงประเด็นที่สุด'" },
+  "blockerSubsMostRelevantDesc":  { "message": "ใน /feed/subscriptions ลบส่วน 'ตรงประเด็นที่สุด' ที่อัลกอริทึมแทรกเข้ามา" },
+  "blockerSubsMembersOnlyLabel":  { "message": "ซ่อนวิดีโอเฉพาะสมาชิก" },
+  "blockerSubsMembersOnlyDesc":   { "message": "ซ่อนวิดีโอที่มีป้าย 'สำหรับสมาชิกเท่านั้น'" },
+  "blockerSubsWatchedLabel":      { "message": "ซ่อนวิดีโอที่ดูแล้ว (เกิน 95%)" },
+  "blockerSubsWatchedDesc":       { "message": "ใน /feed/subscriptions ซ่อนวิดีโอที่แถบความคืบหน้าเกิน 95%" },
+
+  "upsellTitle":         { "message": "ปลดล็อกตัวบล็อกทั้ง 17 รายการ + Focus Lock" },
+  "upsellBody":          { "message": "โปรปลดล็อกตัวบล็อกทั้ง 17 รายการ การบล็อกคำหลัก Pomodoro Focus Lock กฎตามหน้า ไวต์ลิสต์/บล็อกลิสต์ช่อง และ CSS เอง จ่ายครั้งเดียว" },
+  "upsellAllBlockers":   { "message": "ตัวบล็อกทั้ง 17 รายการ — แถบข้าง คอมเมนต์ ภาพปก มิกซ์ และอื่น ๆ" }
+}

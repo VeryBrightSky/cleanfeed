@@ -11,6 +11,14 @@ Manifest V3. Vanilla JavaScript. No build step. No telemetry.
 
 ## Changelog
 
+### v1.4.23 — 2026-06-06 — uninstall feedback + 7 new locales
+
+Uninstall feedback link: when a user uninstalls CleanFeed, Chrome now opens a 30-second Google Form with version and locale query params for correlation. No data collected automatically. Form URL https://forms.gle/qngTc41kCvNSZCCX7.
+
+Seven new locales added: Vietnamese, Thai, Chinese Simplified, Chinese Traditional, Korean, Dutch, Arabic. Total locales: 12 to 19. All new locales tagged with `_translation_status` `auto_v1.4.23_pending_native_review` for future native-speaker QA.
+
+Zero other changes from v1.4.22. No code changes beyond the setUninstallURL one-liner.
+
 ### v1.4.22 — 2026-05-29 (revert subscription pivot — back to $4.99 once, lifetime access; dashboard + grandfather + ExtPay SDK preserved as defensive scaffolding; legacy subscribers auto-grandfathered at no charge; free tier unchanged)
 - **Strategic revert.** v1.4.21's pricing pivot from $4.99 lifetime to $1.99/mo or $19.99/yr subscription is rolled back. Competitive context (Unhook 800k installs free, UnTrap $5.99/mo for AI not blocking, DF Tube paid clone failed publicly, 0.8% conversion benchmark, CleanFeed at 58 installs) made subscription wrong for this product at this scale. v1.4.22 returns to the v1.4.20-era $4.99 one-time lifetime model, with all v1.4.21 plumbing kept in place as future-proofing scaffolding.
 - **EXTPAY DASHBOARD STATE.** Manual prerequisite (already done by the maintainer): ExtPay's plan dashboard now has ONE plan — **$4.99 USD, Once - Lifetime, URL-friendly name `lifetime`**. The previous `monthly` and `annual` nicknames are DELETED from ExtPay. Calling `extpay.openPaymentPage("monthly")` or `("annual")` at this point would 404; the v1.4.22 background handler coerces all incoming plan values to `lifetime` for that reason (with a console.warn so a stale popup state can be traced).

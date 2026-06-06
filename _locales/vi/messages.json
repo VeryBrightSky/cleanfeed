@@ -1,0 +1,26 @@
+{
+
+  "extName": { "message": "CleanFeed – Chặn YouTube Shorts, Feed & Đề xuất | Focus Lock" },
+  "extDescription": { "message": "Ẩn yếu tố gây xao nhãng trên YouTube. Miễn phí: 2 bộ chặn. Pro: cả 17 + Focus Lock + Pomodoro. $4.99 trả một lần. Vĩnh viễn." },
+
+  "ytMusicPausedTitle":  { "message": "CleanFeed đang tạm dừng trên YouTube Music" },
+  "ytMusicPausedDesc":   { "message": "Không áp dụng bộ chặn, huy hiệu hay theo dõi thời gian ở đây — đây là ứng dụng nghe nhạc, không phải feed." },
+
+  "redirectHomeLabel":   { "message": "Mở YouTube ở trang Đăng ký" },
+  "redirectHomeDesc":    { "message": "Tự chuyển hướng youtube.com sang /feed/subscriptions. Không ảnh hưởng /watch, /results, /shorts, v.v." },
+
+  "modeHide":            { "message": "Ẩn" },
+  "modeBlur":            { "message": "Làm mờ" },
+  "modeDim":             { "message": "Làm tối" },
+
+  "blockerSubsMostRelevantLabel": { "message": "Ẩn gợi ý 'Phù hợp nhất'" },
+  "blockerSubsMostRelevantDesc":  { "message": "Trên /feed/subscriptions, xóa phần chèn 'Phù hợp nhất' theo thuật toán" },
+  "blockerSubsMembersOnlyLabel":  { "message": "Ẩn video chỉ dành cho thành viên" },
+  "blockerSubsMembersOnlyDesc":   { "message": "Ẩn video đăng ký có huy hiệu 'chỉ dành cho thành viên'" },
+  "blockerSubsWatchedLabel":      { "message": "Ẩn video đã xem (tiến độ > 95%)" },
+  "blockerSubsWatchedDesc":       { "message": "Trên /feed/subscriptions, ẩn video có thanh tiến độ vượt 95%" },
+
+  "upsellTitle":         { "message": "Mở khóa cả 17 bộ chặn + Focus Lock" },
+  "upsellBody":          { "message": "Pro mở khóa cả 17 bộ chặn, chặn theo từ khóa, Pomodoro Focus Lock, quy tắc theo trang, danh sách cho phép/chặn kênh và CSS tùy chỉnh. Thanh toán một lần." },
+  "upsellAllBlockers":   { "message": "Cả 17 bộ chặn — thanh bên, bình luận, hình thu nhỏ, mix và nhiều hơn" }
+}

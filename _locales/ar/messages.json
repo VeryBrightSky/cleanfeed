@@ -1,0 +1,26 @@
+{
+
+  "extName": { "message": "CleanFeed – حجب يوتيوب شورتس وموجز التوصيات | Focus Lock" },
+  "extDescription": { "message": "أخفِ مشتتات يوتيوب. مجاني: حاجبان. Pro: كل الـ17 + Focus Lock + Pomodoro. $4.99 مرة واحدة. للأبد. بدون اشتراك." },
+
+  "ytMusicPausedTitle":  { "message": "CleanFeed متوقف على YouTube Music" },
+  "ytMusicPausedDesc":   { "message": "هنا لا نطبّق الحواجب أو الشارات أو تتبّع الوقت — هذا تطبيق موسيقى، وليس موجزًا." },
+
+  "redirectHomeLabel":   { "message": "افتح يوتيوب على صفحة الاشتراكات" },
+  "redirectHomeDesc":    { "message": "إعادة توجيه تلقائية من youtube.com إلى /feed/subscriptions. لا يمس /watch أو /results أو /shorts وغيرها." },
+
+  "modeHide":            { "message": "إخفاء" },
+  "modeBlur":            { "message": "تمويه" },
+  "modeDim":             { "message": "تعتيم" },
+
+  "blockerSubsMostRelevantLabel": { "message": "إخفاء اقتراحات 'الأكثر صلة'" },
+  "blockerSubsMostRelevantDesc":  { "message": "في /feed/subscriptions يزيل القسم الخوارزمي 'الأكثر صلة'" },
+  "blockerSubsMembersOnlyLabel":  { "message": "إخفاء فيديوهات الأعضاء فقط" },
+  "blockerSubsMembersOnlyDesc":   { "message": "يخفي فيديوهات الاشتراك ذات شارة 'للأعضاء فقط'" },
+  "blockerSubsWatchedLabel":      { "message": "إخفاء ما تمت مشاهدته (التقدّم > 95%)" },
+  "blockerSubsWatchedDesc":       { "message": "في /feed/subscriptions يخفي الفيديوهات التي تجاوز شريط تقدّمها 95%" },
+
+  "upsellTitle":         { "message": "افتح كل الحواجب الـ17 + Focus Lock" },
+  "upsellBody":          { "message": "Pro يفتح كل الحواجب الـ17، وحجب الكلمات المفتاحية، Pomodoro Focus Lock، قواعد حسب الصفحة، قوائم القنوات البيضاء/السوداء، وCSS مخصّص. دفعة واحدة." },
+  "upsellAllBlockers":   { "message": "كل الحواجب الـ17 — الشريط الجانبي، التعليقات، الصور المصغّرة، قوائم المزج وأكثر" }
+}

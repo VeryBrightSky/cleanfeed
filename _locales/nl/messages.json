@@ -1,0 +1,26 @@
+{
+
+  "extName": { "message": "CleanFeed – Blokkeer YouTube Shorts, Feed & Aanbevelingen | Focus Lock" },
+  "extDescription": { "message": "Verberg YouTube-afleiding. Gratis: 2 blokkers. Pro: alle 17 + Focus Lock + Pomodoro. $4.99 eenmalig. Voor altijd. Geen abonnement." },
+
+  "ytMusicPausedTitle":  { "message": "CleanFeed is gepauzeerd op YouTube Music" },
+  "ytMusicPausedDesc":   { "message": "Hier passen we geen blokkers, badges of tijdmetingen toe — het is een muziekapp, geen feed." },
+
+  "redirectHomeLabel":   { "message": "Open YouTube op Abonnementen" },
+  "redirectHomeDesc":    { "message": "Stuur youtube.com automatisch door naar /feed/subscriptions. Raakt /watch, /results, /shorts enz. niet aan." },
+
+  "modeHide":            { "message": "Verbergen" },
+  "modeBlur":            { "message": "Vervagen" },
+  "modeDim":             { "message": "Dempen" },
+
+  "blockerSubsMostRelevantLabel": { "message": "Verberg 'Meest relevant'-suggesties" },
+  "blockerSubsMostRelevantDesc":  { "message": "Verwijdert de algoritmische 'Meest relevant'-invoeging op /feed/subscriptions" },
+  "blockerSubsMembersOnlyLabel":  { "message": "Verberg leden-exclusieve video's" },
+  "blockerSubsMembersOnlyDesc":   { "message": "Verbergt abonnementsvideo's met een 'alleen voor leden'-badge" },
+  "blockerSubsWatchedLabel":      { "message": "Verberg al bekeken video's (voortgang > 95%)" },
+  "blockerSubsWatchedDesc":       { "message": "Verbergt op /feed/subscriptions video's waarvan de voortgangsbalk voorbij 95% is" },
+
+  "upsellTitle":         { "message": "Ontgrendel alle 17 blokkers + Focus Lock" },
+  "upsellBody":          { "message": "Pro ontgrendelt alle 17 blokkers, trefwoordblokkering, Pomodoro Focus Lock, regels per pagina, kanaal-whitelist + blocklist en aangepaste CSS. Eenmalige betaling." },
+  "upsellAllBlockers":   { "message": "Alle 17 blokkers — zijbalk, reacties, miniaturen, mixen en meer" }
+}
