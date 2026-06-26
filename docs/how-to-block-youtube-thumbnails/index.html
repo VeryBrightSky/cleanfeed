@@ -3,17 +3,17 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>How to Hide YouTube Thumbnails (2026 Guide)</title>
-  <meta name="description" content="Hide YouTube thumbnails to kill clickbait and impulse clicks. A manual Stylus/CSS userstyle method (with snippet) plus the best extensions — CleanFeed, Unhook, DF Tube." />
+  <title>How to Hide YouTube Thumbnails: Complete 2026 Guide</title>
+  <meta name="description" content="How to hide YouTube thumbnails in 2026 to curb clickbait clicks: a custom CSS userstyle and extensions like CleanFeed with a built-in thumbnail toggle." />
   <meta name="theme-color" content="#0f1722" />
   <meta property="og:type" content="article" />
-  <meta property="og:title" content="How to Hide YouTube Thumbnails (2026 Guide)" />
-  <meta property="og:description" content="Why hiding clickbait thumbnails cuts impulse clicks, plus a manual CSS userstyle and the extensions that hide thumbnails site-wide — honest, step by step." />
+  <meta property="og:title" content="How to Hide YouTube Thumbnails: Complete 2026 Guide" />
+  <meta property="og:description" content="How to hide YouTube thumbnails in 2026 to curb clickbait clicks: a custom CSS userstyle and extensions like CleanFeed with a built-in thumbnail toggle." />
   <meta property="og:image" content="https://verybrightsky.github.io/cleanfeed/icon-128.png" />
   <meta property="og:url" content="https://verybrightsky.github.io/cleanfeed/how-to-block-youtube-thumbnails/" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="How to Hide YouTube Thumbnails (2026 Guide)" />
-  <meta name="twitter:description" content="Why hiding clickbait thumbnails cuts impulse clicks, plus a manual CSS userstyle and the extensions that hide thumbnails site-wide — honest, step by step." />
+  <meta name="twitter:title" content="How to Hide YouTube Thumbnails: Complete 2026 Guide" />
+  <meta name="twitter:description" content="How to hide YouTube thumbnails in 2026 to curb clickbait clicks: a custom CSS userstyle and extensions like CleanFeed with a built-in thumbnail toggle." />
   <link rel="canonical" href="https://verybrightsky.github.io/cleanfeed/how-to-block-youtube-thumbnails/" />
   <link rel="icon" href="../icon-128.png" type="image/png" />
   <link rel="stylesheet" href="../css/shared.css" />
@@ -21,6 +21,45 @@
     pre.code{background:#0b121b;border:1px solid var(--border);border-radius:12px;padding:16px 18px;overflow-x:auto;font-size:13px;line-height:1.55;margin:8px 0 20px;}
     pre.code code{color:#cfe3ea;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
   </style>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "HowTo",
+  "name": "How to Hide YouTube Thumbnails: Complete 2026 Guide",
+  "description": "How to hide YouTube thumbnails in 2026 to curb clickbait clicks: a custom CSS userstyle and extensions like CleanFeed with a built-in thumbnail toggle.",
+  "totalTime": "PT10M",
+  "step": [
+    {
+      "@type": "HowToStep",
+      "position": 1,
+      "name": "Install Stylus",
+      "text": "Add Stylus from the Chrome Web Store (or Firefox Add-ons). It's a userstyle manager — it does nothing on its own until you write or import a style. It's lightweight and widely trusted, and unlike a full YouTube extension it only does what your CSS tells it to.",
+      "url": "https://verybrightsky.github.io/cleanfeed/how-to-block-youtube-thumbnails/#step1"
+    },
+    {
+      "@type": "HowToStep",
+      "position": 2,
+      "name": "Create a new style scoped to YouTube",
+      "text": "Click the Stylus icon, choose \"Manage,\" then \"Write new style.\" Give it a name like \"Hide YouTube Thumbnails.\" In the \"Applies to\" section, set it to apply to the URL youtube.com so your CSS only runs on YouTube and nowhere else.",
+      "url": "https://verybrightsky.github.io/cleanfeed/how-to-block-youtube-thumbnails/#step2"
+    },
+    {
+      "@type": "HowToStep",
+      "position": 3,
+      "name": "Paste a thumbnail-hiding rule",
+      "text": "Drop in a starting snippet like the one below. It targets the image containers used in feed items and either hides them or collapses them to a thin neutral bar so the layout doesn't collapse awkwardly:",
+      "url": "https://verybrightsky.github.io/cleanfeed/how-to-block-youtube-thumbnails/#step3"
+    },
+    {
+      "@type": "HowToStep",
+      "position": 4,
+      "name": "Tune it for the pages you use",
+      "text": "You'll quickly notice the rule doesn't catch everything. Search results, the watch-page sidebar, channel pages, and Shorts shelves each use slightly different markup, so you'll need to add more selectors as you spot thumbnails that slip through. This is the fiddly part: it's trial and error with you",
+      "url": "https://verybrightsky.github.io/cleanfeed/how-to-block-youtube-thumbnails/#step4"
+    }
+  ]
+}
+  </script>
 </head>
 <body>
   <nav class="nav">
@@ -45,6 +84,8 @@
     <article class="prose">
       <!-- BODY START -->
       <p>Thumbnails are the single most engineered part of YouTube. A title is just words, but a thumbnail is a designed object: the shocked face, the red arrow, the circled detail, the "you won't believe" composition. Creators A/B-test them obsessively because the thumbnail is what converts a passing glance into a click. That's exactly why hiding them is one of the most underrated ways to make YouTube less compulsive — and almost nobody talks about it, because there is no native setting for it.</p>
+
+      <div class="callout"><strong>Full disclosure:</strong> I'm Daniel — I built CleanFeed, one of the tools mentioned below. I've kept this guide honest and tool-agnostic, including the free manual methods and rival extensions. None of the links are affiliate links.</div>
 
       <p>This guide covers every working method in 2026. We'll start with the honest truth — YouTube gives you no toggle for this — then walk through a manual userstyle approach using Stylus and CSS (with a snippet you can paste in), and finally the browser extensions that hide thumbnails properly across the whole site. I built one of those extensions, so I'll flag my bias and tell you plainly where the free options are the smarter pick.</p>
 
@@ -140,10 +181,10 @@ yt-thumbnail-view-model {
       <p>For many people, yes. Greyscale-and-dim keeps the page layout intact and still removes the color-and-contrast pull that drives impulse clicks, while leaving a faint visual anchor. Fully removing thumbnails is more drastic and turns the feed into a pure text list. Try both — CleanFeed lets you grey or hide, and the CSS snippet above includes a greyscale variant you can uncomment.</p>
 
       <h3>Does hiding thumbnails work on the YouTube mobile app?</h3>
-      <p>No. Browser extensions and Stylus userstyles run only in desktop browsers, and the official mobile app doesn't support them. On a phone your best options are using a browser that supports extensions to visit the YouTube website, or relying on broader habits like browsing the Subscriptions tab. There's no thumbnail toggle inside the native app.</p>
+      <p>No. Extensions and Stylus userstyles run only in desktop browsers; the official mobile app doesn't support them. On a phone, your best option is a browser that supports extensions, or broader habits like living in the Subscriptions tab.</p>
 
       <h3>Is it safe to install Stylus or these extensions?</h3>
-      <p>Stylus is open source and widely used, and it only does what your CSS instructs. Among the blockers, Unhook and CleanFeed are open source so you can read exactly what they do, and CleanFeed runs entirely on your device with no account, no telemetry, and no data leaving your browser. As always, install from the official Chrome Web Store and review the permissions before adding anything.</p>
+      <p>Stylus is open source and widely used, and it only does what your CSS instructs. Unhook and CleanFeed are open source too, so you can read exactly what they do. As always, install from the official Chrome Web Store and review the permissions first.</p>
       <!-- BODY END -->
     </article>
 

@@ -4,19 +4,65 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>How to Block YouTube End Screens & Suggested Videos (2026)</title>
-  <meta name="description" content="Remove YouTube end screens and the suggested-video wall that hijacks the final 20 seconds. Honest manual workarounds plus the best extensions — Unhook, CleanFeed, DF Tube." />
+  <meta name="description" content="How to block YouTube end screens and suggested-video overlays in 2026 using extensions like Unhook and CleanFeed, plus honest manual workarounds." />
   <meta name="theme-color" content="#0f1722" />
   <meta property="og:type" content="article" />
   <meta property="og:title" content="How to Block YouTube End Screens & Suggested Videos (2026)" />
-  <meta property="og:description" content="The end-card overlay in the last 20 seconds, explained — plus every working way to remove it: manual tricks and the extensions worth installing." />
+  <meta property="og:description" content="How to block YouTube end screens and suggested-video overlays in 2026 using extensions like Unhook and CleanFeed, plus honest manual workarounds." />
   <meta property="og:image" content="https://verybrightsky.github.io/cleanfeed/icon-128.png" />
   <meta property="og:url" content="https://verybrightsky.github.io/cleanfeed/how-to-block-youtube-end-screens/" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="How to Block YouTube End Screens & Suggested Videos (2026)" />
-  <meta name="twitter:description" content="The end-card overlay in the last 20 seconds, explained — plus every working way to remove it: manual tricks and the extensions worth installing." />
+  <meta name="twitter:description" content="How to block YouTube end screens and suggested-video overlays in 2026 using extensions like Unhook and CleanFeed, plus honest manual workarounds." />
   <link rel="canonical" href="https://verybrightsky.github.io/cleanfeed/how-to-block-youtube-end-screens/" />
   <link rel="icon" href="../icon-128.png" type="image/png" />
   <link rel="stylesheet" href="../css/shared.css" />
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "HowTo",
+  "name": "How to Block YouTube End Screens & Suggested Videos (2026)",
+  "description": "How to block YouTube end screens and suggested-video overlays in 2026 using extensions like Unhook and CleanFeed, plus honest manual workarounds.",
+  "totalTime": "PT10M",
+  "step": [
+    {
+      "@type": "HowToStep",
+      "position": 1,
+      "name": "Stop the video a few seconds early",
+      "text": "End screens only appear in the final stretch, so pause or close the tab before they load. When the video is clearly wrapping up — \"thanks for watching,\" the music swells, the progress bar near the end — hit pause and the end cards never render. The downside is you have to babysit the timeline and yo",
+      "url": "https://verybrightsky.github.io/cleanfeed/how-to-block-youtube-end-screens/#step1"
+    },
+    {
+      "@type": "HowToStep",
+      "position": 2,
+      "name": "Use theater mode or fullscreen and look away",
+      "text": "Switching to theater mode (the rectangle icon in the player bar) or fullscreen doesn't remove the end screen, but it changes how it sits. In fullscreen, the suggested-video grid still appears when the video ends — but pressing Esc or clicking back drops you out before you start clicking tiles. Some ",
+      "url": "https://verybrightsky.github.io/cleanfeed/how-to-block-youtube-end-screens/#step2"
+    },
+    {
+      "@type": "HowToStep",
+      "position": 3,
+      "name": "Click into empty space, not the tiles",
+      "text": "When the overlay appears, clicking the video frame anywhere that isn't a tile pauses or replays the video rather than sending you elsewhere. So aim for the dead space, or press the spacebar to pause, and you stay on the current page. It does nothing to hide the overlay — the tiles are still there — ",
+      "url": "https://verybrightsky.github.io/cleanfeed/how-to-block-youtube-end-screens/#step3"
+    },
+    {
+      "@type": "HowToStep",
+      "position": 4,
+      "name": "Turn off autoplay so you don't get launched into the next video",
+      "text": "Autoplay and end screens are separate features that compound each other: with autoplay on, the end screen appears and a countdown pulls you into \"Up next.\" Toggle autoplay off (the slider at the top of the sidebar) and you won't be carried automatically into another video while the end cards show. Y",
+      "url": "https://verybrightsky.github.io/cleanfeed/how-to-block-youtube-end-screens/#step4"
+    },
+    {
+      "@type": "HowToStep",
+      "position": 5,
+      "name": "Try a custom content-blocker filter (fragile)",
+      "text": "If you already run uBlock Origin or a similar content blocker, you can write a cosmetic filter to hide the end-screen elements — they live in DOM nodes with class names like ytp-ce-element and ytp-endscreen-content . A rule to hide those can wipe the overlay. The catch is that it's brittle: every ti",
+      "url": "https://verybrightsky.github.io/cleanfeed/how-to-block-youtube-end-screens/#step5"
+    }
+  ]
+}
+  </script>
 </head>
 <body>
   <nav class="nav">
@@ -41,6 +87,8 @@
     <article class="prose">
       <!-- BODY START -->
       <p>You finish watching a video, and just as it ends — sometimes before the speaker has stopped talking — the screen fills with floating thumbnails of other videos. Two big rectangles, maybe a circular "subscribe" badge, sliding into view over the last few seconds. That's an end screen, and it's one of the most effective attention traps YouTube has. You came to watch one thing; now you're staring at a grid of four more, and your hand is already drifting toward the mouse.</p>
+
+      <div class="callout"><strong>Full disclosure:</strong> I'm Daniel — I built CleanFeed, one of the tools mentioned below. I've kept this guide honest and tool-agnostic, including the free manual methods and rival extensions. None of the links are affiliate links.</div>
 
       <p>This guide explains what end screens are, why YouTube gives you no real setting to turn them off, and every method that reduces or removes them in 2026. I'll start with the free manual workarounds — honestly, they are workarounds, not a true off switch — before moving to extensions that delete the overlay completely. I built one of those extensions, so read that section with appropriate skepticism; I recommend a free tool first for most people.</p>
 
