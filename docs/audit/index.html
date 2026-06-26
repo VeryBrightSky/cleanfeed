@@ -4,348 +4,25 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>YouTube Time Audit — How Much Time Has YouTube Stolen?</title>
-  <meta name="description" content="Calculate how many days of your life YouTube has quietly eaten. The number is uncomfortable. Try CleanFeed's free 30-second YouTube Time Audit." />
+  <meta name="description" content="A brutally honest, free 60-second YouTube Time Audit. Answer 7 questions, meet your archetype, and see how many days of your life YouTube has eaten." />
   <meta name="theme-color" content="#0f1722" />
 
   <!-- Open Graph / social cards -->
   <meta property="og:type" content="website" />
   <meta property="og:title" content="YouTube Time Audit — How Much Time Has YouTube Stolen?" />
-  <meta property="og:description" content="Calculate how many days of your life YouTube has quietly eaten. The number is uncomfortable. Try CleanFeed's free 30-second YouTube Time Audit." />
+  <meta property="og:description" content="A brutally honest, free 60-second YouTube Time Audit. Answer 7 questions, meet your archetype, and see how many days of your life YouTube has eaten." />
   <meta property="og:image" content="https://verybrightsky.github.io/cleanfeed/icon-128.png" />
   <meta property="og:url" content="https://verybrightsky.github.io/cleanfeed/audit/" />
 
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="YouTube Time Audit — How Much Time Has YouTube Stolen?" />
-  <meta name="twitter:description" content="Calculate how many days of your life YouTube has quietly eaten. The number is uncomfortable. Try CleanFeed's free 30-second YouTube Time Audit." />
+  <meta name="twitter:description" content="Answer 7 questions, meet your archetype, and see how many days of your life YouTube has eaten." />
   <meta name="twitter:image" content="https://verybrightsky.github.io/cleanfeed/icon-128.png" />
 
   <link rel="canonical" href="https://verybrightsky.github.io/cleanfeed/audit/" />
   <link rel="icon" href="../icon-128.png" type="image/png" />
+  <link rel="stylesheet" href="../css/shared.css" />
 
-  <style>
-    :root {
-      --bg:        #0f1722;
-      --bg-elev:   #15202e;
-      --bg-elev-2: #1c2a3a;
-      --border:    #233346;
-      --text:      #e6edf6;
-      --text-dim:  #93a0b3;
-      --text-faint:#5e6c7e;
-      --accent:    #3cc8c8;
-      --accent-2:  #6fffff;
-      --accent-glow: rgba(60, 200, 200, 0.20);
-      --gold:      #f2cf5f;
-      --warn:      #ff7a8a;
-      --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.40);
-      --shadow-lg: 0 22px 60px rgba(0, 0, 0, 0.55);
-      --grad-accent: linear-gradient(95deg, #3cc8c8 0%, #6fffff 100%);
-      --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 22px;
-      --ease: cubic-bezier(0.20, 0.80, 0.30, 1);
-    }
-    * { box-sizing: border-box; }
-    html, body {
-      margin: 0;
-      background:
-        radial-gradient(1100px 600px at 22% -10%, rgba(60, 200, 200, 0.10), transparent 60%),
-        radial-gradient(900px 600px at 90% 110%, rgba(242, 207, 95, 0.04), transparent 60%),
-        var(--bg);
-      color: var(--text);
-      font: 400 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI",
-            Roboto, "Helvetica Neue", Arial, sans-serif;
-      -webkit-font-smoothing: antialiased;
-      min-height: 100vh;
-    }
-    a { color: var(--accent); text-decoration: none; }
-    a:hover { text-decoration: underline; }
-
-    /* ---- nav (matches index.html) ---- */
-    .nav {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 24px 28px 0;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .nav img { width: 32px; height: 32px; border-radius: 8px; }
-    .nav-brand { font-weight: 700; letter-spacing: 0.2px; color: var(--text); }
-    .nav-brand:hover { text-decoration: none; }
-    .nav-spacer { flex: 1; }
-    .nav a {
-      color: var(--text-dim);
-      font-size: 14px;
-      padding: 8px 12px;
-      border-radius: var(--r-sm);
-      transition: color 150ms var(--ease), background 150ms var(--ease);
-    }
-    .nav a:hover { color: var(--text); background: var(--bg-elev); text-decoration: none; }
-
-    /* ---- header ---- */
-    .audit-hero {
-      max-width: 720px;
-      margin: 0 auto;
-      padding: 64px 28px 8px;
-      text-align: center;
-    }
-    .audit-hero h1 {
-      font-size: clamp(30px, 6vw, 52px);
-      line-height: 1.08;
-      margin: 0 0 16px;
-      letter-spacing: -1.2px;
-      background: linear-gradient(120deg, #f6f9ff 0%, #b9d3da 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .audit-hero p.sub {
-      max-width: 520px;
-      margin: 0 auto;
-      font-size: 18px;
-      color: var(--text-dim);
-    }
-
-    /* ---- calculator card ---- */
-    .calc {
-      max-width: 600px;
-      margin: 36px auto 0;
-      padding: 32px 30px 30px;
-      background: var(--bg-elev);
-      border: 1px solid var(--border);
-      border-radius: var(--r-xl);
-      box-shadow: var(--shadow-md);
-    }
-    .field { margin-bottom: 26px; }
-    .field:last-of-type { margin-bottom: 30px; }
-    .field-top {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      margin-bottom: 12px;
-      gap: 12px;
-    }
-    .field-label { font-size: 15px; color: var(--text); font-weight: 500; }
-    .field-value {
-      font-size: 20px;
-      font-weight: 700;
-      letter-spacing: -0.4px;
-      color: var(--accent);
-      font-variant-numeric: tabular-nums;
-      white-space: nowrap;
-    }
-
-    /* ---- custom range slider (teal fill, dark navy track) ---- */
-    input[type="range"] {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 100%;
-      height: 8px;
-      border-radius: 999px;
-      background: var(--bg-elev-2); /* JS overwrites with teal-fill gradient */
-      outline: none;
-      cursor: pointer;
-      margin: 0;
-    }
-    input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 22px; height: 22px;
-      border-radius: 50%;
-      background: #eafffe;
-      border: 3px solid var(--accent);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.45), 0 0 0 4px rgba(60,200,200,0.18);
-      transition: transform 90ms var(--ease);
-    }
-    input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.12); }
-    input[type="range"]::-moz-range-thumb {
-      width: 22px; height: 22px;
-      border-radius: 50%;
-      background: #eafffe;
-      border: 3px solid var(--accent);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.45), 0 0 0 4px rgba(60,200,200,0.18);
-    }
-    input[type="range"]::-moz-range-track {
-      height: 8px; border-radius: 999px; background: transparent;
-    }
-    input[type="range"]:focus-visible::-webkit-slider-thumb {
-      box-shadow: 0 0 0 4px rgba(60,200,200,0.45);
-    }
-
-    .calc-btn {
-      width: 100%;
-      padding: 16px 22px;
-      border: none;
-      border-radius: var(--r-md);
-      background: var(--grad-accent);
-      color: #0b1828;
-      font: inherit;
-      font-weight: 700;
-      font-size: 16px;
-      cursor: pointer;
-      box-shadow: 0 8px 24px rgba(60, 200, 200, 0.30);
-      transition: transform 100ms var(--ease), filter 150ms var(--ease), box-shadow 150ms var(--ease);
-    }
-    .calc-btn:hover { filter: brightness(1.06); transform: translateY(-2px); box-shadow: 0 12px 32px rgba(60, 200, 200, 0.45); }
-    .calc-btn:active { transform: translateY(0); }
-
-    /* ---- results ---- */
-    .results {
-      max-width: 600px;
-      margin: 28px auto 0;
-      text-align: center;
-      display: none;
-    }
-    .results.show {
-      display: block;
-      animation: riseIn 620ms var(--ease) both;
-    }
-    @keyframes riseIn {
-      from { opacity: 0; transform: translateY(26px) scale(0.965); }
-      to   { opacity: 1; transform: translateY(0) scale(1); }
-    }
-    .big-number {
-      font-size: 96px;
-      line-height: 1;
-      font-weight: 800;
-      letter-spacing: -3px;
-      color: var(--warn);
-      font-variant-numeric: tabular-nums;
-      margin: 8px 0 6px;
-    }
-    .big-caption {
-      font-size: 18px;
-      color: var(--text-dim);
-      margin: 0 auto 20px;
-      max-width: 440px;
-    }
-    .future-line {
-      font-size: 19px;
-      font-weight: 600;
-      color: var(--gold);
-      margin: 0 auto 28px;
-    }
-    .compare-block {
-      background: var(--bg-elev);
-      border: 1px solid var(--border);
-      border-radius: var(--r-lg);
-      padding: 22px 24px;
-      box-shadow: var(--shadow-md);
-      text-align: left;
-      margin-bottom: 22px;
-    }
-    .compare-block h2 {
-      margin: 0 0 14px;
-      font-size: 16px;
-      color: var(--text);
-      font-weight: 600;
-      text-align: center;
-    }
-    .compare-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 10px 0;
-      border-bottom: 1px solid var(--border);
-      font-size: 15.5px;
-      color: var(--text-dim);
-    }
-    .compare-row:last-child { border-bottom: none; }
-    .compare-row .em { font-size: 20px; flex: 0 0 auto; }
-    .compare-row b { color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; }
-    .disclosure {
-      font-size: 12px;
-      color: var(--text-faint);
-      max-width: 460px;
-      margin: 0 auto 26px;
-      line-height: 1.5;
-    }
-    .result-ctas {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      justify-content: center;
-    }
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 15px 24px;
-      font: inherit;
-      font-weight: 600;
-      font-size: 15px;
-      color: var(--text);
-      background: var(--bg-elev);
-      border: 1px solid var(--border);
-      border-radius: var(--r-md);
-      cursor: pointer;
-      transition: transform 100ms var(--ease), background 150ms var(--ease),
-                  box-shadow 150ms var(--ease), filter 150ms var(--ease);
-      text-decoration: none;
-    }
-    .btn:hover { transform: translateY(-2px); background: var(--bg-elev-2); text-decoration: none; }
-    .btn-primary {
-      background: var(--grad-accent);
-      color: #0b1828;
-      border: none;
-      box-shadow: 0 8px 24px rgba(60, 200, 200, 0.30);
-    }
-    .btn-primary:hover { filter: brightness(1.06); box-shadow: 0 12px 32px rgba(60, 200, 200, 0.45); }
-    .btn-outline {
-      background: transparent;
-      border: 1px solid var(--accent);
-      color: var(--accent);
-    }
-    .btn-outline:hover { background: var(--accent-glow); color: var(--accent); }
-
-    /* ---- toast ---- */
-    .toast {
-      position: fixed;
-      left: 50%;
-      bottom: 28px;
-      transform: translateX(-50%) translateY(20px);
-      background: var(--bg-elev-2);
-      border: 1px solid var(--accent);
-      color: var(--text);
-      padding: 11px 18px;
-      border-radius: 999px;
-      font-size: 14px;
-      box-shadow: var(--shadow-md);
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 200ms var(--ease), transform 200ms var(--ease);
-      z-index: 50;
-    }
-    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-    /* ---- footer (matches index.html) ---- */
-    footer {
-      border-top: 1px solid var(--border);
-      padding: 28px;
-      text-align: center;
-      color: var(--text-faint);
-      font-size: 13px;
-      margin-top: 72px;
-    }
-    footer a { color: var(--text-dim); }
-    footer .row {
-      max-width: 1100px;
-      margin: 0 auto;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-
-    /* ---- mobile ---- */
-    @media (max-width: 760px) {
-      .nav { padding: 16px; }
-      .audit-hero { padding: 44px 22px 4px; }
-      .calc { padding: 26px 20px 24px; margin-top: 28px; }
-      .big-number { font-size: 64px; letter-spacing: -2px; }
-      .result-ctas .btn { width: 100%; justify-content: center; }
-      footer .row { flex-direction: column; text-align: center; }
-    }
-  </style>
   <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -355,19 +32,160 @@
   "applicationCategory": "UtilityApplication",
   "operatingSystem": "Any (web browser)",
   "browserRequirements": "Requires JavaScript",
-  "description": "Calculate how many days of your life YouTube has quietly eaten. The number is uncomfortable. Try CleanFeed's free 30-second YouTube Time Audit.",
-  "offers": {
-    "@type": "Offer",
-    "price": "0",
-    "priceCurrency": "USD"
-  },
-  "publisher": {
-    "@type": "Organization",
-    "name": "CleanFeed",
-    "url": "https://verybrightsky.github.io/cleanfeed/"
-  }
+  "description": "A free 7-question audit that estimates how many days of your life YouTube has consumed and assigns you a viewing archetype.",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "publisher": { "@type": "Organization", "name": "CleanFeed", "url": "https://verybrightsky.github.io/cleanfeed/" }
 }
   </script>
+
+  <style>
+    .audit-wrap { max-width: 680px; margin: 0 auto; padding: 28px 22px 90px; }
+
+    /* fade screens */
+    .screen { display: none; }
+    .screen.active { display: block; animation: fadeUp 0.45s var(--ease) both; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+
+    /* ---- landing ---- */
+    .landing { text-align: center; padding-top: 24px; }
+    .landing h1 {
+      font-size: clamp(30px, 6.4vw, 54px);
+      line-height: 1.07;
+      margin: 0 0 18px;
+      letter-spacing: -1.2px;
+      background: linear-gradient(120deg, #f6f9ff 0%, #b9d3da 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .landing .sub { font-size: clamp(16px, 3.6vw, 19px); color: var(--text-dim); max-width: 520px; margin: 0 auto 32px; }
+    .big-cta {
+      display: inline-block; width: 100%; max-width: 360px;
+      padding: 18px 24px; font-size: 18px; font-weight: 700;
+      border: none; border-radius: var(--r-md); cursor: pointer;
+      background: var(--grad-accent); color: #0b1828;
+      box-shadow: 0 8px 24px rgba(60,200,200,0.30);
+      transition: transform 100ms var(--ease), filter 150ms var(--ease), box-shadow 150ms var(--ease);
+    }
+    .big-cta:hover { filter: brightness(1.06); transform: translateY(-2px); box-shadow: 0 12px 32px rgba(60,200,200,0.45); }
+    .big-cta:active { transform: translateY(0); }
+    .cta-fine { margin: 16px auto 0; font-size: 13px; color: var(--text-faint); }
+    .cta-trust { margin: 28px auto 0; font-size: 13px; color: var(--text-dim); }
+
+    /* ---- progress ---- */
+    .progress { margin-bottom: 30px; }
+    .progress-track { height: 6px; background: var(--bg-elev-2); border-radius: 999px; overflow: hidden; }
+    .progress-fill { height: 100%; width: 0; background: var(--grad-accent); border-radius: 999px; transition: width 0.4s var(--ease); }
+    .progress-label { margin-top: 9px; font-size: 13px; color: var(--text-dim); letter-spacing: 0.02em; }
+
+    /* ---- question ---- */
+    .q { display: none; }
+    .q.active { display: block; animation: fadeUp 0.4s var(--ease) both; }
+    .q h2 { font-size: clamp(22px, 5vw, 31px); line-height: 1.18; margin: 0 0 26px; letter-spacing: -0.4px; }
+
+    .slider-val { font-size: 30px; font-weight: 800; color: var(--accent); letter-spacing: -0.6px; margin-bottom: 16px; font-variant-numeric: tabular-nums; }
+
+    input[type="range"] {
+      -webkit-appearance: none; appearance: none; width: 100%; height: 8px;
+      border-radius: 999px; background: var(--bg-elev-2); outline: none; cursor: pointer; margin: 0;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none; width: 26px; height: 26px; border-radius: 50%;
+      background: #eafffe; border: 3px solid var(--accent);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.45), 0 0 0 4px rgba(60,200,200,0.18);
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 26px; height: 26px; border-radius: 50%; background: #eafffe; border: 3px solid var(--accent);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.45), 0 0 0 4px rgba(60,200,200,0.18);
+    }
+
+    .opts { display: grid; gap: 12px; }
+    .opt {
+      display: block; width: 100%; text-align: left; padding: 17px 18px;
+      background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-md);
+      color: var(--text); font: inherit; font-size: 16px; cursor: pointer; line-height: 1.4;
+      transition: border-color 130ms var(--ease), background 130ms var(--ease), transform 90ms var(--ease);
+    }
+    .opt:hover { border-color: var(--accent); background: var(--bg-elev-2); }
+    .opt:active { transform: scale(0.99); }
+    .opt.selected { border-color: var(--accent); background: var(--accent-glow); }
+
+    textarea#q7 {
+      width: 100%; min-height: 96px; padding: 14px 16px; resize: vertical;
+      background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-md);
+      color: var(--text); font: inherit; font-size: 16px; line-height: 1.5;
+    }
+    textarea#q7:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(60,200,200,0.22); }
+
+    .q-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 28px; }
+    .back-btn { background: none; border: none; color: var(--text-dim); font: inherit; font-size: 15px; cursor: pointer; padding: 8px 4px; }
+    .back-btn:hover { color: var(--text); }
+    .q .btn-primary { padding: 14px 26px; }
+
+    /* ---- loading ---- */
+    .loading { text-align: center; padding: 80px 0; }
+    .spinner {
+      width: 54px; height: 54px; margin: 0 auto 24px; border-radius: 50%;
+      border: 4px solid var(--bg-elev-2); border-top-color: var(--accent);
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading p { color: var(--text-dim); font-size: 18px; }
+
+    /* ---- result ---- */
+    .result-section { margin: 0 0 40px; }
+    .archetype-eyebrow { font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+    .archetype-tag {
+      font-size: clamp(34px, 8.5vw, 64px); font-weight: 800; line-height: 1.04;
+      letter-spacing: -1.2px; margin: 0 0 16px;
+    }
+    .archetype-diag { font-size: clamp(16px, 3.8vw, 19px); color: var(--text-dim); line-height: 1.6; }
+
+    .num-block { margin: 0 0 30px; }
+    .big-number { font-size: clamp(64px, 15vw, 104px); font-weight: 800; line-height: 1; letter-spacing: -3px; font-variant-numeric: tabular-nums; }
+    .big-number.warn { color: var(--warn); }
+    .big-number.gold { color: var(--gold); }
+    .num-cap { font-size: clamp(15px, 3.6vw, 17px); color: var(--text-dim); margin: 12px 0 0; line-height: 1.55; max-width: 540px; }
+
+    .receipts { display: grid; gap: 12px; margin: 0 0 40px; }
+    .receipt {
+      display: flex; align-items: center; gap: 14px; padding: 16px 18px;
+      background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-md); font-size: 16px;
+    }
+    .receipt .em { font-size: 22px; flex: 0 0 auto; }
+    .receipt b { color: var(--accent); font-variant-numeric: tabular-nums; }
+
+    /* quotable card */
+    .quote-card {
+      position: relative; border: 1px solid var(--accent); border-radius: var(--r-lg);
+      background: linear-gradient(160deg, rgba(60,200,200,0.09), var(--bg-elev) 82%);
+      padding: 30px 28px 46px; margin: 0 0 40px; box-shadow: var(--shadow-md);
+    }
+    .quote-card .ql { font-size: clamp(19px, 4.6vw, 25px); font-weight: 700; line-height: 1.4; letter-spacing: -0.4px; }
+    .quote-card .ql .hl { color: var(--warn); }
+    .quote-card .ql .hlg { color: var(--gold); }
+    .quote-card .q7line { margin-top: 16px; font-size: clamp(15px, 3.6vw, 17px); color: var(--text-dim); font-style: italic; line-height: 1.5; }
+    .quote-card .brand { position: absolute; right: 18px; bottom: 14px; font-size: 12px; color: var(--text-faint); }
+    .quote-card .brand b { color: var(--accent); font-weight: 700; }
+
+    .whatnow h3 { font-size: 22px; margin: 0 0 14px; letter-spacing: -0.3px; }
+    .whatnow p { color: var(--text-dim); font-size: 16px; line-height: 1.65; margin: 0 0 14px; }
+    .whatnow p strong { color: var(--text); }
+
+    .result-ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
+    .result-ctas .btn { flex: 1 1 220px; justify-content: center; }
+
+    /* toast */
+    .toast {
+      position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px);
+      background: var(--bg-elev-2); border: 1px solid var(--accent); color: var(--text);
+      padding: 12px 20px; border-radius: 999px; font-size: 14px; box-shadow: var(--shadow-md);
+      opacity: 0; pointer-events: none; transition: opacity 200ms var(--ease), transform 200ms var(--ease); z-index: 60; text-align: center;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    @media (max-width: 600px) {
+      .result-ctas .btn { flex: 1 1 100%; }
+    }
+  </style>
 </head>
 <body>
   <nav class="nav">
@@ -380,76 +198,144 @@
     <a href="https://chromewebstore.google.com/detail/cleanfeed-%E2%80%93-block-youtube-shorts-feed/mghmfmjlaelbkellppfneocliomiclnn?utm_source=audit&utm_medium=nav">Install</a>
   </nav>
 
-  <header class="audit-hero">
-    <h1>How much of your life has YouTube actually stolen?</h1>
-    <p class="sub">Be honest. The math is uncomfortable.</p>
-  </header>
+  <main class="audit-wrap">
 
-  <main>
-    <section class="calc" aria-label="YouTube time audit calculator">
-      <div class="field">
-        <div class="field-top">
-          <label class="field-label" for="hours">Hours per day on YouTube</label>
-          <span class="field-value" id="hours-val">2.5 hrs</span>
-        </div>
-        <input type="range" id="hours" min="0" max="8" step="0.5" value="2.5"
-               aria-label="Hours per day on YouTube" />
-      </div>
-
-      <div class="field">
-        <div class="field-top">
-          <label class="field-label" for="years">Years you've been using it</label>
-          <span class="field-value" id="years-val">8 yrs</span>
-        </div>
-        <input type="range" id="years" min="1" max="20" step="1" value="8"
-               aria-label="Years you have been using YouTube" />
-      </div>
-
-      <div class="field">
-        <div class="field-top">
-          <label class="field-label" for="age">Your current age</label>
-          <span class="field-value" id="age-val">28</span>
-        </div>
-        <input type="range" id="age" min="13" max="80" step="1" value="28"
-               aria-label="Your current age" />
-      </div>
-
-      <button class="calc-btn" id="calc-btn" type="button">Show me the damage.</button>
+    <!-- STAGE 1 — LANDING -->
+    <section class="screen landing active" id="landing">
+      <h1>How much of your life has YouTube actually stolen?</h1>
+      <p class="sub">A 60-second audit. The math is uncomfortable. Most people don't make it to the end.</p>
+      <button class="big-cta" id="start-btn" type="button">Start the audit</button>
+      <p class="cta-fine">7 questions · No signup · No email · Your data never leaves this page</p>
+      <p class="cta-trust">Built by Daniel Lomonaco, creator of CleanFeed</p>
     </section>
 
-    <section class="results" id="results" aria-live="polite">
-      <div class="big-number" id="days-lost">0 days</div>
-      <p class="big-caption" id="months-caption">= 0 months of your waking life, already lost</p>
-      <p class="future-line" id="future-line">By 65 you'll lose another 0 years</p>
-
-      <div class="compare-block">
-        <h2>That's enough time to:</h2>
-        <div class="compare-row">
-          <span class="em">📚</span><span>Read <b id="books">0</b> books at 250 pages each</span>
-        </div>
-        <div class="compare-row">
-          <span class="em">🗣️</span><span>Learn <b id="languages">0</b> languages fluently</span>
-        </div>
-        <div class="compare-row">
-          <span class="em">🏃</span><span>Run <b id="miles">0</b> miles</span>
-        </div>
+    <!-- STAGE 2 — QUIZ -->
+    <section class="screen" id="quiz">
+      <div class="progress">
+        <div class="progress-track"><div class="progress-fill" id="prog-fill"></div></div>
+        <div class="progress-label" id="prog-label">Question 1 of 7</div>
       </div>
 
-      <p class="disclosure">Math assumes 16 waking hours/day. Lifespan target = 65 to keep the projection conservative.</p>
+      <div class="q" data-step="1">
+        <h2>How many hours per day do you spend on YouTube?</h2>
+        <div class="slider-val"><span id="v-hours">2.5</span> hrs/day</div>
+        <input type="range" id="s-hours" min="0" max="8" step="0.5" value="2.5" aria-label="Hours per day on YouTube" />
+        <div class="q-nav"><button class="back-btn" data-back type="button">← Back</button><button class="btn btn-primary" data-next type="button">Next →</button></div>
+      </div>
 
-      <div class="result-ctas">
-        <a class="btn btn-primary" id="install-btn"
-           href="https://chromewebstore.google.com/detail/cleanfeed-%E2%80%93-block-youtube-shorts-feed/mghmfmjlaelbkellppfneocliomiclnn?utm_source=audit&utm_medium=cta">
-          Stop the bleed — install CleanFeed
-        </a>
-        <button class="btn btn-outline" id="share-btn" type="button">Share my audit</button>
+      <div class="q" data-step="2">
+        <h2>How many years have you been a YouTube user?</h2>
+        <div class="slider-val"><span id="v-years">8</span> years</div>
+        <input type="range" id="s-years" min="1" max="20" step="1" value="8" aria-label="Years using YouTube" />
+        <div class="q-nav"><button class="back-btn" data-back type="button">← Back</button><button class="btn btn-primary" data-next type="button">Next →</button></div>
+      </div>
+
+      <div class="q" data-step="3">
+        <h2>How old are you?</h2>
+        <div class="slider-val"><span id="v-age">28</span></div>
+        <input type="range" id="s-age" min="13" max="80" step="1" value="28" aria-label="Your age" />
+        <div class="q-nav"><button class="back-btn" data-back type="button">← Back</button><button class="btn btn-primary" data-next type="button">Next →</button></div>
+      </div>
+
+      <div class="q" data-step="4">
+        <h2>When do you usually open YouTube?</h2>
+        <div class="opts" data-qkey="q4">
+          <button class="opt" type="button" data-val="morning">First thing in the morning, before getting out of bed</button>
+          <button class="opt" type="button" data-val="breaks">On work/study breaks throughout the day</button>
+          <button class="opt" type="button" data-val="avoiding">When I'm avoiding something I should be doing</button>
+          <button class="opt" type="button" data-val="late-night">Late at night, in bed</button>
+          <button class="opt" type="button" data-val="all">All of the above</button>
+        </div>
+        <div class="q-nav"><button class="back-btn" data-back type="button">← Back</button><span></span></div>
+      </div>
+
+      <div class="q" data-step="5">
+        <h2>What was the longest YouTube binge you can remember?</h2>
+        <div class="opts" data-qkey="q5">
+          <button class="opt" type="button" data-val="under-1">Under an hour</button>
+          <button class="opt" type="button" data-val="1-3">1–3 hours</button>
+          <button class="opt" type="button" data-val="3-6">3–6 hours</button>
+          <button class="opt" type="button" data-val="half-day">Half a day or more</button>
+          <button class="opt" type="button" data-val="cant-remember">I genuinely can't remember the last time I closed YouTube voluntarily</button>
+        </div>
+        <div class="q-nav"><button class="back-btn" data-back type="button">← Back</button><span></span></div>
+      </div>
+
+      <div class="q" data-step="6">
+        <h2>Be honest — how often do you open YouTube, then forget what you actually came for?</h2>
+        <div class="opts" data-qkey="q6">
+          <button class="opt" type="button" data-val="almost-never">Almost never</button>
+          <button class="opt" type="button" data-val="few-week">A few times a week</button>
+          <button class="opt" type="button" data-val="most-days">Most days</button>
+          <button class="opt" type="button" data-val="every-time">Every single time</button>
+        </div>
+        <div class="q-nav"><button class="back-btn" data-back type="button">← Back</button><span></span></div>
+      </div>
+
+      <div class="q" data-step="7">
+        <h2>What did you mean to look up the last time you opened YouTube?</h2>
+        <textarea id="q7" placeholder="A recipe. A tutorial. I have no idea anymore." aria-label="What you meant to look up (optional)"></textarea>
+        <div class="q-nav"><button class="back-btn" data-back type="button">← Back</button><button class="btn btn-primary" data-next type="button">See the damage →</button></div>
       </div>
     </section>
+
+    <!-- STAGE 3a — LOADING -->
+    <section class="screen loading" id="loading">
+      <div class="spinner"></div>
+      <p>Calculating the damage…</p>
+    </section>
+
+    <!-- STAGE 3b — RESULT -->
+    <section class="screen" id="result">
+      <div class="result-section">
+        <div class="archetype-eyebrow">Your YouTube archetype</div>
+        <h2 class="archetype-tag" id="r-archetype">—</h2>
+        <p class="archetype-diag" id="r-diag"></p>
+      </div>
+
+      <div class="result-section">
+        <div class="num-block">
+          <div class="big-number warn"><span id="r-days">0</span> days</div>
+          <p class="num-cap" id="r-days-cap"></p>
+        </div>
+        <div class="num-block">
+          <div class="big-number gold"><span id="r-future">0</span> days</div>
+          <p class="num-cap" id="r-future-cap"></p>
+        </div>
+      </div>
+
+      <div class="result-section">
+        <div class="receipts">
+          <div class="receipt"><span class="em">📚</span><span>Books you could have read: <b id="r-books">0</b></span></div>
+          <div class="receipt"><span class="em">🌍</span><span>Languages you could be fluent in: <b id="r-langs">0</b></span></div>
+          <div class="receipt"><span class="em">🏃</span><span>Marathons you could have trained for: <b id="r-marathons">0</b></span></div>
+        </div>
+      </div>
+
+      <div class="quote-card" id="quote-card">
+        <div class="ql" id="r-quote"></div>
+        <div class="q7line" id="r-q7line" style="display:none;"></div>
+        <div class="brand"><b>CleanFeed</b> · verybrightsky.github.io/cleanfeed</div>
+      </div>
+
+      <div class="result-section whatnow">
+        <h3>What now?</h3>
+        <p><strong>Manual fix (free):</strong> Make <code>youtube.com/feed/subscriptions</code> your homepage. Bookmark it. Never visit the youtube.com root again.</p>
+        <p><strong>Soft fix (free):</strong> Install Unhook. It hides Shorts and the homepage feed. You can disable it any time — which is the catch.</p>
+        <p><strong>Hard fix ($4.99 once):</strong> That's what I built CleanFeed for. Focus Lock with a PIN you can't talk yourself out of. Pomodoro. A time tracker that doesn't lie. One-time payment, because subscribing to focus felt like the wrong incentive.</p>
+
+        <div class="result-ctas">
+          <a class="btn btn-primary" id="install-btn" href="https://chromewebstore.google.com/detail/cleanfeed-%E2%80%93-block-youtube-shorts-feed/mghmfmjlaelbkellppfneocliomiclnn?utm_source=audit&utm_medium=cta">Install CleanFeed</a>
+          <button class="btn btn-outline" id="share-btn" type="button">Share my audit</button>
+        </div>
+      </div>
+    </section>
+
   </main>
 
-  <div class="toast" id="toast" role="status" aria-live="polite">Copied — paste anywhere</div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <footer>
+  <footer class="site">
     <div class="row">
       <div>© <span id="year"></span> Daniel Lomonaco · CleanFeed</div>
       <div>
@@ -464,110 +350,304 @@
   <script>
     document.getElementById("year").textContent = new Date().getFullYear();
 
-    var hours = document.getElementById("hours");
-    var years = document.getElementById("years");
-    var age   = document.getElementById("age");
-    var hoursVal = document.getElementById("hours-val");
-    var yearsVal = document.getElementById("years-val");
-    var ageVal   = document.getElementById("age-val");
-    var results  = document.getElementById("results");
-    var lastDays = 0;
+    var SHARE_URL = "https://verybrightsky.github.io/cleanfeed/audit/";
+    var SHARE_URL_SHORT = "verybrightsky.github.io/cleanfeed/audit";
 
-    // Paint the teal track-fill behind the thumb to match the brand.
-    function paint(el) {
-      var min = parseFloat(el.min), max = parseFloat(el.max), v = parseFloat(el.value);
-      var pct = ((v - min) / (max - min)) * 100;
-      el.style.background =
-        "linear-gradient(90deg, var(--accent) 0%, var(--accent-2) " + pct + "%, " +
-        "var(--bg-elev-2) " + pct + "%, var(--bg-elev-2) 100%)";
+    // ---- archetypes ----
+    var ARCHETYPES = {
+      "morning": {
+        name: "The Morning Doomscroller",
+        diag: "Your eyes open and your thumb finds YouTube before your feet find the floor. The day hasn't started and you've already handed the first stretch of it to autoplay. That's not a wake-up routine — it's a snooze button that scrolls."
+      },
+      "late-night": {
+        name: "The Late-Night Spiraler",
+        diag: "You open YouTube to wind down. Three hours later it's 2am and you're fourteen videos deep into the lives of strangers. You're not relaxing — you're being held hostage by an algorithm trained to predict exactly when you'll reach for the next one."
+      },
+      "avoidance": {
+        name: "The Avoidance Watcher",
+        diag: "There's always something you should be doing, and YouTube is always right there to make sure you don't do it. This isn't entertainment — it's a very convincing way to feel busy while dodging the thing that actually matters. The tab is open because the to-do list is scary."
+      },
+      "breaks": {
+        name: "The Break-Time Drifter",
+        diag: "“Just a quick video on my break” is the most expensive sentence in your day. Five minutes becomes forty, the break is over, and you can't name a single thing you watched. The algorithm doesn't take breaks — so somehow, neither do you."
+      },
+      "all-in": {
+        name: "The All-In Captive",
+        diag: "Morning, breaks, late nights, avoidance — there's no single trigger, because every moment is the trigger. YouTube isn't a thing you do anymore; it's the background hum of your whole day. Be honest: it's not running in the background. You are."
+      },
+      "conscious": {
+        name: "The Conscious Watcher",
+        diag: "Plot twist — you're mostly fine. You open YouTube on purpose, watch the thing, and leave. That's rarer than you'd think; most people taking this audit can't say the same. Keep doing whatever you're doing, because the algorithm hasn't got its hooks in you. Yet.",
+        soft: true
+      }
+    };
+
+    function getArchetype(q4, q5, q6) {
+      if (q6 === "almost-never" && q5 === "under-1") return "conscious";
+      if (q4 === "all" || q6 === "every-time") return "all-in";
+      if (q4 === "morning") return "morning";
+      if (q4 === "late-night") return "late-night";
+      if (q4 === "avoiding") return "avoidance";
+      if (q4 === "breaks") return "breaks";
+      return "all-in"; // safety net — never reached when q4 is always set
     }
 
-    function syncLabels() {
-      hoursVal.textContent = parseFloat(hours.value) + " hrs";
-      yearsVal.textContent = parseInt(years.value, 10) + " yrs";
-      ageVal.textContent   = parseInt(age.value, 10);
+    // ---- state + flow ----
+    var state = { hours: 2.5, years: 8, age: 28, q4: null, q5: null, q6: null, q7: "" };
+    var R = null;            // computed result
+    var lastCanvas = null;   // share card
+    var idx = 0;             // 0-based question index (0..6)
+    var TOTAL = 7;
+
+    var screens = {
+      landing: document.getElementById("landing"),
+      quiz: document.getElementById("quiz"),
+      loading: document.getElementById("loading"),
+      result: document.getElementById("result")
+    };
+    function showScreen(name) {
+      Object.keys(screens).forEach(function (k) { screens[k].classList.remove("active"); });
+      screens[name].classList.add("active");
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
-    [hours, years, age].forEach(function (el) {
-      el.addEventListener("input", function () { paint(el); syncLabels(); });
-      paint(el);
+    var qEls = Array.prototype.slice.call(document.querySelectorAll("#quiz .q"));
+    function showStep(i) {
+      qEls.forEach(function (q) { q.classList.remove("active"); });
+      var el = qEls[i];
+      // restart fade animation
+      void el.offsetWidth;
+      el.classList.add("active");
+      var pct = ((i + 1) / TOTAL) * 100;
+      document.getElementById("prog-fill").style.width = pct + "%";
+      document.getElementById("prog-label").textContent = "Question " + (i + 1) + " of " + TOTAL;
+    }
+
+    // sliders — live labels + state
+    function wireSlider(inputId, valId, key, suffix) {
+      var inp = document.getElementById(inputId);
+      var lab = document.getElementById(valId);
+      function upd() { state[key] = parseFloat(inp.value); lab.textContent = inp.value; }
+      inp.addEventListener("input", upd);
+      upd();
+    }
+    wireSlider("s-hours", "v-hours", "hours");
+    wireSlider("s-years", "v-years", "years");
+    wireSlider("s-age", "v-age", "age");
+
+    document.getElementById("start-btn").addEventListener("click", function () {
+      idx = 0; showScreen("quiz"); showStep(0);
     });
-    syncLabels();
+
+    // next / back via delegation
+    document.getElementById("quiz").addEventListener("click", function (e) {
+      var t = e.target;
+      if (t.matches("[data-next]")) { advance(); }
+      else if (t.matches("[data-back]")) { goBack(); }
+      else if (t.classList.contains("opt")) { pickOption(t); }
+    });
+
+    function pickOption(btn) {
+      var box = btn.closest(".opts");
+      var key = box.getAttribute("data-qkey");
+      Array.prototype.forEach.call(box.querySelectorAll(".opt"), function (o) { o.classList.remove("selected"); });
+      btn.classList.add("selected");
+      state[key] = btn.getAttribute("data-val");
+      setTimeout(advance, 320); // smooth auto-advance
+    }
+
+    function advance() {
+      if (idx === 6) { // Q7 -> capture optional text, finish
+        state.q7 = (document.getElementById("q7").value || "").trim();
+        finish();
+        return;
+      }
+      idx++;
+      showStep(idx);
+    }
+
+    function goBack() {
+      if (idx === 0) { showScreen("landing"); return; }
+      idx--;
+      showScreen("quiz");
+      showStep(idx);
+      // restore selected highlight for MC steps
+      var box = qEls[idx].querySelector(".opts");
+      if (box) {
+        var key = box.getAttribute("data-qkey");
+        Array.prototype.forEach.call(box.querySelectorAll(".opt"), function (o) {
+          o.classList.toggle("selected", o.getAttribute("data-val") === state[key]);
+        });
+      }
+    }
 
     function round1(n) { return Math.round(n * 10) / 10; }
 
-    function calculate() {
-      var hoursPerDay = parseFloat(hours.value);
-      var yearsUsing  = parseInt(years.value, 10);
-      var ageNow      = parseInt(age.value, 10);
-
-      var minutesLostSoFar = hoursPerDay * 60 * 365 * yearsUsing;
-      var daysLostSoFar    = minutesLostSoFar / (16 * 60);
-      var monthsLost       = daysLostSoFar / 30;
-
-      var yearsToSixtyFive = Math.max(0, 65 - ageNow);
-      var daysToLoseFuture = (hoursPerDay * 365 * yearsToSixtyFive) / 16;
-      var yearsToLoseFuture = daysToLoseFuture / 365;
-
-      var books = Math.floor(daysLostSoFar / 4);
-      var languages = Math.floor(daysLostSoFar / 180);
-      var miles = Math.floor(daysLostSoFar * 7);
-
-      lastDays = round1(daysLostSoFar);
-
-      document.getElementById("days-lost").textContent = round1(daysLostSoFar) + " days";
-      document.getElementById("months-caption").textContent =
-        "= " + round1(monthsLost) + " months of your waking life, already lost";
-      document.getElementById("future-line").textContent =
-        "By 65 you'll lose another " + round1(yearsToLoseFuture) + " years";
-      document.getElementById("books").textContent = books;
-      document.getElementById("languages").textContent = languages;
-      document.getElementById("miles").textContent = miles;
-
-      // Re-trigger the entrance animation on each calculation.
-      results.classList.remove("show");
-      void results.offsetWidth;
-      results.classList.add("show");
-      results.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
-
-    document.getElementById("calc-btn").addEventListener("click", calculate);
-
-    // ---- share ----
-    var toast = document.getElementById("toast");
-    var toastTimer;
-    function showToast(text) {
-      toast.textContent = text;
-      toast.classList.add("show");
-      clearTimeout(toastTimer);
-      toastTimer = setTimeout(function () { toast.classList.remove("show"); }, 2600);
-    }
-
-    document.getElementById("share-btn").addEventListener("click", async function () {
-      var shareData = {
-        title: "YouTube has stolen " + lastDays + " days of my life",
-        text: "Just calculated how much YouTube has eaten of my life. The number is uncomfortable. Take the YouTube Time Audit: verybrightsky.github.io/cleanfeed/audit/",
-        url: "https://verybrightsky.github.io/cleanfeed/audit/"
+    function compute() {
+      var hours = state.hours, years = state.years, age = state.age;
+      var daysLost = (hours * 60 * 365 * years) / (16 * 60);
+      var y65 = Math.max(0, 65 - age);
+      var daysFuture = (hours * 365 * y65) / 16;
+      var yearsFuture = daysFuture / 365;
+      var monthsLost = daysLost / 30;
+      var key = getArchetype(state.q4, state.q5, state.q6);
+      return {
+        key: key,
+        name: ARCHETYPES[key].name,
+        diag: ARCHETYPES[key].diag,
+        soft: !!ARCHETYPES[key].soft,
+        daysLost: round1(daysLost),
+        monthsLost: round1(monthsLost),
+        daysFuture: Math.round(daysFuture),
+        yearsFuture: round1(yearsFuture),
+        books: Math.floor(daysLost / 4),
+        langs: Math.floor(daysLost / 180),
+        marathons: Math.max(1, Math.floor(daysLost / 100)),
+        age: age,
+        q7: state.q7
       };
-      if (navigator.share) {
-        try { await navigator.share(shareData); return; }
-        catch (e) { if (e && e.name === "AbortError") return; }
+    }
+
+    function finish() {
+      showScreen("loading");
+      setTimeout(function () {
+        R = compute();
+        renderResult(R);
+        showScreen("result");
+      }, 1500);
+    }
+
+    function renderResult(r) {
+      document.getElementById("r-archetype").textContent = r.name;
+      document.getElementById("r-diag").textContent = r.diag;
+
+      document.getElementById("r-days").textContent = r.daysLost;
+      document.getElementById("r-days-cap").textContent =
+        "= " + r.monthsLost + " months of your waking life, already spent on YouTube. You don't get those back.";
+      document.getElementById("r-future").textContent = r.daysFuture;
+      document.getElementById("r-future-cap").textContent =
+        r.yearsFuture + " years of your remaining life, if nothing changes. Possibly more if YouTube keeps optimizing for you.";
+
+      document.getElementById("r-books").textContent = r.books;
+      document.getElementById("r-langs").textContent = r.langs;
+      document.getElementById("r-marathons").textContent = r.marathons;
+
+      document.getElementById("r-quote").innerHTML =
+        "I'm " + r.age + ". I've already given YouTube <span class=\"hl\">" + r.daysLost + " days</span>. " +
+        "I'll give it <span class=\"hlg\">" + r.daysFuture + " more</span> if I don't change something.";
+
+      var q7line = document.getElementById("r-q7line");
+      if (r.q7) {
+        q7line.style.display = "block";
+        q7line.textContent = "Last time I opened YouTube, I was looking for " + r.q7 + ". I didn't find it.";
+      } else {
+        q7line.style.display = "none";
       }
-      // Fallback: copy the tweet text to the clipboard.
-      var copyText = shareData.text;
-      try {
-        await navigator.clipboard.writeText(copyText);
-        showToast("Copied — paste anywhere");
-      } catch (e) {
-        var ta = document.createElement("textarea");
-        ta.value = copyText;
-        ta.style.position = "fixed"; ta.style.opacity = "0";
-        document.body.appendChild(ta); ta.select();
-        try { document.execCommand("copy"); showToast("Copied — paste anywhere"); }
-        catch (_) { showToast("Couldn't copy — select and copy manually"); }
-        document.body.removeChild(ta);
+
+      // pre-build the share card so the button is instant
+      lastCanvas = makeCard(r);
+    }
+
+    // ---- share card (1080x1080) ----
+    function wrapText(ctx, text, x, y, maxW, lh) {
+      var words = text.split(" "), line = "", yy = y;
+      for (var i = 0; i < words.length; i++) {
+        var test = line ? line + " " + words[i] : words[i];
+        if (ctx.measureText(test).width > maxW && line) { ctx.fillText(line, x, yy); line = words[i]; yy += lh; }
+        else { line = test; }
       }
+      ctx.fillText(line, x, yy);
+      return yy;
+    }
+
+    function makeCard(r) {
+      var c = document.createElement("canvas");
+      c.width = 1080; c.height = 1080;
+      var x = c.getContext("2d");
+      var FONT = "Arial, Helvetica, sans-serif";
+
+      // background + subtle glow
+      x.fillStyle = "#0f1722"; x.fillRect(0, 0, 1080, 1080);
+      var g = x.createRadialGradient(250, 120, 0, 250, 120, 760);
+      g.addColorStop(0, "rgba(60,200,200,0.13)"); g.addColorStop(1, "rgba(15,23,34,0)");
+      x.fillStyle = g; x.fillRect(0, 0, 1080, 1080);
+
+      x.textAlign = "left";
+      // eyebrow
+      x.fillStyle = "#3cc8c8"; x.font = "700 30px " + FONT;
+      x.fillText("YOUTUBE TIME AUDIT", 90, 140);
+
+      // archetype (white, wrap up to 2 lines)
+      x.fillStyle = "#e6edf6"; x.font = "800 84px " + FONT;
+      var afterY = wrapText(x, r.name, 90, 300, 900, 94);
+
+      // days lost (red)
+      var ly = Math.max(afterY + 150, 560);
+      x.fillStyle = "#ff7a8a"; x.font = "800 132px " + FONT;
+      x.fillText(r.daysLost + " days", 90, ly);
+      x.fillStyle = "#93a0b3"; x.font = "400 34px " + FONT;
+      x.fillText("lost to YouTube so far", 94, ly + 56);
+
+      // projected (gold)
+      var gy = ly + 170;
+      x.fillStyle = "#f2cf5f"; x.font = "800 60px " + FONT;
+      x.fillText(r.daysFuture + " days projected by age 65", 90, gy);
+
+      // footer: url (left) + wordmark (right)
+      x.fillStyle = "#5e6c7e"; x.font = "400 26px " + FONT; x.textAlign = "left";
+      x.fillText(SHARE_URL_SHORT, 90, 1000);
+      x.fillStyle = "#3cc8c8"; x.font = "700 34px " + FONT; x.textAlign = "right";
+      x.fillText("CleanFeed", 990, 1000);
+
+      return c;
+    }
+
+    function tweetText(r) {
+      return "YouTube has stolen " + r.daysLost + " days of my life. I'm " + r.name +
+             ". Take the audit: " + SHARE_URL_SHORT;
+    }
+
+    var toastEl = document.getElementById("toast");
+    var toastTimer;
+    function toast(msg) {
+      toastEl.textContent = msg; toastEl.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 3200);
+    }
+
+    document.getElementById("share-btn").addEventListener("click", function () {
+      if (!lastCanvas || !R) return;
+      var tweet = tweetText(R);
+      lastCanvas.toBlob(function (blob) {
+        if (!blob) { toast("Couldn't build the image — try again."); return; }
+        var file = new File([blob], "youtube-time-audit.png", { type: "image/png" });
+        // mobile / supported: native share with the image file
+        if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+          navigator.share({ files: [file], text: tweet, url: SHARE_URL })
+            .catch(function (e) { if (!e || e.name !== "AbortError") desktopShare(blob, tweet); });
+          return;
+        }
+        desktopShare(blob, tweet);
+      }, "image/png");
     });
+
+    function desktopShare(blob, tweet) {
+      var url = URL.createObjectURL(blob);
+      var win = window.open(url, "_blank");
+      if (!win) {
+        // popup blocked — offer a download instead
+        var a = document.createElement("a");
+        a.href = url; a.download = "youtube-time-audit.png"; document.body.appendChild(a); a.click(); a.remove();
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(tweet).then(
+          function () { toast("Image ready — paste into your tweet/IG/Threads"); },
+          function () { toast("Image ready in a new tab — screenshot or save it"); }
+        );
+      } else {
+        toast("Image ready in a new tab — screenshot or save it");
+      }
+    }
   </script>
 </body>
 </html>
