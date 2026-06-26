@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>How to Hide YouTube Thumbnails (2026 Guide)</title>
+  <meta name="description" content="Hide YouTube thumbnails to kill clickbait and impulse clicks. A manual Stylus/CSS userstyle method (with snippet) plus the best extensions — CleanFeed, Unhook, DF Tube." />
+  <meta name="theme-color" content="#0f1722" />
+  <meta property="og:type" content="article" />
+  <meta property="og:title" content="How to Hide YouTube Thumbnails (2026 Guide)" />
+  <meta property="og:description" content="Why hiding clickbait thumbnails cuts impulse clicks, plus a manual CSS userstyle and the extensions that hide thumbnails site-wide — honest, step by step." />
+  <meta property="og:image" content="https://verybrightsky.github.io/cleanfeed/icon-128.png" />
+  <meta property="og:url" content="https://verybrightsky.github.io/cleanfeed/how-to-block-youtube-thumbnails/" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="How to Hide YouTube Thumbnails (2026 Guide)" />
+  <meta name="twitter:description" content="Why hiding clickbait thumbnails cuts impulse clicks, plus a manual CSS userstyle and the extensions that hide thumbnails site-wide — honest, step by step." />
+  <link rel="canonical" href="https://verybrightsky.github.io/cleanfeed/how-to-block-youtube-thumbnails/" />
+  <link rel="icon" href="../icon-128.png" type="image/png" />
+  <link rel="stylesheet" href="../css/shared.css" />
+  <style>
+    pre.code{background:#0b121b;border:1px solid var(--border);border-radius:12px;padding:16px 18px;overflow-x:auto;font-size:13px;line-height:1.55;margin:8px 0 20px;}
+    pre.code code{color:#cfe3ea;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a href="../index.html" class="nav-brand" style="display:flex;align-items:center;gap:12px;">
+      <img src="../icon-128.png" alt="" /><span>CleanFeed</span>
+    </a>
+    <span class="nav-spacer"></span>
+    <a href="../audit/index.html">Audit</a>
+    <a href="../compare.html">Compare</a>
+    <a href="../press.html">Press</a>
+    <a href="https://chromewebstore.google.com/detail/cleanfeed-%E2%80%93-block-youtube-shorts-feed/mghmfmjlaelbkellppfneocliomiclnn?utm_source=seo&utm_medium=nav">Install</a>
+  </nav>
+
+  <div class="container wide">
+    <a class="back" href="../index.html">← Back to CleanFeed</a>
+    <header class="post-hero">
+      <h1>How to Hide YouTube Thumbnails (2026 Guide)</h1>
+      <p class="sub">Thumbnails are the bait. Strip them out and YouTube becomes a list of titles you can actually read — far less tempting, far easier to leave. Here's the manual CSS route and the extensions that do it properly.</p>
+      <p class="meta">Updated June 2026 · Written by the CleanFeed team.</p>
+    </header>
+
+    <article class="prose">
+      <!-- BODY START -->
+      <p>Thumbnails are the single most engineered part of YouTube. A title is just words, but a thumbnail is a designed object: the shocked face, the red arrow, the circled detail, the "you won't believe" composition. Creators A/B-test them obsessively because the thumbnail is what converts a passing glance into a click. That's exactly why hiding them is one of the most underrated ways to make YouTube less compulsive — and almost nobody talks about it, because there is no native setting for it.</p>
+
+      <p>This guide covers every working method in 2026. We'll start with the honest truth — YouTube gives you no toggle for this — then walk through a manual userstyle approach using Stylus and CSS (with a snippet you can paste in), and finally the browser extensions that hide thumbnails properly across the whole site. I built one of those extensions, so I'll flag my bias and tell you plainly where the free options are the smarter pick.</p>
+
+      <h2>Why hiding thumbnails actually reduces impulse clicks</h2>
+      <p>Impulse clicks are visual, not verbal. When you scan a feed of thumbnails, you're not reading — you're reacting to faces, colors, and motion-implied drama before the conscious, deliberate part of your brain catches up. The click happens in the gap between seeing and thinking. A bright, high-contrast thumbnail of a surprised expression is a tiny dopamine slot machine, and the whole homepage is a wall of them.</p>
+
+      <p>Strip the thumbnails away and that wall becomes a plain list of text titles. Suddenly you have to <em>read</em> "Pro Photographer Reacts To Cheap Cameras" instead of being grabbed by a zoomed-in shocked face and a red circle. Reading is slower and more effortful than reacting, and that small added friction is enough to break the autopilot. You start asking "do I actually want to watch this?" instead of clicking first and regretting it ninety seconds later. Clickbait only works when you can see the clickbait. Text titles are far less tempting precisely because they engage judgment instead of reflex — and titles tend to be more honest than thumbnails, nudging you toward substance over packaging.</p>
+
+      <div class="callout"><strong>The honest starting point:</strong> YouTube has no built-in "hide thumbnails" setting anywhere — not on desktop, not in the mobile app, not in account settings. Every method below is a workaround. There's no official toggle to flip, so you'll either write a bit of CSS yourself or lean on an extension that does it for you.</div>
+
+      <h2>Method A: The manual route — a Stylus userstyle (CSS)</h2>
+      <p>If you don't want to install a dedicated YouTube extension, you can hide thumbnails yourself with a userstyle manager. The most popular is <strong>Stylus</strong>, a free, open-source extension for Chrome and Firefox that lets you inject your own CSS into specific sites. The idea is simple: you write a rule that finds YouTube's thumbnail image elements and hides them, leaving titles and channel names intact. Here's how, step by step.</p>
+
+      <ol>
+        <li>
+          <h3>Install Stylus</h3>
+          <p>Add Stylus from the Chrome Web Store (or Firefox Add-ons). It's a userstyle manager — it does nothing on its own until you write or import a style. It's lightweight and widely trusted, and unlike a full YouTube extension it only does what your CSS tells it to.</p>
+        </li>
+        <li>
+          <h3>Create a new style scoped to YouTube</h3>
+          <p>Click the Stylus icon, choose "Manage," then "Write new style." Give it a name like "Hide YouTube Thumbnails." In the "Applies to" section, set it to apply to the URL <code>youtube.com</code> so your CSS only runs on YouTube and nowhere else.</p>
+        </li>
+        <li>
+          <h3>Paste a thumbnail-hiding rule</h3>
+          <p>Drop in a starting snippet like the one below. It targets the image containers used in feed items and either hides them or collapses them to a thin neutral bar so the layout doesn't collapse awkwardly:</p>
+          <pre class="code"><code>/* Hide YouTube thumbnails — leave titles & channel text */
+ytd-thumbnail,
+ytd-playlist-thumbnail,
+yt-thumbnail-view-model,
+#thumbnail img,
+a#thumbnail {
+  visibility: hidden !important;
+}
+
+/* Collapse the empty thumbnail box so titles line up */
+ytd-thumbnail,
+yt-thumbnail-view-model {
+  background: #1a2230 !important;
+  min-height: 0 !important;
+}
+
+/* Optional: grey them instead of hiding outright */
+/* #thumbnail img { filter: grayscale(1) brightness(.4) !important; } */</code></pre>
+          <p>Save with the keyboard shortcut or the "Save" button, then reload YouTube. The thumbnails should disappear or grey out while titles remain readable. Uncomment the last rule if you'd rather <em>grey</em> thumbnails (a softer approach that still kills the color-and-contrast pull) than remove them entirely.</p>
+        </li>
+        <li>
+          <h3>Tune it for the pages you use</h3>
+          <p>You'll quickly notice the rule doesn't catch everything. Search results, the watch-page sidebar, channel pages, and Shorts shelves each use slightly different markup, so you'll need to add more selectors as you spot thumbnails that slip through. This is the fiddly part: it's trial and error with your browser's element inspector.</p>
+        </li>
+      </ol>
+
+      <p>Be honest with yourself about the trade-offs here, because they're real. <strong>The manual route is genuinely fiddly.</strong> YouTube renames its CSS classes and restructures its custom elements regularly, and every time it does, your selectors break and thumbnails reappear until you patch the style. You have no friendly toggle — to turn it off you disable the whole userstyle. It won't follow you to the mobile app (Stylus runs only in desktop browsers). And it's a blunt instrument: getting it to hide feed thumbnails without also breaking video player controls or your subscription avatars takes patience. For a tinkerer who enjoys this, it's free and infinitely customizable. For everyone else, it's maintenance you'll resent within a month.</p>
+
+      <img src="../screenshots/screenshot-homepage-messy.png" alt="A default YouTube homepage crowded with bright, high-contrast clickbait thumbnails" style="width:100%;border-radius:12px;border:1px solid var(--border);margin:8px 0 20px;" />
+
+      <h2>Method B: Extensions that hide thumbnails for you</h2>
+      <p>The reason to use an extension instead of a userstyle is maintenance: a good extension's developer tracks YouTube's layout changes and updates the selectors so your thumbnails stay hidden without you touching anything. The catch — and this is important — is that thumbnail hiding is a genuinely <em>niche</em> feature. Plenty of popular "clean YouTube" extensions focus on Shorts, recommendations, and comments but treat thumbnails as an afterthought or skip them entirely. So don't assume any distraction blocker does this well. Here are the ones worth knowing, with honest notes on how good their thumbnail handling actually is.</p>
+
+      <ol>
+        <li>
+          <h3>CleanFeed — pay-once, a first-class thumbnail toggle</h3>
+          <p>I'll declare my bias: I built CleanFeed. It's the one extension here with a dedicated, first-class thumbnail blocker — a single toggle that greys or hides thumbnails site-wide (homepage, search, sidebar, subscriptions) and keeps working through YouTube's layout changes, because keeping that selector current is part of what you're paying for. Thumbnails are one of its 17 individual blockers (alongside Shorts, the homepage feed, sidebar recommendations, comments, autoplay, end-screen suggestions, and more). Its real differentiator is <strong>Focus Lock</strong>: set a 4-digit PIN, switch your blockers on, and to turn any of them back off mid-session you have to hold a button for a full 60 seconds. The PIN is stored salted-SHA256, never in plaintext. That matters for thumbnails specifically, because the impulse to peek is strong — Focus Lock makes "just re-enable thumbnails for a second" cost you a deliberate minute. There's a built-in Pomodoro timer (25/5) that auto-locks every blocker during focus, and a time tracker that only counts focused, visible YouTube tabs. It's $4.99 once — no subscription, no account, no telemetry — and the free tier keeps any 2 blockers on forever, so you can run thumbnails-off plus one more without paying. It's open source (MIT) and new on the Chrome Web Store, so it has a small day-one user base; that's the honest downside versus the established options.</p>
+        </li>
+        <li>
+          <h3>Unhook — free and excellent, but limited on thumbnails</h3>
+          <p>Unhook is the gold-standard free distraction blocker: open source, 800,000+ users, granular toggles for nearly every YouTube element, with an optional Pro tier. For Shorts, recommendations, comments, and the homepage feed it's superb and I recommend it before anything else. On <em>thumbnails specifically</em>, though, its handling is limited — it's built around hiding whole sections and elements rather than stripping thumbnail images while preserving the title list, so you won't get a clean, dedicated "grey out every thumbnail and keep the text" mode the way CleanFeed offers. If thumbnails are a nice-to-have on top of broader decluttering, Unhook may be all you need and it's free. If a precise, persistent thumbnails-off-only view is your actual goal, it's not Unhook's strong suit.</p>
+        </li>
+        <li>
+          <h3>DF Tube — simple, light, partial coverage</h3>
+          <p>DF Tube (Distraction Free for YouTube) is the minimalist option: a small set of toggles that hide distractions like the sidebar, comments, and the end-screen wall, with a free tier plus an optional paid upgrade. It's easy to understand and barely there in terms of footprint. Its thumbnail handling is partial — it can strip a lot of visual clutter, but it isn't a dedicated, site-wide thumbnail blocker with a grey-out option, and it has no lock mechanism. Reach for it if you want something lighter than Unhook and thumbnails-off isn't your single must-have.</p>
+        </li>
+      </ol>
+
+      <p>Below is the CleanFeed popup, where the thumbnails blocker sits as its own toggle among the others — flip it on and the feed becomes text. Any extension's "clean" result looks broadly like this; the difference is whether thumbnails specifically are handled as a real, persistent feature.</p>
+
+      <img src="../screenshots/screenshot-popup-clean.png" alt="The CleanFeed extension popup showing individual blockers, including a dedicated thumbnails toggle" style="width:100%;border-radius:12px;border:1px solid var(--border);margin:8px 0 20px;" />
+
+      <h2>Which method should you actually use?</h2>
+      <p>If you like tinkering and want zero new YouTube extensions, the Stylus userstyle is free and yours to shape — just accept that you'll be patching selectors every time YouTube reshuffles its markup. If you want thumbnails gone and kept gone with no maintenance, an extension is the answer. Try <strong>Unhook</strong> first if you want broad, free decluttering and only loosely care about thumbnails. Choose <strong>CleanFeed</strong> if a precise, persistent, site-wide thumbnails-off view is the whole point — it's the only one here with a first-class toggle for it, plus the 60-second Focus Lock that stops you from peeking back. <strong>DF Tube</strong> is the calm middle if you want something lighter than Unhook.</p>
+
+      <h2>Frequently asked questions</h2>
+
+      <h3>Can I hide YouTube thumbnails without an extension?</h3>
+      <p>Only with a userstyle manager like Stylus, which still requires installing Stylus and writing CSS. YouTube itself has no native thumbnail setting on desktop or mobile. So the truly "no install at all" answer is no — but the Stylus route avoids a dedicated YouTube extension if that's your preference.</p>
+
+      <h3>Why do thumbnails keep coming back after I hide them with CSS?</h3>
+      <p>Because YouTube periodically renames its CSS classes and restructures its custom elements. A selector that matched a thumbnail container last month may match nothing today, so your userstyle silently stops working until you update it. Maintained extensions avoid this by shipping selector updates to you; a hand-written userstyle is yours to keep patching.</p>
+
+      <h3>Will hiding thumbnails break video playback or the player?</h3>
+      <p>It shouldn't, if your selectors are scoped to feed and list thumbnails rather than the player. A too-broad rule can accidentally hide player controls or channel avatars, which is exactly why the manual route takes tuning. Dedicated extensions are scoped carefully so the watch page and playback keep working normally.</p>
+
+      <h3>Is greying out thumbnails better than removing them?</h3>
+      <p>For many people, yes. Greyscale-and-dim keeps the page layout intact and still removes the color-and-contrast pull that drives impulse clicks, while leaving a faint visual anchor. Fully removing thumbnails is more drastic and turns the feed into a pure text list. Try both — CleanFeed lets you grey or hide, and the CSS snippet above includes a greyscale variant you can uncomment.</p>
+
+      <h3>Does hiding thumbnails work on the YouTube mobile app?</h3>
+      <p>No. Browser extensions and Stylus userstyles run only in desktop browsers, and the official mobile app doesn't support them. On a phone your best options are using a browser that supports extensions to visit the YouTube website, or relying on broader habits like browsing the Subscriptions tab. There's no thumbnail toggle inside the native app.</p>
+
+      <h3>Is it safe to install Stylus or these extensions?</h3>
+      <p>Stylus is open source and widely used, and it only does what your CSS instructs. Among the blockers, Unhook and CleanFeed are open source so you can read exactly what they do, and CleanFeed runs entirely on your device with no account, no telemetry, and no data leaving your browser. As always, install from the official Chrome Web Store and review the permissions before adding anything.</p>
+      <!-- BODY END -->
+    </article>
+
+    <!-- FINAL CTA -->
+    <section class="cta-block">
+      <h2>Try CleanFeed free</h2>
+      <p>Two blockers free forever — run thumbnails-off plus one more without paying. Upgrade once for $4.99: no subscription, no account, no telemetry. If you just want broad decluttering, Unhook is a great free pick; CleanFeed is for a first-class thumbnails toggle and a Focus Lock you can't undo on impulse.</p>
+      <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/cleanfeed-%E2%80%93-block-youtube-shorts-feed/mghmfmjlaelbkellppfneocliomiclnn?utm_source=seo&utm_medium=organic&utm_campaign=how-to-block-youtube-thumbnails">Install CleanFeed (2 blockers free)</a>
+      <a class="cta-sub" href="https://github.com/VeryBrightSky/cleanfeed">View the source on GitHub</a>
+    </section>
+  </div>
+
+  <footer class="site">
+    <div class="row">
+      <div>© <span id="year"></span> Daniel Lomonaco · CleanFeed</div>
+      <div>
+        <a href="../audit/index.html">Audit</a> ·
+        <a href="../compare.html">Compare</a> ·
+        <a href="../press.html">Press Kit</a> ·
+        <a href="https://github.com/VeryBrightSky/cleanfeed">GitHub</a>
+      </div>
+    </div>
+  </footer>
+  <script>document.getElementById("year").textContent = new Date().getFullYear();</script>
+</body>
+</html>

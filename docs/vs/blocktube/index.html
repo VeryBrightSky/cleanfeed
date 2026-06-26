@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BlockTube vs CleanFeed: Which YouTube Blocker Wins in 2026</title>
+  <meta name="description" content="BlockTube vs CleanFeed compared honestly: BlockTube's free regex channel/keyword blocklists vs CleanFeed's Focus Lock, Pomodoro and per-page rules for $4.99 once." />
+  <meta name="theme-color" content="#0f1722" />
+  <meta property="og:type" content="article" />
+  <meta property="og:title" content="BlockTube vs CleanFeed: Which YouTube Blocker Wins in 2026" />
+  <meta property="og:description" content="A solo developer compares BlockTube and CleanFeed honestly — including where free, regex-powered BlockTube is the better pick." />
+  <meta property="og:image" content="https://verybrightsky.github.io/cleanfeed/icon-128.png" />
+  <meta property="og:url" content="https://verybrightsky.github.io/cleanfeed/vs/blocktube/" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="BlockTube vs CleanFeed: Which YouTube Blocker Wins in 2026" />
+  <meta name="twitter:description" content="A solo developer compares BlockTube and CleanFeed honestly — including where free, regex-powered BlockTube is the better pick." />
+  <link rel="canonical" href="https://verybrightsky.github.io/cleanfeed/vs/blocktube/" />
+  <link rel="icon" href="../../icon-128.png" type="image/png" />
+  <link rel="stylesheet" href="../../css/shared.css" />
+</head>
+<body>
+  <nav class="nav">
+    <a href="../../index.html" class="nav-brand" style="display:flex;align-items:center;gap:12px;">
+      <img src="../../icon-128.png" alt="" /><span>CleanFeed</span>
+    </a>
+    <span class="nav-spacer"></span>
+    <a href="../../audit/index.html">Audit</a>
+    <a href="../../compare.html">Compare</a>
+    <a href="../../press.html">Press</a>
+    <a href="https://chromewebstore.google.com/detail/cleanfeed-%E2%80%93-block-youtube-shorts-feed/mghmfmjlaelbkellppfneocliomiclnn?utm_source=seo&utm_medium=nav">Install</a>
+  </nav>
+
+  <div class="container">
+    <a class="back" href="../../index.html">← Back to CleanFeed</a>
+    <header class="post-hero">
+      <h1>BlockTube vs CleanFeed: Which YouTube Blocker Wins in 2026</h1>
+      <p class="sub">One is a free, surgical regex blocklist. The other is a focus tool with a lock you can't talk yourself out of. They solve different problems.</p>
+      <p class="meta">Updated June 2026 · Written by the CleanFeed team.</p>
+    </header>
+
+    <article class="prose">
+      <!-- BODY START -->
+      <p>BlockTube and CleanFeed both stop YouTube from wasting your day, but they come at the problem from opposite ends. BlockTube is a free, precise scalpel for permanently erasing specific channels, keywords and patterns — if you can write a regex, you can make a creator vanish from your YouTube forever. CleanFeed is a behaviour tool: it strips the addictive surfaces (Shorts, the homepage feed, recommendations) and then bolts a real commitment device on top so you actually stay out. This page is a fair fight between the two, including the parts where BlockTube simply wins.</p>
+
+      <div class="callout"><strong>Full disclosure:</strong> I'm Daniel, I built CleanFeed. I've also used BlockTube for months. This comparison aims to be honest, including the cases where BlockTube is the better choice. The links are not affiliate links.</div>
+
+      <p>Here's the short version before the detail: if your problem is "these exact channels and these exact words must never appear again," BlockTube is excellent and costs nothing. If your problem is "I keep opening YouTube to watch one thing and lose an hour," that's a discipline gap, not a filtering gap, and CleanFeed's Focus Lock and Pomodoro are built specifically for it. Most people only have one of those two problems. A few have both.</p>
+
+      <h2>Quick comparison</h2>
+      <div class="table-wrap">
+        <table class="compare">
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th class="us">CleanFeed</th>
+              <th>BlockTube</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Price</td><td class="us">$4.99 one-time</td><td>Free</td></tr>
+            <tr><td>Free tier</td><td class="us">Any 2 blockers forever + time tracker</td><td>Everything (fully free)</td></tr>
+            <tr><td>Pricing model</td><td class="us">One-time lifetime, no account</td><td>Free, open source</td></tr>
+            <tr><td>Focus Lock (commitment mode)</td><td class="us"><span class="yes">✅</span> 4-digit PIN, 60s hold to unlock</td><td><span class="no">❌</span></td></tr>
+            <tr><td>Pomodoro timer</td><td class="us"><span class="yes">✅</span> 25/5, auto-locks blockers</td><td><span class="no">❌</span></td></tr>
+            <tr><td>Channel block</td><td class="us"><span class="yes">✅</span> right-click + whitelist</td><td><span class="yes">✅</span> by name, ID, regex</td></tr>
+            <tr><td>Keyword filter</td><td class="us"><span class="yes">✅</span> hide by title</td><td><span class="yes">✅</span> regex on title, comments, more</td></tr>
+            <tr><td>Custom CSS</td><td class="us"><span class="yes">✅</span></td><td><span class="yes">✅</span></td></tr>
+            <tr><td>Open source</td><td class="us"><span class="yes">✅</span> MIT</td><td><span class="yes">✅</span> GPL</td></tr>
+            <tr><td>Mobile</td><td class="us"><span class="no">❌</span> desktop Chrome</td><td><span class="no">❌</span> desktop only</td></tr>
+            <tr><td>Time tracker</td><td class="us"><span class="yes">✅</span> focused tabs only</td><td><span class="no">❌</span></td></tr>
+            <tr><td>Per-page rules</td><td class="us"><span class="yes">✅</span> per blocker, per page</td><td><span class="no">❌</span> global filters</td></tr>
+            <tr><td>One-click element toggles</td><td class="us"><span class="yes">✅</span> 17 named blockers</td><td>Partial — config-driven</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>When BlockTube is the better choice</h2>
+      <div class="vs">
+        <p>I want to be unambiguous here, because BlockTube earns it: for surgical, permanent blocking of specific content, nothing CleanFeed does is better. If your goal is to nuke a list of channels and keywords and never see them again, install BlockTube and don't look back.</p>
+        <p>The first case is the curated blocklist. BlockTube lets you block by channel name, by channel ID, by video title and even by comment content — and you can express all of it as regular expressions. That means one rule like <code>/(reaction|drama|tier list)/i</code> can erase an entire genre across all of YouTube, search results included. CleanFeed's keyword filter hides videos by title, which covers the common case, but it does not give you BlockTube's regex reach across comments and multiple fields. If you think in patterns, BlockTube is your tool.</p>
+        <p>The second case is filter lists. BlockTube can import and export its block rules as JSON, so you can share a blocklist, back it up, or apply a community-maintained list of low-quality channels in seconds. That portability is genuinely useful for power users and for parents building a shared deny-list across machines. CleanFeed has no equivalent shareable filter-list format.</p>
+        <p>The third case is simply price and philosophy. BlockTube is free, GPL-licensed and asks nothing of you. If you object on principle to paying for any browser extension, or you only need filtering and none of the focus machinery, BlockTube is the honest pick and CleanFeed would be overkill.</p>
+      </div>
+
+      <h2>When CleanFeed is the better choice</h2>
+      <div class="vs us">
+        <p>CleanFeed wins when the problem isn't <em>what</em> you see but <em>that you keep coming back</em>. BlockTube can hide channels, but it cannot stop you from turning it off the moment you want to binge — and that off-switch is exactly the failure point for most people.</p>
+        <p>Focus Lock is the wedge. You set a 4-digit PIN, switch your blockers on, and they stay on. To disable them mid-session you have to hold a button for a full 60 seconds — long enough for the impulse to pass and for you to ask whether you really meant it. The PIN is stored as a salted SHA-256 hash, never in plaintext. BlockTube has no commitment mechanism at all; its settings are one click away, always. If you've ever disabled a blocker "just for a second," you know why that matters.</p>
+        <p>On top of that sits a built-in Pomodoro timer running 25/5 cycles. When a focus block starts, every blocker auto-locks for the duration, so your work sprint is genuinely protected rather than politely suggested. A time tracker counts only focused, visible YouTube tabs — never background playback — so you get an honest number for how much YouTube actually ate today. Add per-page rules (On/Off/Inherit for each blocker on each YouTube surface) and you get precision BlockTube doesn't offer: strip the homepage feed but keep recommendations on a channel page, for instance. None of this is about filtering content. It's about changing behaviour, and that's the whole point.</p>
+      </div>
+
+      <h2>Detailed feature breakdown</h2>
+
+      <h3>Blocking model</h3>
+      <p>These two tools block differently, and the difference explains everything else. BlockTube is filter-first: you define rules (channels, keywords, regex) and BlockTube removes anything that matches, everywhere it appears. It's powerful and exact, but it's a config you maintain. CleanFeed is surface-first: it ships 17 individually named blockers for the parts of YouTube engineered to keep you scrolling — Shorts, the homepage feed, sidebar recommendations, comments, autoplay, end-screen suggestions, trending and explore tabs, live chat, thumbnails, the subscription algorithm feed, the merch shelf, breaking news, mixes and playlists, Playables and more. You toggle the surfaces you don't trust yourself with, and you're done. No rules to write.</p>
+      <p>In practice, the BlockTube user says "I never want to see MrBeast or anything tagged drama." The CleanFeed user says "I never want to see a recommendation feed at all." Both are valid; they're just different jobs.</p>
+
+      <h3>Channels and keywords</h3>
+      <p>This is BlockTube's home turf and I won't pretend otherwise. CleanFeed gives you a channel whitelist plus a right-click blocklist (block a channel straight from a video) and keyword filtering that hides videos by title — clean, fast, no syntax. BlockTube gives you the full regex toolkit across more fields. For the average person who wants three annoying channels gone, CleanFeed's right-click block is faster. For the person maintaining a 200-line pattern list, BlockTube is the only real option.</p>
+
+      <h3>Commitment and focus</h3>
+      <p>Here the comparison is one-sided in the other direction. CleanFeed has Focus Lock, a Pomodoro timer that auto-locks blockers, and a focused-tab time tracker. BlockTube has none of these — it was never trying to. If self-control is your bottleneck, this category decides the whole comparison, and BlockTube can't compete on it because it isn't a focus tool.</p>
+
+      <h3>Power-user controls</h3>
+      <p>Both ship custom CSS for people who want to restyle YouTube themselves, so it's a tie there. CleanFeed adds per-page rules — a matrix of On/Off/Inherit for each blocker on each type of YouTube page — which BlockTube's global-filter model doesn't have. BlockTube counters with JSON import/export of its rule sets, which CleanFeed lacks. Pick the control surface that matches how you think.</p>
+
+      <h3>Platform, privacy and trust</h3>
+      <p>Both are open source — CleanFeed under MIT, BlockTube under GPL — so you or anyone can audit them. Both are desktop-only; neither blocks YouTube on a phone, since mobile browsers don't run these extensions. CleanFeed also works on YouTube Music and ships in 19 locales. On privacy, CleanFeed takes no account, sends no telemetry and stores its PIN only as a salted hash; BlockTube, being a local filter, likewise keeps everything on your machine. I'll be straight about one weakness: CleanFeed is new to the Chrome Web Store with a small day-one user base, while BlockTube has years of installs and battle-testing behind it. If a long track record matters to you, that's a point for BlockTube.</p>
+
+      <h2>Pricing comparison</h2>
+      <p>The math here is simple because BlockTube is free and CleanFeed is cheap. BlockTube costs $0, forever, with every feature unlocked. CleanFeed is $4.99 one time for a lifetime license — no subscription, no renewal, no account. There is no recurring cost on either side, so this isn't a $71-a-year-versus-free situation like some competitors; it's free versus a single coffee's worth of money, once.</p>
+      <p>So how do I justify charging anything against a free tool? Honestly: by the focus machinery, not the filtering. CleanFeed's free tier already gives you any 2 blockers active forever, the daily time tracker, and a 1-hour pause — enough to genuinely cut Shorts and the homepage feed at no cost. The $4.99 unlocks all 17 blockers plus Focus Lock and the Pomodoro lock. You are paying for the commitment device, the thing that stops you turning blockers off on impulse — and that's exactly the feature BlockTube doesn't have at any price. If you don't need a lock, don't pay; the free tier or BlockTube will serve you fine. If the lock is what finally makes blocking stick, $4.99 once is a rounding error against the hours it buys back.</p>
+
+      <h2>Honest verdict</h2>
+      <p>Choose BlockTube if your problem is content: you want surgical, regex-powered, permanent blocking of specific channels and keywords, you value importable filter lists, and you want it free — it's the better tool for that job and I'll happily recommend it. Choose CleanFeed if your problem is behaviour: you keep relapsing into YouTube and need a lock you can't instantly undo, a Pomodoro timer that enforces your work blocks, and an honest tracker of where your time goes. Plenty of people could run both — BlockTube as the permanent deny-list, CleanFeed as the focus harness — and lose nothing but the free tier overlap. Be honest with yourself about which problem you actually have, and pick accordingly.</p>
+      <!-- BODY END -->
+    </article>
+
+    <!-- FINAL CTA -->
+    <section class="cta-block">
+      <h2>Try CleanFeed free</h2>
+      <p>Two blockers free forever. Upgrade once for $4.99 — no subscription, no account, no telemetry.</p>
+      <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/cleanfeed-%E2%80%93-block-youtube-shorts-feed/mghmfmjlaelbkellppfneocliomiclnn?utm_source=seo&utm_medium=organic&utm_campaign=blocktube">Install CleanFeed (2 blockers free)</a>
+      <a class="cta-sub" href="https://github.com/VeryBrightSky/cleanfeed">View the source on GitHub</a>
+    </section>
+  </div>
+
+  <footer class="site">
+    <div class="row">
+      <div>© <span id="year"></span> Daniel Lomonaco · CleanFeed</div>
+      <div>
+        <a href="../../audit/index.html">Audit</a> ·
+        <a href="../../compare.html">Compare</a> ·
+        <a href="../../press.html">Press Kit</a> ·
+        <a href="https://github.com/VeryBrightSky/cleanfeed">GitHub</a>
+      </div>
+    </div>
+  </footer>
+  <script>document.getElementById("year").textContent = new Date().getFullYear();</script>
+</body>
+</html>

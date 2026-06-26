@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>YouTube Focus Mode in Chrome: How to Set It Up (2026)</title>
+  <meta name="description" content="YouTube has no official focus mode, so here's how to build one in Chrome — a dedicated profile, a YouTube app window, paused history, plus the best free and pay-once extensions." />
+  <meta name="theme-color" content="#0f1722" />
+  <meta property="og:type" content="article" />
+  <meta property="og:title" content="YouTube Focus Mode in Chrome: How to Set It Up (2026)" />
+  <meta property="og:description" content="A practical, honest guide to building a real YouTube focus mode in Chrome — manual tricks plus the best free and pay-once extensions." />
+  <meta property="og:image" content="https://verybrightsky.github.io/cleanfeed/icon-128.png" />
+  <meta property="og:url" content="https://verybrightsky.github.io/cleanfeed/youtube-focus-mode-chrome/" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="YouTube Focus Mode in Chrome: How to Set It Up (2026)" />
+  <meta name="twitter:description" content="A practical, honest guide to building a real YouTube focus mode in Chrome — manual tricks plus the best free and pay-once extensions." />
+  <link rel="canonical" href="https://verybrightsky.github.io/cleanfeed/youtube-focus-mode-chrome/" />
+  <link rel="icon" href="../icon-128.png" type="image/png" />
+  <link rel="stylesheet" href="../css/shared.css" />
+</head>
+<body>
+  <nav class="nav">
+    <a href="../index.html" class="nav-brand" style="display:flex;align-items:center;gap:12px;">
+      <img src="../icon-128.png" alt="" /><span>CleanFeed</span>
+    </a>
+    <span class="nav-spacer"></span>
+    <a href="../audit/index.html">Audit</a>
+    <a href="../compare.html">Compare</a>
+    <a href="../press.html">Press</a>
+    <a href="https://chromewebstore.google.com/detail/cleanfeed-%E2%80%93-block-youtube-shorts-feed/mghmfmjlaelbkellppfneocliomiclnn?utm_source=seo&utm_medium=nav">Install</a>
+  </nav>
+
+  <div class="container wide">
+    <a class="back" href="../index.html">← Back to CleanFeed</a>
+    <header class="post-hero">
+      <h1>YouTube Focus Mode in Chrome: How to Set It Up (2026)</h1>
+      <p class="sub">YouTube ships no "focus mode" button — so here's how to build one yourself in Chrome, using native settings first and extensions where they genuinely help.</p>
+      <p class="meta">Updated June 2026 · Written by the CleanFeed team.</p>
+    </header>
+
+    <article class="prose">
+      <!-- BODY START -->
+      <p>Type "YouTube focus mode" into any search bar and you'll expect a switch hiding somewhere in YouTube's settings. There isn't one. YouTube has a "pause watch history" toggle and a bedtime reminder, but no single mode that strips the homepage feed, Shorts, autoplay and recommendations so you can watch one video and leave. The good news is that you can assemble a real focus mode in Chrome in about fifteen minutes — partly from Chrome's own features, partly from a small, honest set of extensions. This guide walks both routes, in order, so you can stop at whatever level of discipline you actually need.</p>
+
+      <div class="callout"><strong>Full disclosure:</strong> I'm Daniel, and I built one of the extensions mentioned below (CleanFeed). I've also leaned on the free tools here for years. This guide leads with the manual, no-install steps and points you to the free extension most people should try first. None of the links are affiliate links — I make nothing if you click them.</div>
+
+      <h2>Part A — Build a focus mode with Chrome's native tools (no extensions)</h2>
+      <p>Start here. These steps cost nothing, install nothing, and survive even when you wipe your extensions. On their own they won't strip every distracting pixel, but they remove most of the temptation and create a clean, separate space for watching with intent.</p>
+
+      <h3>Step 1 — Create a dedicated "Work" Chrome profile</h3>
+      <p>This is the single highest-leverage move, and almost nobody does it. In Chrome, click your profile avatar in the top-right corner, choose <strong>Add</strong>, and create a new profile called "Focus" or "Work." Don't sign it into the Google account you use for personal YouTube — or if you do, sign in but skip syncing your watch history and subscriptions. The point is a browser window where YouTube doesn't know you: no personalized homepage stuffed with the exact rabbit holes you fall into, no "because you watched" rows, no recommendation feed trained on your weakest moments. A logged-out or work-only YouTube is dramatically less sticky because the algorithm has nothing to bait you with. Pin this profile to your taskbar and do your focused work exclusively inside it. Your fun profile, with all its history and subscriptions, stays one window away for when you actually want it.</p>
+
+      <h3>Step 2 — Install YouTube as a Chrome app window (PWA)</h3>
+      <p>A normal browser tab sits in a strip next to your email, your work, and twelve other tabs — every one a one-click detour. You can give YouTube its own stripped-down window instead. Open <code>youtube.com</code>, click the three-dot menu in Chrome's top-right, then <strong>Cast, save, and share → Install page as app</strong> (older builds: <strong>More tools → Create shortcut</strong>, then tick "Open as window"). YouTube now launches in its own frame with no address bar, no tab strip, and no bookmarks bar tempting you sideways. It feels more like a single-purpose appliance than an open browser, which is exactly the psychological nudge a focus mode is supposed to provide. Combine this with the work profile from Step 1 and you've already built something YouTube doesn't offer natively.</p>
+
+      <h3>Step 3 — Pause your watch history</h3>
+      <p>Go to <a href="https://myactivity.google.com/product/youtube">YouTube History settings</a> (or, in YouTube, <strong>You → Settings → Privacy → manage history</strong>) and turn off <strong>YouTube Watch History</strong>. With history paused, the recommendation engine loses its fuel: the homepage stops curating an endless personalized feed and falls back to generic, far less compelling suggestions. You lose "continue watching" convenience, but for a focus profile that's the trade you want. This single toggle is the closest thing YouTube has to an official focus feature, and it's buried where most people never look.</p>
+
+      <h3>Step 4 — Lock down YouTube in Chrome Site Settings</h3>
+      <p>Visit <code>chrome://settings/content</code> and use the per-site controls to defang YouTube's grabbiest behaviors. Under <strong>Notifications</strong>, block youtube.com so it can never ping you back mid-task. Under <strong>Sound</strong>, you can set sites to muted by default if autoplay audio is your trigger. You can't hide the homepage feed from here — Chrome Site Settings governs permissions, not page layout — but cutting notifications alone removes a whole category of pulls back into the app. While you're in settings, also check <strong>chrome://settings/onStartup</strong> and make sure your focus profile doesn't open YouTube automatically.</p>
+
+      <h3>Step 5 — Bookmark the Subscriptions feed and start there</h3>
+      <p>The homepage is the slot machine; your <a href="https://www.youtube.com/feed/subscriptions">Subscriptions feed</a> is the library. Bookmark <code>youtube.com/feed/subscriptions</code> in your focus profile and make a rule: you open YouTube to that URL, never to the homepage. The Subscriptions page shows only channels you deliberately chose, in reverse-chronological order, with no algorithmic "you might also like" injected between them. It's the difference between walking into a bookshop with a title in mind and being handed a stack of impulse buys at the till. If you want to go further, set this bookmark as your app-window's launch behavior.</p>
+
+      <h3>Step 6 — Use reading and zen tricks for the watch page</h3>
+      <p>Even on a single video, the right rail of recommendations and the comment pit are designed to keep you scrolling. A few zero-install tricks help: drop the window into full-screen theater mode while watching so the sidebar disappears, collapse the comments, and resize the browser window narrow enough that the "Up next" column wraps out of view. Chrome's built-in <strong>Reading mode</strong> (in the side panel) won't reflow a video, but for the description and linked articles it strips the page to text. None of these are a true lock — they rely on you not undoing them — but stacked on top of Steps 1–5 they get you most of the way to a calm, single-purpose YouTube without a single extension.</p>
+
+      <h2>Part B — Extensions that create a real focus mode</h2>
+      <p>The manual route is solid, but it has one gap: nothing stops you from talking yourself out of it. Re-enabling history is two clicks; opening the homepage is one. If you genuinely lose hours to YouTube, you want a tool that hides the bait <em>and</em> makes relapsing harder. Below are three honest options, weakest enforcement to strongest. Install in the order that matches how much you trust yourself.</p>
+
+      <img src="../screenshots/screenshot-popup-clean.png" alt="CleanFeed popup showing individual blockers and Focus Lock controls for a YouTube focus mode in Chrome" style="width:100%;border-radius:12px;border:1px solid var(--border);margin:8px 0 20px;" />
+
+      <h3>Unhook — the best free starting point</h3>
+      <p>If you only install one extension, make it <strong>Unhook</strong>. It's free, open source, and used by more than 800,000 people, and it has earned that reach. Unhook gives you granular on/off toggles for nearly every distracting surface: the homepage feed, Shorts, the sidebar recommendations, end-screen cards, comments, the trending tab, notifications and more. Pair it with the work profile from Part A and you have a genuinely clean YouTube in two minutes, for free. The honest limit is enforcement: every toggle is just a toggle. There's no lock, no commitment mode, no password gate, and no timer — so in a weak moment you can switch the homepage back on in one second. For most people who simply want the clutter gone and trust themselves to leave it gone, that's completely fine, and Unhook is the right answer.</p>
+
+      <h3>DF Tube — the lightweight, set-and-forget pick</h3>
+      <p><strong>DF Tube (Distraction Free for YouTube)</strong> is the minimalist option. Where Unhook hands you a control panel, DF Tube takes an opinionated approach: install it and it quietly strips the big distractions — the homepage feed, related-video sidebar, comments, autoplay — with almost no setup. It has free and paid tiers, and the free tier covers what most people need. It does less than Unhook on purpose, and that simplicity is the appeal if a wall of toggles overwhelms you. Like Unhook, though, it has <strong>no lock mechanism</strong>, no Pomodoro timer, and no focus-time tracking — it removes temptation but won't stop you reversing it.</p>
+
+      <h3>CleanFeed — the closest thing to an enforced focus mode</h3>
+      <p>This one's mine, so weigh it accordingly. <strong>CleanFeed</strong> covers the same ground as the tools above — it has 17 individual blockers (Shorts, homepage feed, sidebar recommendations, comments, autoplay, end-screen suggestions, trending and explore tabs, live chat, thumbnails, the subscription algorithm feed, the merch shelf, breaking news, mixes and playlists, Playables, and more) — but it adds the layer the others deliberately skip: enforcement. <strong>Focus Lock</strong> lets you set a 4-digit PIN; your chosen blockers lock on, and to disable one mid-session you have to hold a button for a full 60 seconds. That 60-second hold is just enough friction to kill an impulse before it becomes an hour. The PIN is stored as a salted SHA-256 hash, never in plaintext. There's a built-in <strong>Pomodoro timer</strong> (25/5 cycles) that auto-locks every blocker during focus periods, and a <strong>time tracker</strong> that only counts focused, visible YouTube tabs, never background ones — so you get an honest picture of where the time actually goes. You also get channel whitelisting, right-click blocklisting, keyword filtering by video title, per-page rules, and custom CSS, and it works on YouTube Music across 19 locales.</p>
+      <p>Pricing is <strong>$4.99 once</strong> — lifetime, no subscription, no account, no telemetry — and it's open source under the MIT license. The honest caveats: it's new on the Chrome Web Store with a small day-one user base, so it hasn't been battle-tested at Unhook's scale, and if you only want simple toggles you already trust yourself to keep, Focus Lock and Pomodoro are weight you won't use. The free tier gives you any 2 blockers forever plus the daily time tracker and a 1-hour pause, so you can build a basic focus mode for nothing and only pay if the lock earns its keep.</p>
+
+      <h2>So which focus mode should you build?</h2>
+      <div class="decision">
+        <p>Match the setup to how much willpower you can spare:</p>
+        <ul>
+          <li><strong>Lowest effort, no installs:</strong> do Part A — a work profile, YouTube as an app window, paused history, and the Subscriptions bookmark. It's free and survives any extension reset.</li>
+          <li><strong>You want the clutter gone and trust yourself:</strong> add <strong>Unhook</strong> (free) on top of Part A. This is the right answer for most people.</li>
+          <li><strong>You want simple and frictionless:</strong> <strong>DF Tube</strong>, install and forget.</li>
+          <li><strong>You keep talking yourself out of it:</strong> <strong>CleanFeed</strong> ($4.99 once) for Focus Lock, Pomodoro and time tracking — a focus mode you can't undo on a whim.</li>
+        </ul>
+      </div>
+
+      <h2>FAQ</h2>
+      <p><strong>Does YouTube have a built-in focus mode?</strong> No. YouTube offers paused watch history, a "take a break" reminder and a bedtime reminder, but there's no single mode that hides the homepage, Shorts, autoplay and recommendations. You have to assemble one yourself using Chrome's tools and extensions, as above.</p>
+      <p><strong>Can I do this without installing any extension?</strong> Yes — Part A is entirely native: a dedicated Chrome profile, YouTube installed as an app window, paused history, locked-down Site Settings, and the Subscriptions feed as your start point. It won't strip every element, but it removes most of the pull.</p>
+      <p><strong>What's the difference between Unhook and CleanFeed?</strong> Unhook is free, open source and excellent at hiding distractions with simple toggles — but every toggle is reversible in one click. CleanFeed adds enforcement: a PIN-locked Focus Lock with a 60-second hold to disable, a Pomodoro timer and a focused-time tracker. Start with Unhook; reach for CleanFeed when toggles aren't enough.</p>
+      <p><strong>Does this work on YouTube Music too?</strong> The native Chrome tricks apply to any site. Among the extensions, CleanFeed explicitly supports YouTube Music; check each extension's listing for music support before relying on it.</p>
+      <p><strong>Will paused history log me out or break playback?</strong> No. Pausing watch history only stops YouTube from recording what you watch and feeding it back into recommendations. Videos still play normally; you just lose personalized "continue watching" rows — which is the point for a focus profile.</p>
+      <!-- BODY END -->
+    </article>
+
+    <!-- FINAL CTA -->
+    <section class="cta-block">
+      <h2>Try CleanFeed free</h2>
+      <p>Two blockers free forever. Upgrade once for $4.99 — no subscription, no account, no telemetry.</p>
+      <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/cleanfeed-%E2%80%93-block-youtube-shorts-feed/mghmfmjlaelbkellppfneocliomiclnn?utm_source=seo&utm_medium=organic&utm_campaign=youtube-focus-mode-chrome">Install CleanFeed (2 blockers free)</a>
+      <a class="cta-sub" href="https://github.com/VeryBrightSky/cleanfeed">View the source on GitHub</a>
+    </section>
+  </div>
+
+  <footer class="site">
+    <div class="row">
+      <div>© <span id="year"></span> Daniel Lomonaco · CleanFeed</div>
+      <div>
+        <a href="../audit/index.html">Audit</a> ·
+        <a href="../compare.html">Compare</a> ·
+        <a href="../press.html">Press Kit</a> ·
+        <a href="https://github.com/VeryBrightSky/cleanfeed">GitHub</a>
+      </div>
+    </div>
+  </footer>
+  <script>document.getElementById("year").textContent = new Date().getFullYear();</script>
+</body>
+</html>

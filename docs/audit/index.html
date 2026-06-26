@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>YouTube Time Audit — How much of your life has YouTube stolen? | CleanFeed</title>
+  <meta name="description" content="Calculate how many days of your life YouTube has consumed. The number is uncomfortable. Free 30-second audit from CleanFeed." />
+  <meta name="theme-color" content="#0f1722" />
+
+  <!-- Open Graph / social cards -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="YouTube Time Audit — How much of your life has YouTube stolen?" />
+  <meta property="og:description" content="Calculate how many days of your life YouTube has consumed. The number is uncomfortable. Free 30-second audit from CleanFeed." />
+  <meta property="og:image" content="https://verybrightsky.github.io/cleanfeed/icon-128.png" />
+  <meta property="og:url" content="https://verybrightsky.github.io/cleanfeed/audit/" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="YouTube Time Audit — How much of your life has YouTube stolen?" />
+  <meta name="twitter:description" content="Calculate how many days of your life YouTube has consumed. The number is uncomfortable." />
+  <meta name="twitter:image" content="https://verybrightsky.github.io/cleanfeed/icon-128.png" />
+
+  <link rel="canonical" href="https://verybrightsky.github.io/cleanfeed/audit/" />
+  <link rel="icon" href="../icon-128.png" type="image/png" />
+
+  <style>
+    :root {
+      --bg:        #0f1722;
+      --bg-elev:   #15202e;
+      --bg-elev-2: #1c2a3a;
+      --border:    #233346;
+      --text:      #e6edf6;
+      --text-dim:  #93a0b3;
+      --text-faint:#5e6c7e;
+      --accent:    #3cc8c8;
+      --accent-2:  #6fffff;
+      --accent-glow: rgba(60, 200, 200, 0.20);
+      --gold:      #f2cf5f;
+      --warn:      #ff7a8a;
+      --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.40);
+      --shadow-lg: 0 22px 60px rgba(0, 0, 0, 0.55);
+      --grad-accent: linear-gradient(95deg, #3cc8c8 0%, #6fffff 100%);
+      --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 22px;
+      --ease: cubic-bezier(0.20, 0.80, 0.30, 1);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      background:
+        radial-gradient(1100px 600px at 22% -10%, rgba(60, 200, 200, 0.10), transparent 60%),
+        radial-gradient(900px 600px at 90% 110%, rgba(242, 207, 95, 0.04), transparent 60%),
+        var(--bg);
+      color: var(--text);
+      font: 400 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI",
+            Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ---- nav (matches index.html) ---- */
+    .nav {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px 28px 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .nav img { width: 32px; height: 32px; border-radius: 8px; }
+    .nav-brand { font-weight: 700; letter-spacing: 0.2px; color: var(--text); }
+    .nav-brand:hover { text-decoration: none; }
+    .nav-spacer { flex: 1; }
+    .nav a {
+      color: var(--text-dim);
+      font-size: 14px;
+      padding: 8px 12px;
+      border-radius: var(--r-sm);
+      transition: color 150ms var(--ease), background 150ms var(--ease);
+    }
+    .nav a:hover { color: var(--text); background: var(--bg-elev); text-decoration: none; }
+
+    /* ---- header ---- */
+    .audit-hero {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 64px 28px 8px;
+      text-align: center;
+    }
+    .audit-hero h1 {
+      font-size: clamp(30px, 6vw, 52px);
+      line-height: 1.08;
+      margin: 0 0 16px;
+      letter-spacing: -1.2px;
+      background: linear-gradient(120deg, #f6f9ff 0%, #b9d3da 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .audit-hero p.sub {
+      max-width: 520px;
+      margin: 0 auto;
+      font-size: 18px;
+      color: var(--text-dim);
+    }
+
+    /* ---- calculator card ---- */
+    .calc {
+      max-width: 600px;
+      margin: 36px auto 0;
+      padding: 32px 30px 30px;
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: var(--r-xl);
+      box-shadow: var(--shadow-md);
+    }
+    .field { margin-bottom: 26px; }
+    .field:last-of-type { margin-bottom: 30px; }
+    .field-top {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      gap: 12px;
+    }
+    .field-label { font-size: 15px; color: var(--text); font-weight: 500; }
+    .field-value {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.4px;
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    /* ---- custom range slider (teal fill, dark navy track) ---- */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--bg-elev-2); /* JS overwrites with teal-fill gradient */
+      outline: none;
+      cursor: pointer;
+      margin: 0;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: #eafffe;
+      border: 3px solid var(--accent);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.45), 0 0 0 4px rgba(60,200,200,0.18);
+      transition: transform 90ms var(--ease);
+    }
+    input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.12); }
+    input[type="range"]::-moz-range-thumb {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: #eafffe;
+      border: 3px solid var(--accent);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.45), 0 0 0 4px rgba(60,200,200,0.18);
+    }
+    input[type="range"]::-moz-range-track {
+      height: 8px; border-radius: 999px; background: transparent;
+    }
+    input[type="range"]:focus-visible::-webkit-slider-thumb {
+      box-shadow: 0 0 0 4px rgba(60,200,200,0.45);
+    }
+
+    .calc-btn {
+      width: 100%;
+      padding: 16px 22px;
+      border: none;
+      border-radius: var(--r-md);
+      background: var(--grad-accent);
+      color: #0b1828;
+      font: inherit;
+      font-weight: 700;
+      font-size: 16px;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(60, 200, 200, 0.30);
+      transition: transform 100ms var(--ease), filter 150ms var(--ease), box-shadow 150ms var(--ease);
+    }
+    .calc-btn:hover { filter: brightness(1.06); transform: translateY(-2px); box-shadow: 0 12px 32px rgba(60, 200, 200, 0.45); }
+    .calc-btn:active { transform: translateY(0); }
+
+    /* ---- results ---- */
+    .results {
+      max-width: 600px;
+      margin: 28px auto 0;
+      text-align: center;
+      display: none;
+    }
+    .results.show {
+      display: block;
+      animation: riseIn 620ms var(--ease) both;
+    }
+    @keyframes riseIn {
+      from { opacity: 0; transform: translateY(26px) scale(0.965); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .big-number {
+      font-size: 96px;
+      line-height: 1;
+      font-weight: 800;
+      letter-spacing: -3px;
+      color: var(--warn);
+      font-variant-numeric: tabular-nums;
+      margin: 8px 0 6px;
+    }
+    .big-caption {
+      font-size: 18px;
+      color: var(--text-dim);
+      margin: 0 auto 20px;
+      max-width: 440px;
+    }
+    .future-line {
+      font-size: 19px;
+      font-weight: 600;
+      color: var(--gold);
+      margin: 0 auto 28px;
+    }
+    .compare-block {
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 22px 24px;
+      box-shadow: var(--shadow-md);
+      text-align: left;
+      margin-bottom: 22px;
+    }
+    .compare-block h3 {
+      margin: 0 0 14px;
+      font-size: 16px;
+      color: var(--text);
+      font-weight: 600;
+      text-align: center;
+    }
+    .compare-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 15.5px;
+      color: var(--text-dim);
+    }
+    .compare-row:last-child { border-bottom: none; }
+    .compare-row .em { font-size: 20px; flex: 0 0 auto; }
+    .compare-row b { color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .disclosure {
+      font-size: 12px;
+      color: var(--text-faint);
+      max-width: 460px;
+      margin: 0 auto 26px;
+      line-height: 1.5;
+    }
+    .result-ctas {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 15px 24px;
+      font: inherit;
+      font-weight: 600;
+      font-size: 15px;
+      color: var(--text);
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      cursor: pointer;
+      transition: transform 100ms var(--ease), background 150ms var(--ease),
+                  box-shadow 150ms var(--ease), filter 150ms var(--ease);
+      text-decoration: none;
+    }
+    .btn:hover { transform: translateY(-2px); background: var(--bg-elev-2); text-decoration: none; }
+    .btn-primary {
+      background: var(--grad-accent);
+      color: #0b1828;
+      border: none;
+      box-shadow: 0 8px 24px rgba(60, 200, 200, 0.30);
+    }
+    .btn-primary:hover { filter: brightness(1.06); box-shadow: 0 12px 32px rgba(60, 200, 200, 0.45); }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+    }
+    .btn-outline:hover { background: var(--accent-glow); color: var(--accent); }
+
+    /* ---- toast ---- */
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 28px;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--bg-elev-2);
+      border: 1px solid var(--accent);
+      color: var(--text);
+      padding: 11px 18px;
+      border-radius: 999px;
+      font-size: 14px;
+      box-shadow: var(--shadow-md);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 200ms var(--ease), transform 200ms var(--ease);
+      z-index: 50;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ---- footer (matches index.html) ---- */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 28px;
+      text-align: center;
+      color: var(--text-faint);
+      font-size: 13px;
+      margin-top: 72px;
+    }
+    footer a { color: var(--text-dim); }
+    footer .row {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    /* ---- mobile ---- */
+    @media (max-width: 760px) {
+      .nav { padding: 16px; }
+      .audit-hero { padding: 44px 22px 4px; }
+      .calc { padding: 26px 20px 24px; margin-top: 28px; }
+      .big-number { font-size: 64px; letter-spacing: -2px; }
+      .result-ctas .btn { width: 100%; justify-content: center; }
+      footer .row { flex-direction: column; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a href="../index.html" class="nav-brand" style="display:flex;align-items:center;gap:12px;">
+      <img src="../icon-128.png" alt="" /><span>CleanFeed</span>
+    </a>
+    <span class="nav-spacer"></span>
+    <a href="../vs/unhook/index.html">Compare</a>
+    <a href="../press.html">Press</a>
+    <a href="https://chromewebstore.google.com/detail/cleanfeed-%E2%80%93-block-youtube-shorts-feed/mghmfmjlaelbkellppfneocliomiclnn?utm_source=audit&utm_medium=nav">Install</a>
+  </nav>
+
+  <header class="audit-hero">
+    <h1>How much of your life has YouTube actually stolen?</h1>
+    <p class="sub">Be honest. The math is uncomfortable.</p>
+  </header>
+
+  <main>
+    <section class="calc" aria-label="YouTube time audit calculator">
+      <div class="field">
+        <div class="field-top">
+          <label class="field-label" for="hours">Hours per day on YouTube</label>
+          <span class="field-value" id="hours-val">2.5 hrs</span>
+        </div>
+        <input type="range" id="hours" min="0" max="8" step="0.5" value="2.5"
+               aria-label="Hours per day on YouTube" />
+      </div>
+
+      <div class="field">
+        <div class="field-top">
+          <label class="field-label" for="years">Years you've been using it</label>
+          <span class="field-value" id="years-val">8 yrs</span>
+        </div>
+        <input type="range" id="years" min="1" max="20" step="1" value="8"
+               aria-label="Years you have been using YouTube" />
+      </div>
+
+      <div class="field">
+        <div class="field-top">
+          <label class="field-label" for="age">Your current age</label>
+          <span class="field-value" id="age-val">28</span>
+        </div>
+        <input type="range" id="age" min="13" max="80" step="1" value="28"
+               aria-label="Your current age" />
+      </div>
+
+      <button class="calc-btn" id="calc-btn" type="button">Show me the damage.</button>
+    </section>
+
+    <section class="results" id="results" aria-live="polite">
+      <div class="big-number" id="days-lost">0 days</div>
+      <p class="big-caption" id="months-caption">= 0 months of your waking life, already lost</p>
+      <p class="future-line" id="future-line">By 65 you'll lose another 0 years</p>
+
+      <div class="compare-block">
+        <h3>That's enough time to:</h3>
+        <div class="compare-row">
+          <span class="em">📚</span><span>Read <b id="books">0</b> books at 250 pages each</span>
+        </div>
+        <div class="compare-row">
+          <span class="em">🗣️</span><span>Learn <b id="languages">0</b> languages fluently</span>
+        </div>
+        <div class="compare-row">
+          <span class="em">🏃</span><span>Run <b id="miles">0</b> miles</span>
+        </div>
+      </div>
+
+      <p class="disclosure">Math assumes 16 waking hours/day. Lifespan target = 65 to keep the projection conservative.</p>
+
+      <div class="result-ctas">
+        <a class="btn btn-primary" id="install-btn"
+           href="https://chromewebstore.google.com/detail/cleanfeed-%E2%80%93-block-youtube-shorts-feed/mghmfmjlaelbkellppfneocliomiclnn?utm_source=audit&utm_medium=cta">
+          Stop the bleed — install CleanFeed
+        </a>
+        <button class="btn btn-outline" id="share-btn" type="button">Share my audit</button>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite">Copied — paste anywhere</div>
+
+  <footer>
+    <div class="row">
+      <div>© <span id="year"></span> Daniel Lomonaco · CleanFeed</div>
+      <div>
+        <a href="../press.html">Press Kit</a> ·
+        <a href="../compare.html">Compare</a> ·
+        <a href="../index.html">Home</a> ·
+        <a href="https://github.com/VeryBrightSky/cleanfeed">GitHub</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById("year").textContent = new Date().getFullYear();
+
+    var hours = document.getElementById("hours");
+    var years = document.getElementById("years");
+    var age   = document.getElementById("age");
+    var hoursVal = document.getElementById("hours-val");
+    var yearsVal = document.getElementById("years-val");
+    var ageVal   = document.getElementById("age-val");
+    var results  = document.getElementById("results");
+    var lastDays = 0;
+
+    // Paint the teal track-fill behind the thumb to match the brand.
+    function paint(el) {
+      var min = parseFloat(el.min), max = parseFloat(el.max), v = parseFloat(el.value);
+      var pct = ((v - min) / (max - min)) * 100;
+      el.style.background =
+        "linear-gradient(90deg, var(--accent) 0%, var(--accent-2) " + pct + "%, " +
+        "var(--bg-elev-2) " + pct + "%, var(--bg-elev-2) 100%)";
+    }
+
+    function syncLabels() {
+      hoursVal.textContent = parseFloat(hours.value) + " hrs";
+      yearsVal.textContent = parseInt(years.value, 10) + " yrs";
+      ageVal.textContent   = parseInt(age.value, 10);
+    }
+
+    [hours, years, age].forEach(function (el) {
+      el.addEventListener("input", function () { paint(el); syncLabels(); });
+      paint(el);
+    });
+    syncLabels();
+
+    function round1(n) { return Math.round(n * 10) / 10; }
+
+    function calculate() {
+      var hoursPerDay = parseFloat(hours.value);
+      var yearsUsing  = parseInt(years.value, 10);
+      var ageNow      = parseInt(age.value, 10);
+
+      var minutesLostSoFar = hoursPerDay * 60 * 365 * yearsUsing;
+      var daysLostSoFar    = minutesLostSoFar / (16 * 60);
+      var monthsLost       = daysLostSoFar / 30;
+
+      var yearsToSixtyFive = Math.max(0, 65 - ageNow);
+      var daysToLoseFuture = (hoursPerDay * 365 * yearsToSixtyFive) / 16;
+      var yearsToLoseFuture = daysToLoseFuture / 365;
+
+      var books = Math.floor(daysLostSoFar / 4);
+      var languages = Math.floor(daysLostSoFar / 180);
+      var miles = Math.floor(daysLostSoFar * 7);
+
+      lastDays = round1(daysLostSoFar);
+
+      document.getElementById("days-lost").textContent = round1(daysLostSoFar) + " days";
+      document.getElementById("months-caption").textContent =
+        "= " + round1(monthsLost) + " months of your waking life, already lost";
+      document.getElementById("future-line").textContent =
+        "By 65 you'll lose another " + round1(yearsToLoseFuture) + " years";
+      document.getElementById("books").textContent = books;
+      document.getElementById("languages").textContent = languages;
+      document.getElementById("miles").textContent = miles;
+
+      // Re-trigger the entrance animation on each calculation.
+      results.classList.remove("show");
+      void results.offsetWidth;
+      results.classList.add("show");
+      results.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    document.getElementById("calc-btn").addEventListener("click", calculate);
+
+    // ---- share ----
+    var toast = document.getElementById("toast");
+    var toastTimer;
+    function showToast(text) {
+      toast.textContent = text;
+      toast.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { toast.classList.remove("show"); }, 2600);
+    }
+
+    document.getElementById("share-btn").addEventListener("click", async function () {
+      var shareData = {
+        title: "YouTube has stolen " + lastDays + " days of my life",
+        text: "Just calculated how much YouTube has eaten of my life. The number is uncomfortable. Take the YouTube Time Audit: verybrightsky.github.io/cleanfeed/audit/",
+        url: "https://verybrightsky.github.io/cleanfeed/audit/"
+      };
+      if (navigator.share) {
+        try { await navigator.share(shareData); return; }
+        catch (e) { if (e && e.name === "AbortError") return; }
+      }
+      // Fallback: copy the tweet text to the clipboard.
+      var copyText = shareData.text;
+      try {
+        await navigator.clipboard.writeText(copyText);
+        showToast("Copied — paste anywhere");
+      } catch (e) {
+        var ta = document.createElement("textarea");
+        ta.value = copyText;
+        ta.style.position = "fixed"; ta.style.opacity = "0";
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand("copy"); showToast("Copied — paste anywhere"); }
+        catch (_) { showToast("Couldn't copy — select and copy manually"); }
+        document.body.removeChild(ta);
+      }
+    });
+  </script>
+</body>
+</html>
