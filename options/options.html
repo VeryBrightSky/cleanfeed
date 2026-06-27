@@ -89,6 +89,38 @@
       </div>
     </section>
 
+    <!-- v1.4.24 — Focus Schedule (PRO) -->
+    <section class="cf-panel" id="cf-schedule-panel">
+      <h2>Focus Schedule <span class="cf-tag-pro">PRO</span></h2>
+      <p class="cf-help">
+        Auto-activate Focus Lock during set time windows — no PIN needed to enter.
+        Exiting early still needs the 60-second PIN hold, exactly like a manual Focus Lock.
+      </p>
+      <label class="cf-checkbox-row">
+        <input id="cf-schedule-enable" type="checkbox" />
+        <span>Enable scheduled Focus Lock</span>
+      </label>
+      <div id="cf-schedule-list" class="cf-schedule-list" aria-live="polite">
+        <!-- entries rendered by options.js renderSchedule() -->
+      </div>
+      <div class="cf-row-actions">
+        <button id="cf-schedule-add" class="cf-btn cf-btn-primary" type="button">+ Add Schedule</button>
+      </div>
+    </section>
+
+    <!-- v1.4.24 — Appearance -->
+    <section class="cf-panel">
+      <h2>Appearance</h2>
+      <label class="cf-theme-row">
+        <span>Popup theme</span>
+        <select id="cf-popup-theme" class="cf-select">
+          <option value="auto">Auto (match system)</option>
+          <option value="dark">Dark</option>
+          <option value="light">Light</option>
+        </select>
+      </label>
+    </section>
+
     <!-- Focus Lock (PRO) -->
     <section class="cf-panel" id="cf-focus-panel">
       <h2>Focus Lock <span class="cf-tag-pro">PRO</span></h2>
@@ -218,6 +250,41 @@
       <span><a href="https://extensionpay.com/extension/cleanfeed2342" target="_blank" rel="noopener noreferrer">Manage subscription</a></span>
     </footer>
   </div>
+
+  <!-- v1.4.24 — Add / Edit Schedule modal -->
+  <div id="cf-sched-modal" class="cf-modal" hidden aria-hidden="true">
+    <div class="cf-modal-backdrop" data-cf-sched-close></div>
+    <div class="cf-modal-card" role="dialog" aria-modal="true" aria-labelledby="cf-sched-modal-title">
+      <button class="cf-modal-close" type="button" data-cf-sched-close aria-label="Close">✕</button>
+      <h2 id="cf-sched-modal-title">Add schedule</h2>
+      <label class="cf-field">
+        <span class="cf-field-label">Name</span>
+        <input id="cf-sched-name" type="text" maxlength="40" placeholder="e.g. Work hours" autocomplete="off" />
+      </label>
+      <div class="cf-field">
+        <span class="cf-field-label">Days</span>
+        <div class="cf-day-row" id="cf-sched-days">
+          <!-- day checkboxes rendered by options.js -->
+        </div>
+      </div>
+      <div class="cf-time-row">
+        <label class="cf-field cf-field-half">
+          <span class="cf-field-label">Start</span>
+          <input id="cf-sched-start" type="time" value="09:00" />
+        </label>
+        <label class="cf-field cf-field-half">
+          <span class="cf-field-label">End</span>
+          <input id="cf-sched-end" type="time" value="17:00" />
+        </label>
+      </div>
+      <p id="cf-sched-error" class="cf-status cf-status-warn" aria-live="polite"></p>
+      <div class="cf-row-actions">
+        <button id="cf-sched-save" class="cf-btn cf-btn-primary" type="button">Save</button>
+        <button id="cf-sched-cancel" class="cf-btn" type="button" data-cf-sched-close>Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <script src="options.js"></script>
 </body>
 </html>

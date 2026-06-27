@@ -15,6 +15,12 @@
     <span class="cf-tier" id="cf-tier-badge">FREE</span>
   </header>
 
+  <!-- v1.4.24 — today's blocks one-liner + quiet usage streak -->
+  <section class="cf-today-bar" id="cf-today-bar" aria-label="Today" hidden>
+    <p class="cf-today-line" id="cf-today-line"></p>
+    <p class="cf-streak-line" id="cf-streak-line" hidden></p>
+  </section>
+
   <!-- Focus Lock banner (shown when active) -->
   <section id="cf-focus-banner" class="cf-focus-banner" hidden>
     <div class="cf-focus-banner-head">
@@ -81,6 +87,12 @@
     <!-- toggles injected by popup.js -->
   </main>
 
+  <!-- v1.4.24 — scheduled Focus Lock indicator (next / active window) -->
+  <section class="cf-sched-indicator" id="cf-sched-indicator" hidden>
+    <span class="cf-sched-icon" aria-hidden="true">⏰</span>
+    <span class="cf-sched-text" id="cf-sched-text"></span>
+  </section>
+
   <!-- v1.4.21 Phase 3 — state-driven upgrade card. popup.js renderUpgrade()
        writes one of six cases (A–F) into this section based on
        cf_grandfathered + cf_subscription.status. Body is JS-rendered so
@@ -141,6 +153,7 @@
     </div>
   </div>
 
+  <script src="../lib/cf-features.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

@@ -30,20 +30,66 @@
   --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px;
   --s-6: 24px; --s-8: 32px;
 }
+/* v1.4.24 — "Auto" theme: follow the OS only when the user hasn't forced a
+   theme via Options. The :not() guards let html.cf-theme-dark / .cf-theme-light
+   (set by popup.js applyTheme) override the system preference. */
 @media (prefers-color-scheme: light) {
-  :root {
-    --bg:        #f7f8fa;
-    --bg-elev:   #ffffff;
+  html:not(.cf-theme-dark):not(.cf-theme-light) {
+    --bg:        #ffffff;
+    --bg-elev:   #f7f8fa;
     --bg-elev-2: #eef1f6;
-    --bg-elev-3: #e3e8ef;
-    --border:    #d3d8e0;
-    --text:      #14202f;
-    --text-dim:  #4a5566;
+    --bg-elev-3: #e4e7eb;
+    --border:    #e4e7eb;
+    --text:      #1a1f2e;
+    --text-dim:  #4a5568;
     --text-faint:#8593a3;
     --shadow-md: 0 4px 14px rgba(20, 30, 50, 0.10);
     --shadow-lg: 0 14px 40px rgba(20, 30, 50, 0.14);
   }
 }
+/* v1.4.24 — forced themes (Options → Popup theme: Dark / Light). A class on
+   <html> overrides both :root and the media query above. */
+html.cf-theme-light {
+  --bg:        #ffffff;
+  --bg-elev:   #f7f8fa;
+  --bg-elev-2: #eef1f6;
+  --bg-elev-3: #e4e7eb;
+  --border:    #e4e7eb;
+  --text:      #1a1f2e;
+  --text-dim:  #4a5568;
+  --text-faint:#8593a3;
+  --shadow-md: 0 4px 14px rgba(20, 30, 50, 0.10);
+  --shadow-lg: 0 14px 40px rgba(20, 30, 50, 0.14);
+  color-scheme: light;
+}
+html.cf-theme-dark {
+  --bg:        #0f1722;
+  --bg-elev:   #15202e;
+  --bg-elev-2: #1c2a3a;
+  --bg-elev-3: #243549;
+  --border:    #233346;
+  --text:      #e6edf6;
+  --text-dim:  #93a0b3;
+  --text-faint:#5e6c7e;
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.55);
+  color-scheme: dark;
+}
+
+/* v1.4.24 — today bar, streak line, scheduled-focus indicator */
+.cf-today-bar { padding: var(--s-2) var(--s-4) 0; }
+.cf-today-line { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--text-dim); }
+.cf-today-line.cf-today-empty { color: var(--text-faint); font-style: italic; }
+.cf-streak-line { margin: 4px 0 0; font-size: 12.5px; font-weight: 600; color: var(--text); }
+.cf-sched-indicator {
+  display: flex; align-items: center; gap: var(--s-2);
+  margin: var(--s-3) var(--s-4) 0;
+  padding: 9px 12px;
+  background: var(--bg-elev); border: 1px solid var(--border);
+  border-radius: var(--r-md); font-size: 12.5px; color: var(--text-dim);
+}
+.cf-sched-indicator.cf-sched-active { border-color: var(--accent); color: var(--text); }
+.cf-sched-icon { font-size: 14px; line-height: 1; }
 
 * { box-sizing: border-box; }
 html, body {

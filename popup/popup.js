@@ -202,7 +202,9 @@ function loadState() {
        "blockerModes", "redirectHomeToSubs",
        // v1.4.21 Phase 3 — subscription + grandfather + dashboard data
        "cf_grandfathered", "cf_grandfathered_reason", "cf_subscription",
-       "cf_stats"],
+       "cf_stats",
+       // v1.4.24 — Focus Schedule + usage streak + popup theme
+       "focusSchedule", "cf_streak", "popupTheme"],
       (data) => {
         STATE.paid = !!data.paid;
         STATE.settings = data.settings || {};
@@ -230,6 +232,14 @@ function loadState() {
         STATE.cf_stats = (data.cf_stats && typeof data.cf_stats === "object")
           ? data.cf_stats
           : { blocked: {}, autoplay_avoided: {}, session_started: 0 };
+        // v1.4.24
+        STATE.focusSchedule = (data.focusSchedule && typeof data.focusSchedule === "object")
+          ? data.focusSchedule
+          : { enabled: false, schedules: [] };
+        STATE.cf_streak = (data.cf_streak && typeof data.cf_streak === "object")
+          ? data.cf_streak
+          : { streakCount: 0, lastActiveDate: null };
+        STATE.popupTheme = data.popupTheme || "auto";
         resolve();
       }
     );
@@ -691,6 +701,98 @@ function renderWeekStats() {
       `+ ${s.autoplayVideos} autoplay${s.autoplayVideos === 1 ? "" : "s"} avoided`));
   }
   host.hidden = false;
+}
+
+// ---------- v1.4.24 — popup theme (Auto / Dark / Light) ----------
+// Forced themes set a class on <html>; "auto" removes both so the
+// prefers-color-scheme media query in popup.css takes over.
+function applyTheme(mode) {
+  const root = document.documentElement;
+  root.classList.remove("cf-theme-dark", "cf-theme-light");
+  if (mode === "dark") root.classList.add("cf-theme-dark");
+  else if (mode === "light") root.classList.add("cf-theme-light");
+}
+
+// ---------- v1.4.24 — today's stats one-liner ----------
+function renderTodayStats() {
+  const host = $("cf-today-bar");
+  const line = $("cf-today-line");
+  if (!host || !line) return;
+  if (STATE.onYouTubeMusic) { host.hidden = true; return; }
+  const F = (typeof self !== "undefined" && self.CFFeatures) ? self.CFFeatures : null;
+  const blocked = (STATE.cf_stats && STATE.cf_stats.blocked) || {};
+  const dayObj = blocked[_todayKey()];
+  const today = (dayObj && typeof dayObj === "object") ? dayObj : {};
+  const total = F ? F.totalToday(today) : 0;
+  if (!F || total === 0) {
+    line.textContent = "Open YouTube to start counting today’s blocks";
+    line.classList.add("cf-today-empty");
+    host.hidden = false;
+    return;
+  }
+  line.classList.remove("cf-today-empty");
+  const top = F.summarizeToday(today, 3, F.SHORT_LABELS);
+  line.textContent = "Today: " + top.map((t) => `${t.count} ${t.label}`).join(" · ") + " hidden";
+  host.hidden = false;
+}
+
+// ---------- v1.4.24 — quiet usage streak (no nudges, no alerts) ----------
+function renderStreak() {
+  const line = $("cf-streak-line");
+  if (!line) return;
+  const n = Number(STATE.cf_streak && STATE.cf_streak.streakCount) || 0;
+  if (n < 1 || STATE.onYouTubeMusic) { line.hidden = true; return; }
+  line.textContent = `🔥 ${n} day${n === 1 ? "" : "s"} using CleanFeed`;
+  line.hidden = false;
+}
+
+// ---------- v1.4.24 — scheduled Focus Lock indicator ----------
+function _formatClock(ms) {
+  const n = Number(ms);
+  try {
+    return new Date(n).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  } catch (_) {
+    const d = new Date(n);
+    return d.getHours() + ":" + String(d.getMinutes()).padStart(2, "0");
+  }
+}
+function _relDayLabel(ms, now) {
+  const a = new Date(Number(ms));
+  const b = now || new Date();
+  const da = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+  const db = new Date(b.getFullYear(), b.getMonth(), b.getDate());
+  const diff = Math.round((da - db) / 86400000);
+  if (diff <= 0) return "today";
+  if (diff === 1) return "tomorrow";
+  try { return a.toLocaleDateString(undefined, { weekday: "long" }); }
+  catch (_) { return "in " + diff + " days"; }
+}
+function renderScheduleIndicator() {
+  const host = $("cf-sched-indicator");
+  const text = $("cf-sched-text");
+  if (!host || !text) return;
+  const F = (typeof self !== "undefined" && self.CFFeatures) ? self.CFFeatures : null;
+  const fs = STATE.focusSchedule || { enabled: false, schedules: [] };
+  if (!F || !fs.enabled || !Array.isArray(fs.schedules) || fs.schedules.length === 0 || STATE.onYouTubeMusic) {
+    host.hidden = true; return;
+  }
+  const lock = STATE.focusLock || {};
+  const lockedBySched = lock.scheduleInitiated && Number(lock.activeUntil || 0) > Date.now();
+  if (lockedBySched) {
+    const end = Number(lock.scheduleEndsAt || lock.activeUntil);
+    text.textContent = "Active focus window until " + _formatClock(end);
+    host.classList.add("cf-sched-active");
+    host.hidden = false;
+    return;
+  }
+  const next = F.findNextWindow(fs, new Date(), 8);
+  if (next) {
+    text.textContent = "Next focus window: " + _relDayLabel(next.startsAt) + " " + _formatClock(next.startsAt);
+    host.classList.remove("cf-sched-active");
+    host.hidden = false;
+    return;
+  }
+  host.hidden = true;
 }
 
 // v1.4.21 Phase 3 — short locale-aware date string for "Pro ends Aug 12, 2026"
@@ -1500,14 +1602,18 @@ async function init() {
     return;
   }
 
+  applyTheme(STATE.popupTheme);
   renderTierBadge();
   renderStats();
+  renderTodayStats();
+  renderStreak();
   renderWeekStats();
   renderUpgrade();
   renderFocusBanner();
   renderTimeMini();
   renderPause();
   renderBlockers();
+  renderScheduleIndicator();
   renderReviewPrompt();
 
   // Refresh paid status from background; re-render the parts that depend on it.
@@ -1546,6 +1652,7 @@ async function init() {
       renderFocusBanner();
       renderPause();
       renderBlockers();
+      renderScheduleIndicator();
     }
     if (changes.timeTracking) {
       STATE.timeTracking = changes.timeTracking.newValue || {};
@@ -1569,6 +1676,20 @@ async function init() {
       STATE.cf_stats = changes.cf_stats.newValue
         || { blocked: {}, autoplay_avoided: {}, session_started: 0 };
       renderWeekStats();
+      renderTodayStats();
+    }
+    // v1.4.24 — streak / schedule / theme live updates
+    if (changes.cf_streak) {
+      STATE.cf_streak = changes.cf_streak.newValue || { streakCount: 0, lastActiveDate: null };
+      renderStreak();
+    }
+    if (changes.focusSchedule) {
+      STATE.focusSchedule = changes.focusSchedule.newValue || { enabled: false, schedules: [] };
+      renderScheduleIndicator();
+    }
+    if (changes.popupTheme) {
+      STATE.popupTheme = changes.popupTheme.newValue || "auto";
+      applyTheme(STATE.popupTheme);
     }
     if (changes.perPageEnabled) {
       STATE.perPageEnabled = !!changes.perPageEnabled.newValue;

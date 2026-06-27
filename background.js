@@ -28,6 +28,17 @@ function _cflog() {
   try { console.log.apply(console, ["[CleanFeed]"].concat([].slice.call(arguments))); }
   catch (_) {}
 }
+
+// v1.4.24 — shared pure feature logic (Focus Schedule matching, streak,
+// today's-stats summary) lives in lib/cf-features.js so the popup and the
+// Node test-suite load the EXACT same code. importScripts is the classic
+// service-worker include mechanism (background.js is a classic SW, not a
+// module worker). Exposes self.CFFeatures.
+try {
+  importScripts("lib/cf-features.js");
+} catch (e) {
+  try { console.error("[CleanFeed] cf-features.js failed to load", e); } catch (_) {}
+}
 _cflog("SW boot start, manifest version", (chrome.runtime.getManifest() || {}).version);
 
 importScripts("lib/extpay.js");
@@ -406,6 +417,15 @@ function _ensureExtpaySyncAlarm() {
   } catch (_) { /* alarms permission denied — silently no-op */ }
 }
 
+// v1.4.24 — Focus Schedule tick. Fires every 60s to compare the wall clock
+// against the user's schedule windows and auto-activate / deactivate Focus
+// Lock accordingly. Idempotent (create replaces a same-named alarm).
+function _ensureFocusScheduleAlarm() {
+  try {
+    chrome.alarms.create("cf-focus-schedule", { periodInMinutes: 1 });
+  } catch (_) { /* alarms permission denied — silently no-op */ }
+}
+
 chrome.runtime.onInstalled.addListener((details) => {
   _eagerlyMintApiKey("install/update (" + details.reason + ")");
   // v1.4.23 — uninstall feedback form. setUninstallURL persists across
@@ -432,6 +452,10 @@ chrome.runtime.onInstalled.addListener((details) => {
   // update. Network errors here are silent (sync function handles them).
   syncSubscriptionFromExtPay().catch(() => {});
   _ensureExtpaySyncAlarm();
+  // v1.4.24 — register the 60s Focus Schedule tick + run one immediate check
+  // so a window that's already in progress locks without waiting up to a min.
+  _ensureFocusScheduleAlarm();
+  checkFocusSchedule().catch(() => {});
   verifyLicenseIfPresent().catch(() => {});
 });
 chrome.runtime.onStartup.addListener(() => {
@@ -448,6 +472,9 @@ chrome.runtime.onStartup.addListener(() => {
   // v1.4.21-phase2 — pull fresh subscription state on every browser launch.
   syncSubscriptionFromExtPay().catch(() => {});
   _ensureExtpaySyncAlarm();
+  // v1.4.24 — same Focus Schedule wiring at every browser launch.
+  _ensureFocusScheduleAlarm();
+  checkFocusSchedule().catch(() => {});
   verifyLicenseIfPresent().catch(() => {});
 });
 
@@ -544,6 +571,14 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       cf_grandfathered_at: null,
       cf_grandfathered_reason: null,
       cf_subscription: { status: "none", plan: null, cancelAt: null, lastSyncAt: 0 },
+      // v1.4.24 — Focus Schedule: auto-activate Focus Lock during windows.
+      // `enabled` is the master toggle; each entry has its own `enabled`.
+      focusSchedule: { enabled: false, schedules: [] },
+      // v1.4.24 — usage streak (consecutive local days with >=1 min of
+      // focused YouTube time while CleanFeed is active). Quiet; no alerts.
+      cf_streak: { streakCount: 0, lastActiveDate: null },
+      // v1.4.24 — popup theme preference: "auto" | "dark" | "light".
+      popupTheme: "auto",
     };
     await chrome.storage.local.set(defaults);
     // Set the readiness flag in a SEPARATE write so popup/content can
@@ -652,6 +687,66 @@ async function _migrateForV140() {
   await chrome.storage.local.set(patch);
 }
 
+// -------- Focus Schedule engine (v1.4.24) -------------------------------
+//
+// Runs on the 60s "cf-focus-schedule" alarm (and once on install/startup).
+// If the wall clock is inside an enabled window and Focus Lock isn't already
+// active, auto-activate it (no PIN required to ENTER — that's the whole
+// point of a schedule). When the window ends — or the master toggle is
+// flipped off — deactivate ONLY locks we started (scheduleInitiated), never
+// a user's manual / Pomodoro lock.
+//
+// Exiting EARLY is unchanged: the content script gates on focusLock.activeUntil
+// exactly as for a manual lock, so the 60-second PIN hold is still required.
+async function checkFocusSchedule() {
+  let data;
+  try {
+    data = await chrome.storage.local.get(["focusSchedule", "focusLock", "paid"]);
+  } catch (_) { return; }
+  const fs = data.focusSchedule || { enabled: false, schedules: [] };
+  const fl = Object.assign({ activeUntil: 0 }, data.focusLock || {});
+  const paid = !!data.paid;
+  const now = Date.now();
+  const lockedNow = Number(fl.activeUntil || 0) > now;
+  const bySchedule = !!fl.scheduleInitiated;
+  const F = (typeof self !== "undefined" && self.CFFeatures) ? self.CFFeatures : null;
+
+  const active = (fs.enabled && paid && F) ? F.findActiveSchedule(fs, new Date()) : null;
+
+  if (active && active.endsAt) {
+    if (!lockedNow) {
+      // Auto-activate. PIN is NOT required to enter a scheduled lock.
+      fl.activeUntil = active.endsAt;
+      fl.mode = "standard";
+      fl.scheduleInitiated = true;
+      fl.scheduleId = active.schedule.id || null;
+      fl.scheduleEndsAt = active.endsAt;
+      await chrome.storage.local.set({ focusLock: fl });
+      updateBadge();
+    } else if (bySchedule && Number(fl.scheduleEndsAt || 0) !== active.endsAt) {
+      // Already locked by us — keep activeUntil aligned to the live window end
+      // (e.g. the user edited the window's end time mid-session).
+      fl.activeUntil = active.endsAt;
+      fl.scheduleEndsAt = active.endsAt;
+      fl.scheduleId = active.schedule.id || fl.scheduleId || null;
+      await chrome.storage.local.set({ focusLock: fl });
+      updateBadge();
+    }
+    // If locked by the USER (not bySchedule), leave it completely alone.
+    return;
+  }
+
+  // No active window (or master toggle off / not paid): release a lock we own.
+  if (bySchedule) {
+    fl.activeUntil = 0;
+    fl.scheduleInitiated = false;
+    fl.scheduleId = null;
+    fl.scheduleEndsAt = 0;
+    await chrome.storage.local.set({ focusLock: fl });
+    updateBadge();
+  }
+}
+
 // -------- Pomodoro alarm handler (F4) -----------------------------------
 //
 // Phase 1: focus — blockers force-on (handled by content.js via focusLock
@@ -664,6 +759,11 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   // errors here are silent (handled inside syncSubscriptionFromExtPay).
   if (alarm.name === "cf-extpay-sync") {
     syncSubscriptionFromExtPay().catch(() => {});
+    return;
+  }
+  // v1.4.24 — Focus Schedule 60s tick.
+  if (alarm.name === "cf-focus-schedule") {
+    checkFocusSchedule().catch(() => {});
     return;
   }
   if (alarm.name !== "cf-pomodoro") return;
@@ -861,6 +961,21 @@ async function _flushTimeTracker() {
     if (!keep.has(k)) delete tt[k];
   }
   await chrome.storage.local.set({ timeTracking: tt });
+
+  // v1.4.24 — usage streak. Once today's focused-YT time crosses 1 minute,
+  // advance the consecutive-day streak. Pure logic lives in cf-features.js
+  // (unit-tested). Quiet by design — no notifications, no nudges.
+  try {
+    const F = (typeof self !== "undefined" && self.CFFeatures) ? self.CFFeatures : null;
+    if (F && (tt[_ttAccum.date] || 0) >= 60) {
+      const sd = await chrome.storage.local.get(["cf_streak"]);
+      const prev = sd.cf_streak || { streakCount: 0, lastActiveDate: null };
+      const next = F.updateStreak(prev, _ttAccum.date);
+      if (next.streakCount !== prev.streakCount || next.lastActiveDate !== prev.lastActiveDate) {
+        await chrome.storage.local.set({ cf_streak: next });
+      }
+    }
+  } catch (_) { /* streak is best-effort; never break time tracking */ }
 }
 
 function _recordTime(ms) {
@@ -922,6 +1037,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       fl.pomodoro = cfg;
       fl.pomodoroState = { phase: "focus", cycle: 1, total: cfg.cycles, until };
       fl.activeUntil = until;
+      // v1.4.24 — a user-started Pomodoro is NOT a scheduled lock, so the
+      // Focus Schedule engine must never auto-deactivate it.
+      fl.scheduleInitiated = false;
       await chrome.storage.local.set({ focusLock: fl });
       try { chrome.alarms.clear("cf-pomodoro"); } catch (_) {}
       chrome.alarms.create("cf-pomodoro", { when: until });

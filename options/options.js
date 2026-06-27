@@ -27,6 +27,10 @@ const STATE = {
   cf_grandfathered_reason: null,
   cf_subscription: { status: "none", plan: null, cancelAt: null, lastSyncAt: 0 },
   cf_stats: { blocked: {}, autoplay_avoided: {}, session_started: 0 },
+  // v1.4.24 — Focus Schedule + popup theme
+  focusSchedule: { enabled: false, schedules: [] },
+  popupTheme: "auto",
+  _editingScheduleId: null,
 };
 
 // v1.4.21 Phase 3 — minimal blocker-id → human-label map for the dashboard
@@ -91,7 +95,9 @@ async function load() {
        "cleanfeed_license", "installId",
        // v1.4.21 Phase 3
        "cf_grandfathered", "cf_grandfathered_at", "cf_grandfathered_reason",
-       "cf_subscription", "cf_stats"],
+       "cf_subscription", "cf_stats",
+       // v1.4.24
+       "focusSchedule", "popupTheme"],
       (data) => {
         STATE.paid = !!data.paid;
         STATE.whitelistedChannels = data.whitelistedChannels || [];
@@ -115,6 +121,12 @@ async function load() {
         STATE.cf_stats = (data.cf_stats && typeof data.cf_stats === "object")
           ? data.cf_stats
           : { blocked: {}, autoplay_avoided: {}, session_started: 0 };
+        // v1.4.24
+        STATE.focusSchedule = (data.focusSchedule && typeof data.focusSchedule === "object"
+          && Array.isArray(data.focusSchedule.schedules))
+          ? data.focusSchedule
+          : { enabled: false, schedules: [] };
+        STATE.popupTheme = data.popupTheme || "auto";
         resolve();
       }
     );
@@ -494,7 +506,9 @@ async function startFocusLock() {
   const dur = STATE.selectedDurationMin;
   const FAR_FUTURE = 8640000000000000;  // beyond any reasonable date
   const activeUntil = dur === -1 ? FAR_FUTURE : Date.now() + dur * 60 * 1000;
-  STATE.focusLock = Object.assign({}, STATE.focusLock, { activeUntil });
+  // v1.4.24 — a manually-started lock is user-initiated, so the Focus
+  // Schedule engine must never auto-deactivate it.
+  STATE.focusLock = Object.assign({}, STATE.focusLock, { activeUntil, scheduleInitiated: false });
   await chrome.storage.local.set({ focusLock: STATE.focusLock });
   $("cf-start-pin").value = "";
   renderFocusLock();
@@ -1003,6 +1017,213 @@ function renderStatsDashboard() {
   totalsHost.textContent = `All-time: ${allTimeBlocked} ${allTimeBlocked === 1 ? "video" : "videos"} blocked, ${hours} ${hours === 1 ? "hour" : "hours"} saved, ${allTimeAutoplay} autoplay ${allTimeAutoplay === 1 ? "chain" : "chains"} avoided.`;
 }
 
+// ===== v1.4.24 — Focus Schedule + popup theme ============================
+
+// Monday-first day order for the UI; values are JS getDay() numbers (0=Sun).
+const CF_SCHED_DAYS = [
+  { n: 1, label: "Mon" }, { n: 2, label: "Tue" }, { n: 3, label: "Wed" },
+  { n: 4, label: "Thu" }, { n: 5, label: "Fri" }, { n: 6, label: "Sat" },
+  { n: 0, label: "Sun" },
+];
+
+function _schedDaysSummary(days) {
+  const set = Array.isArray(days) ? days.slice().sort((a, b) => a - b) : [];
+  if (set.length === 0) return "No days";
+  if (set.length === 7) return "Every day";
+  if (set.length === 5 && [1, 2, 3, 4, 5].every((d) => set.indexOf(d) !== -1)) return "Mon–Fri";
+  if (set.length === 2 && set.indexOf(0) !== -1 && set.indexOf(6) !== -1) return "Weekends";
+  return CF_SCHED_DAYS.filter((d) => set.indexOf(d.n) !== -1).map((d) => d.label).join(", ");
+}
+
+function _schedTime12(hm) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(hm || ""));
+  if (!m) return hm;
+  let h = Number(m[1]); const mm = m[2];
+  const ap = h < 12 ? "AM" : "PM";
+  h = h % 12; if (h === 0) h = 12;
+  return `${h}:${mm} ${ap}`;
+}
+
+function _schedNewId() {
+  return "sch_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+function _focusScheduleObj() {
+  const fs = STATE.focusSchedule;
+  return (fs && typeof fs === "object" && Array.isArray(fs.schedules))
+    ? fs : { enabled: false, schedules: [] };
+}
+
+async function saveFocusSchedule() {
+  await chrome.storage.local.set({ focusSchedule: STATE.focusSchedule });
+}
+
+function renderSchedule() {
+  const fs = _focusScheduleObj();
+  STATE.focusSchedule = fs;
+  const cb = $("cf-schedule-enable");
+  if (cb) { cb.checked = !!fs.enabled; cb.disabled = !STATE.paid; }
+  const addBtn = $("cf-schedule-add");
+  if (addBtn) addBtn.disabled = !STATE.paid;
+  const list = $("cf-schedule-list");
+  if (!list) return;
+  while (list.firstChild) list.removeChild(list.firstChild);
+  if (!STATE.paid) {
+    const p = document.createElement("p");
+    p.className = "cf-help";
+    p.textContent = "Focus Schedule is a Pro feature.";
+    list.appendChild(p);
+    return;
+  }
+  if (fs.schedules.length === 0) {
+    const p = document.createElement("p");
+    p.className = "cf-help";
+    p.textContent = "No schedules yet. Add one to auto-start Focus Lock.";
+    list.appendChild(p);
+    return;
+  }
+  for (const s of fs.schedules) list.appendChild(_scheduleRow(s));
+}
+
+function _scheduleRow(s) {
+  const row = document.createElement("div");
+  row.className = "cf-sched-item" + (s.enabled === false ? " cf-sched-off" : "");
+
+  const enable = document.createElement("input");
+  enable.type = "checkbox";
+  enable.checked = s.enabled !== false;
+  enable.title = "Enable this schedule";
+  enable.addEventListener("change", () => toggleScheduleEntry(s.id, enable.checked));
+
+  const main = document.createElement("div");
+  main.className = "cf-sched-item-main";
+  const name = document.createElement("div");
+  name.className = "cf-sched-item-name";
+  name.textContent = s.name || "Schedule"; // textContent — never trust stored names as HTML
+  const meta = document.createElement("div");
+  meta.className = "cf-sched-item-meta";
+  meta.textContent = `${_schedDaysSummary(s.days)} · ${_schedTime12(s.startTime)} – ${_schedTime12(s.endTime)}`;
+  main.appendChild(name); main.appendChild(meta);
+
+  const actions = document.createElement("div");
+  actions.className = "cf-sched-item-actions";
+  const edit = document.createElement("button");
+  edit.type = "button"; edit.className = "cf-icon-btn"; edit.textContent = "Edit";
+  edit.addEventListener("click", () => openScheduleModal(s.id));
+  const del = document.createElement("button");
+  del.type = "button"; del.className = "cf-icon-btn cf-icon-danger"; del.textContent = "Delete";
+  del.addEventListener("click", () => deleteScheduleEntry(s.id));
+  actions.appendChild(edit); actions.appendChild(del);
+
+  row.appendChild(enable); row.appendChild(main); row.appendChild(actions);
+  return row;
+}
+
+async function onScheduleEnableToggle() {
+  if (!STATE.paid) return;
+  const fs = _focusScheduleObj();
+  fs.enabled = !!$("cf-schedule-enable").checked;
+  STATE.focusSchedule = fs;
+  await saveFocusSchedule();
+}
+
+async function toggleScheduleEntry(id, enabled) {
+  const fs = _focusScheduleObj();
+  const e = fs.schedules.find((x) => x.id === id);
+  if (!e) return;
+  e.enabled = !!enabled;
+  STATE.focusSchedule = fs;
+  await saveFocusSchedule();
+  renderSchedule();
+}
+
+async function deleteScheduleEntry(id) {
+  const fs = _focusScheduleObj();
+  fs.schedules = fs.schedules.filter((x) => x.id !== id);
+  STATE.focusSchedule = fs;
+  await saveFocusSchedule();
+  renderSchedule();
+}
+
+function _renderDayChips(selected) {
+  const host = $("cf-sched-days");
+  if (!host) return;
+  while (host.firstChild) host.removeChild(host.firstChild);
+  const sel = Array.isArray(selected) ? selected : [];
+  for (const d of CF_SCHED_DAYS) {
+    const lab = document.createElement("label");
+    lab.className = "cf-day-chip" + (sel.indexOf(d.n) !== -1 ? " cf-day-on" : "");
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.value = String(d.n); cb.checked = sel.indexOf(d.n) !== -1;
+    cb.addEventListener("change", () => lab.classList.toggle("cf-day-on", cb.checked));
+    const span = document.createElement("span");
+    span.textContent = d.label;
+    lab.appendChild(cb); lab.appendChild(span);
+    host.appendChild(lab);
+  }
+}
+
+function openScheduleModal(id) {
+  if (!STATE.paid) return;
+  const fs = _focusScheduleObj();
+  const entry = id ? fs.schedules.find((x) => x.id === id) : null;
+  STATE._editingScheduleId = entry ? entry.id : null;
+  $("cf-sched-modal-title").textContent = entry ? "Edit schedule" : "Add schedule";
+  $("cf-sched-name").value = entry ? (entry.name || "") : "";
+  $("cf-sched-start").value = entry ? (entry.startTime || "09:00") : "09:00";
+  $("cf-sched-end").value = entry ? (entry.endTime || "17:00") : "17:00";
+  $("cf-sched-error").textContent = "";
+  _renderDayChips(entry ? entry.days : [1, 2, 3, 4, 5]);
+  const modal = $("cf-sched-modal");
+  modal.hidden = false; modal.setAttribute("aria-hidden", "false");
+  $("cf-sched-name").focus();
+}
+
+function closeScheduleModal() {
+  const modal = $("cf-sched-modal");
+  if (!modal) return;
+  modal.hidden = true; modal.setAttribute("aria-hidden", "true");
+  STATE._editingScheduleId = null;
+}
+
+async function saveScheduleFromModal() {
+  const name = $("cf-sched-name").value.trim() || "Schedule";
+  const start = $("cf-sched-start").value;
+  const end = $("cf-sched-end").value;
+  const days = Array.prototype.slice
+    .call(document.querySelectorAll("#cf-sched-days input:checked"))
+    .map((cb) => Number(cb.value));
+  const err = $("cf-sched-error");
+  if (days.length === 0) { err.textContent = "Pick at least one day."; return; }
+  if (!/^\d{2}:\d{2}$/.test(start) || !/^\d{2}:\d{2}$/.test(end)) { err.textContent = "Set a start and end time."; return; }
+  if (start === end) { err.textContent = "Start and end can’t be the same."; return; }
+  const fs = _focusScheduleObj();
+  if (STATE._editingScheduleId) {
+    const e = fs.schedules.find((x) => x.id === STATE._editingScheduleId);
+    if (e) { e.name = name; e.days = days; e.startTime = start; e.endTime = end; }
+  } else {
+    fs.schedules.push({
+      id: _schedNewId(), name, enabled: true,
+      days, startTime: start, endTime: end, blockersToEnforce: "all",
+    });
+  }
+  STATE.focusSchedule = fs;
+  await saveFocusSchedule();
+  closeScheduleModal();
+  renderSchedule();
+}
+
+function renderThemeSelect() {
+  const sel = $("cf-popup-theme");
+  if (sel) sel.value = STATE.popupTheme || "auto";
+}
+
+async function onThemeChange() {
+  const v = $("cf-popup-theme").value;
+  STATE.popupTheme = (v === "dark" || v === "light") ? v : "auto";
+  await chrome.storage.local.set({ popupTheme: STATE.popupTheme });
+}
+
 async function init() {
   try {
     $("cf-version").textContent = "v" + chrome.runtime.getManifest().version;
@@ -1024,6 +1245,9 @@ async function init() {
   renderKeywords();
   renderPomodoro();
   renderPerPage();
+  // v1.4.24
+  renderSchedule();
+  renderThemeSelect();
 
   $("cf-whitelist-add").addEventListener("click", addChannel);
   $("cf-whitelist-new").addEventListener("keydown", (e) => {
@@ -1042,6 +1266,13 @@ async function init() {
   $("cf-pomo-start").addEventListener("click", startPomodoro);
   $("cf-pomo-cancel").addEventListener("click", cancelPomodoro);
   $("cf-perpage-enable").addEventListener("change", onPerPageToggle);
+  // v1.4.24 — Focus Schedule + popup theme wiring
+  $("cf-schedule-enable").addEventListener("change", onScheduleEnableToggle);
+  $("cf-schedule-add").addEventListener("click", () => openScheduleModal(null));
+  $("cf-sched-save").addEventListener("click", saveScheduleFromModal);
+  $("cf-popup-theme").addEventListener("change", onThemeChange);
+  document.querySelectorAll("[data-cf-sched-close]").forEach((b) => b.addEventListener("click", closeScheduleModal));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeScheduleModal(); });
   // v1.4.17 — license redemption
   $("cf-license-redeem").addEventListener("click", onLicenseRedeem);
   $("cf-license-input").addEventListener("keydown", (e) => {
@@ -1053,7 +1284,7 @@ async function init() {
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;
-    if (changes.paid) { STATE.paid = !!changes.paid.newValue; renderTier(); renderWhitelist(); renderBlockedList(); renderFocusLock(); renderKeywords(); renderPomodoro(); renderPerPage(); }
+    if (changes.paid) { STATE.paid = !!changes.paid.newValue; renderTier(); renderWhitelist(); renderBlockedList(); renderFocusLock(); renderKeywords(); renderPomodoro(); renderPerPage(); renderSchedule(); }
     if (changes.whitelistedChannels) { STATE.whitelistedChannels = changes.whitelistedChannels.newValue || []; renderWhitelist(); }
     if (changes.customCSS) { STATE.customCSS = changes.customCSS.newValue || ""; renderCustomCSS(); }
     if (changes.blockedChannels) { STATE.blockedChannels = changes.blockedChannels.newValue || []; renderBlockedList(); }
@@ -1086,6 +1317,17 @@ async function init() {
       STATE.cf_stats = changes.cf_stats.newValue
         || { blocked: {}, autoplay_avoided: {}, session_started: 0 };
       renderStatsDashboard();
+    }
+    // v1.4.24
+    if (changes.focusSchedule) {
+      STATE.focusSchedule = (changes.focusSchedule.newValue && Array.isArray(changes.focusSchedule.newValue.schedules))
+        ? changes.focusSchedule.newValue
+        : { enabled: false, schedules: [] };
+      renderSchedule();
+    }
+    if (changes.popupTheme) {
+      STATE.popupTheme = changes.popupTheme.newValue || "auto";
+      renderThemeSelect();
     }
   });
 }
