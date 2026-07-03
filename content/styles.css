@@ -37,7 +37,10 @@ body.cf-block-shorts ytd-rich-section-renderer:has(ytd-rich-shelf-renderer[is-sh
 body.cf-block-shorts ytd-guide-entry-renderer:has(a[title="Shorts"]),
 body.cf-block-shorts ytd-mini-guide-entry-renderer:has(a[title="Shorts"]),
 body.cf-block-shorts ytd-guide-entry-renderer:has(yt-formatted-string[title="Shorts"]),
-body.cf-block-shorts grid-shelf-view-model:has([title="Shorts"]) {
+body.cf-block-shorts grid-shelf-view-model:has([title="Shorts"]),
+/* v1.4.24.2 — new-DOM Shorts shelf (no [title="Shorts"]); match by lockups */
+body.cf-block-shorts grid-shelf-view-model:has(ytm-shorts-lockup-view-model-v2),
+body.cf-block-shorts ytm-shorts-lockup-view-model-v2 {
   display: none !important;
 }
 
@@ -46,7 +49,9 @@ body.cf-block-watch-sidebar ytd-watch-flexy #secondary,
 body.cf-block-watch-sidebar ytd-watch-flexy #secondary-inner,
 body.cf-block-watch-sidebar ytd-watch-next-secondary-results-renderer,
 body.cf-block-watch-sidebar #related.ytd-watch-flexy,
-body.cf-block-watch-sidebar ytd-compact-video-renderer {
+body.cf-block-watch-sidebar ytd-compact-video-renderer,
+/* v1.4.24.2 — new-DOM sidebar recs, scoped to the watch-page rail */
+body.cf-block-watch-sidebar #secondary yt-lockup-view-model {
   display: none !important;
 }
 /* Without the sidebar, the video can stretch wider for a cleaner read */
@@ -111,6 +116,8 @@ body.cf-comments-shown .cf-show-comments-btn {
 body.cf-block-thumbnails ytd-thumbnail img,
 body.cf-block-thumbnails yt-image img,
 body.cf-block-thumbnails .yt-thumbnail-view-model img,
+/* v1.4.24.2 — new-DOM thumbnail is a TAG, not a class; class form kept above */
+body.cf-block-thumbnails yt-thumbnail-view-model img,
 body.cf-block-thumbnails ytd-playlist-thumbnail img,
 body.cf-block-thumbnails ytd-moving-thumbnail-renderer img {
   opacity: 0 !important;
@@ -118,12 +125,14 @@ body.cf-block-thumbnails ytd-moving-thumbnail-renderer img {
 }
 body.cf-block-thumbnails ytd-thumbnail:hover img,
 body.cf-block-thumbnails yt-image:hover img,
-body.cf-block-thumbnails .yt-thumbnail-view-model:hover img {
+body.cf-block-thumbnails .yt-thumbnail-view-model:hover img,
+body.cf-block-thumbnails yt-thumbnail-view-model:hover img {
   opacity: 0.55 !important;
 }
 /* Give the parent a neutral, slightly-textured placeholder when image is hidden */
 body.cf-block-thumbnails ytd-thumbnail,
 body.cf-block-thumbnails .yt-thumbnail-view-model,
+body.cf-block-thumbnails yt-thumbnail-view-model,
 body.cf-block-thumbnails ytd-playlist-thumbnail {
   background: linear-gradient(135deg, #2a2e36 0%, #1c2028 100%) !important;
 }
@@ -292,7 +301,9 @@ body.cf-block-shorts.cf-mode-shorts-blur ytd-reel-item-renderer,
 body.cf-block-shorts.cf-mode-shorts-blur ytd-shorts,
 body.cf-block-shorts.cf-mode-shorts-blur ytd-guide-entry-renderer:has(a[title="Shorts"]),
 body.cf-block-shorts.cf-mode-shorts-blur ytd-mini-guide-entry-renderer:has(a[title="Shorts"]),
-body.cf-block-shorts.cf-mode-shorts-blur grid-shelf-view-model:has([title="Shorts"]) {
+body.cf-block-shorts.cf-mode-shorts-blur grid-shelf-view-model:has([title="Shorts"]),
+body.cf-block-shorts.cf-mode-shorts-blur grid-shelf-view-model:has(ytm-shorts-lockup-view-model-v2),
+body.cf-block-shorts.cf-mode-shorts-blur ytm-shorts-lockup-view-model-v2 {
   display: revert !important; filter: blur(8px) !important; pointer-events: none !important;
 }
 body.cf-block-shorts.cf-mode-shorts-blur ytd-rich-shelf-renderer[is-shorts]:hover,
@@ -301,7 +312,9 @@ body.cf-block-shorts.cf-mode-shorts-blur ytd-reel-item-renderer:hover,
 body.cf-block-shorts.cf-mode-shorts-blur ytd-shorts:hover,
 body.cf-block-shorts.cf-mode-shorts-blur ytd-guide-entry-renderer:has(a[title="Shorts"]):hover,
 body.cf-block-shorts.cf-mode-shorts-blur ytd-mini-guide-entry-renderer:has(a[title="Shorts"]):hover,
-body.cf-block-shorts.cf-mode-shorts-blur grid-shelf-view-model:has([title="Shorts"]):hover {
+body.cf-block-shorts.cf-mode-shorts-blur grid-shelf-view-model:has([title="Shorts"]):hover,
+body.cf-block-shorts.cf-mode-shorts-blur grid-shelf-view-model:has(ytm-shorts-lockup-view-model-v2):hover,
+body.cf-block-shorts.cf-mode-shorts-blur ytm-shorts-lockup-view-model-v2:hover {
   filter: none !important; pointer-events: auto !important;
 }
 body.cf-block-shorts.cf-mode-shorts-dim ytd-rich-shelf-renderer[is-shorts],
@@ -310,7 +323,9 @@ body.cf-block-shorts.cf-mode-shorts-dim ytd-reel-item-renderer,
 body.cf-block-shorts.cf-mode-shorts-dim ytd-shorts,
 body.cf-block-shorts.cf-mode-shorts-dim ytd-guide-entry-renderer:has(a[title="Shorts"]),
 body.cf-block-shorts.cf-mode-shorts-dim ytd-mini-guide-entry-renderer:has(a[title="Shorts"]),
-body.cf-block-shorts.cf-mode-shorts-dim grid-shelf-view-model:has([title="Shorts"]) {
+body.cf-block-shorts.cf-mode-shorts-dim grid-shelf-view-model:has([title="Shorts"]),
+body.cf-block-shorts.cf-mode-shorts-dim grid-shelf-view-model:has(ytm-shorts-lockup-view-model-v2),
+body.cf-block-shorts.cf-mode-shorts-dim ytm-shorts-lockup-view-model-v2 {
   display: revert !important; opacity: 0.15 !important; pointer-events: none !important;
 }
 body.cf-block-shorts.cf-mode-shorts-dim ytd-rich-shelf-renderer[is-shorts]:hover,
@@ -319,7 +334,9 @@ body.cf-block-shorts.cf-mode-shorts-dim ytd-reel-item-renderer:hover,
 body.cf-block-shorts.cf-mode-shorts-dim ytd-shorts:hover,
 body.cf-block-shorts.cf-mode-shorts-dim ytd-guide-entry-renderer:has(a[title="Shorts"]):hover,
 body.cf-block-shorts.cf-mode-shorts-dim ytd-mini-guide-entry-renderer:has(a[title="Shorts"]):hover,
-body.cf-block-shorts.cf-mode-shorts-dim grid-shelf-view-model:has([title="Shorts"]):hover {
+body.cf-block-shorts.cf-mode-shorts-dim grid-shelf-view-model:has([title="Shorts"]):hover,
+body.cf-block-shorts.cf-mode-shorts-dim grid-shelf-view-model:has(ytm-shorts-lockup-view-model-v2):hover,
+body.cf-block-shorts.cf-mode-shorts-dim ytm-shorts-lockup-view-model-v2:hover {
   opacity: 1 !important; pointer-events: auto !important;
 }
 
@@ -328,7 +345,8 @@ body.cf-block-watch-sidebar.cf-mode-watch-sidebar-blur ytd-watch-flexy #secondar
 body.cf-block-watch-sidebar.cf-mode-watch-sidebar-blur ytd-watch-flexy #secondary-inner,
 body.cf-block-watch-sidebar.cf-mode-watch-sidebar-blur ytd-watch-next-secondary-results-renderer,
 body.cf-block-watch-sidebar.cf-mode-watch-sidebar-blur #related.ytd-watch-flexy,
-body.cf-block-watch-sidebar.cf-mode-watch-sidebar-blur ytd-compact-video-renderer {
+body.cf-block-watch-sidebar.cf-mode-watch-sidebar-blur ytd-compact-video-renderer,
+body.cf-block-watch-sidebar.cf-mode-watch-sidebar-blur #secondary yt-lockup-view-model {
   display: revert !important; filter: blur(8px) !important; pointer-events: none !important;
 }
 body.cf-block-watch-sidebar.cf-mode-watch-sidebar-blur #related.ytd-watch-flexy:hover,
@@ -339,7 +357,8 @@ body.cf-block-watch-sidebar.cf-mode-watch-sidebar-dim ytd-watch-flexy #secondary
 body.cf-block-watch-sidebar.cf-mode-watch-sidebar-dim ytd-watch-flexy #secondary-inner,
 body.cf-block-watch-sidebar.cf-mode-watch-sidebar-dim ytd-watch-next-secondary-results-renderer,
 body.cf-block-watch-sidebar.cf-mode-watch-sidebar-dim #related.ytd-watch-flexy,
-body.cf-block-watch-sidebar.cf-mode-watch-sidebar-dim ytd-compact-video-renderer {
+body.cf-block-watch-sidebar.cf-mode-watch-sidebar-dim ytd-compact-video-renderer,
+body.cf-block-watch-sidebar.cf-mode-watch-sidebar-dim #secondary yt-lockup-view-model {
   display: revert !important; opacity: 0.15 !important; pointer-events: none !important;
 }
 body.cf-block-watch-sidebar.cf-mode-watch-sidebar-dim #related.ytd-watch-flexy:hover,
@@ -446,12 +465,14 @@ body.cf-block-live-chat.cf-mode-live-chat-dim #chat.ytd-watch-flexy:hover {
 /* --- thumbnails: existing rules use opacity, blur layers on top --- */
 body.cf-block-thumbnails.cf-mode-thumbnails-blur ytd-thumbnail img,
 body.cf-block-thumbnails.cf-mode-thumbnails-blur yt-image img,
-body.cf-block-thumbnails.cf-mode-thumbnails-blur .yt-thumbnail-view-model img {
+body.cf-block-thumbnails.cf-mode-thumbnails-blur .yt-thumbnail-view-model img,
+body.cf-block-thumbnails.cf-mode-thumbnails-blur yt-thumbnail-view-model img {
   opacity: 1 !important; filter: blur(8px) !important;
 }
 body.cf-block-thumbnails.cf-mode-thumbnails-blur ytd-thumbnail:hover img,
 body.cf-block-thumbnails.cf-mode-thumbnails-blur yt-image:hover img,
-body.cf-block-thumbnails.cf-mode-thumbnails-blur .yt-thumbnail-view-model:hover img {
+body.cf-block-thumbnails.cf-mode-thumbnails-blur .yt-thumbnail-view-model:hover img,
+body.cf-block-thumbnails.cf-mode-thumbnails-blur yt-thumbnail-view-model:hover img {
   filter: none !important;
 }
 /* Dim mode = existing default (opacity 0). The default hide rule is already
@@ -459,7 +480,8 @@ body.cf-block-thumbnails.cf-mode-thumbnails-blur .yt-thumbnail-view-model:hover 
  * actually identical to default — alias for the user's mental model. */
 body.cf-block-thumbnails.cf-mode-thumbnails-dim ytd-thumbnail img,
 body.cf-block-thumbnails.cf-mode-thumbnails-dim yt-image img,
-body.cf-block-thumbnails.cf-mode-thumbnails-dim .yt-thumbnail-view-model img {
+body.cf-block-thumbnails.cf-mode-thumbnails-dim .yt-thumbnail-view-model img,
+body.cf-block-thumbnails.cf-mode-thumbnails-dim yt-thumbnail-view-model img {
   opacity: 0.15 !important;
 }
 

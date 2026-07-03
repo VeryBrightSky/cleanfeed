@@ -62,6 +62,12 @@
         'ytd-guide-entry-renderer:has(yt-formatted-string[title="Shorts"])',
         // Search results "Shorts" shelves
         'grid-shelf-view-model:has([title="Shorts"])',
+        // v1.4.24.2 — new-DOM Shorts shelf (yt-*-view-model migration). The
+        // migrated shelf no longer exposes [title="Shorts"], so match it by
+        // the shorts lockups it wraps; also catch standalone lockups that
+        // appear outside a shelf. Old selectors above are KEPT (both DOMs live).
+        "grid-shelf-view-model:has(ytm-shorts-lockup-view-model-v2)",
+        "ytm-shorts-lockup-view-model-v2",
         "ytd-reel-shelf-renderer",
         // Block direct /shorts/ navigation route — covered by content.js redirect
       ],
@@ -79,6 +85,10 @@
         "ytd-watch-next-secondary-results-renderer",
         "#related.ytd-watch-flexy",
         "ytd-compact-video-renderer",
+        // v1.4.24.2 — new-DOM sidebar recs (yt-lockup-view-model). Scoped to
+        // #secondary so we only hide lockups in the watch-page rail, not
+        // lockups elsewhere (search/home). Old selector above KEPT.
+        "#secondary yt-lockup-view-model",
       ],
     },
     {
@@ -173,6 +183,10 @@
         "ytd-thumbnail img",
         "yt-image img",
         ".yt-thumbnail-view-model img",
+        // v1.4.24.2 — new-DOM thumbnail is a custom-element TAG, not a class.
+        // The class form above matches nothing on migrated cohorts; the tag
+        // form below does. Class form KEPT (harmless, covers any class usage).
+        "yt-thumbnail-view-model img",
       ],
     },
     {
