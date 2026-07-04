@@ -118,6 +118,8 @@ body.cf-block-thumbnails yt-image img,
 body.cf-block-thumbnails .yt-thumbnail-view-model img,
 /* v1.4.24.2 — new-DOM thumbnail is a TAG, not a class; class form kept above */
 body.cf-block-thumbnails yt-thumbnail-view-model img,
+/* v1.4.24.3 — Shorts lockups carry their own thumbnail image */
+body.cf-block-thumbnails ytm-shorts-lockup-view-model-v2 img,
 body.cf-block-thumbnails ytd-playlist-thumbnail img,
 body.cf-block-thumbnails ytd-moving-thumbnail-renderer img {
   opacity: 0 !important;
@@ -126,13 +128,15 @@ body.cf-block-thumbnails ytd-moving-thumbnail-renderer img {
 body.cf-block-thumbnails ytd-thumbnail:hover img,
 body.cf-block-thumbnails yt-image:hover img,
 body.cf-block-thumbnails .yt-thumbnail-view-model:hover img,
-body.cf-block-thumbnails yt-thumbnail-view-model:hover img {
+body.cf-block-thumbnails yt-thumbnail-view-model:hover img,
+body.cf-block-thumbnails ytm-shorts-lockup-view-model-v2:hover img {
   opacity: 0.55 !important;
 }
 /* Give the parent a neutral, slightly-textured placeholder when image is hidden */
 body.cf-block-thumbnails ytd-thumbnail,
 body.cf-block-thumbnails .yt-thumbnail-view-model,
 body.cf-block-thumbnails yt-thumbnail-view-model,
+body.cf-block-thumbnails ytm-shorts-lockup-view-model-v2,
 body.cf-block-thumbnails ytd-playlist-thumbnail {
   background: linear-gradient(135deg, #2a2e36 0%, #1c2028 100%) !important;
 }
@@ -160,7 +164,10 @@ body.cf-block-breaking-news ytd-rich-shelf-renderer:has(yt-formatted-string[titl
   display: none !important;
 }
 body.cf-block-mixes-playlists ytd-radio-renderer,
-body.cf-block-mixes-playlists ytd-compact-radio-renderer {
+body.cf-block-mixes-playlists ytd-compact-radio-renderer,
+/* v1.4.24.3 — new-DOM Mix/radio playlists (list=RD…), not ordinary playlists */
+body.cf-block-mixes-playlists yt-lockup-view-model:has(a[href*="&list=RD"]),
+body.cf-block-mixes-playlists yt-lockup-view-model:has(a[href*="list=RD"]) {
   display: none !important;
 }
 
@@ -242,11 +249,22 @@ body.cf-block-subs-members-only ytd-rich-item-renderer:has(.badge-style-type-mem
 body.cf-block-subs-members-only ytd-rich-item-renderer:has([aria-label*="Members only"]) {
   display: none !important;
 }
+/* v1.4.24.3 — new-DOM members-only cards are yt-lockup-view-model; the badge
+ * exposes no stable attribute, so content.js's applyMembersOnlySweep scans
+ * badge text and marks matches with data-cf-members-only="1". */
+body.cf-block-subs-members-only yt-lockup-view-model[data-cf-members-only="1"] {
+  display: none !important;
+}
 
 /* Already-watched >95%: selector-side we mark the parent card with
  * data-cf-watched="1" from content.js (applyWatchedSweep) — pure CSS
  * here just hides what JS marked. */
 body.cf-block-subs-watched ytd-browse[page-subtype="subscriptions"] ytd-rich-item-renderer[data-cf-watched="1"] {
+  display: none !important;
+}
+/* v1.4.24.3 — fully-migrated cohorts wrap the card in yt-lockup-view-model
+ * (no ytd-rich-item-renderer); applyWatchedSweep tags whichever it finds. */
+body.cf-block-subs-watched ytd-browse[page-subtype="subscriptions"] yt-lockup-view-model[data-cf-watched="1"] {
   display: none !important;
 }
 
@@ -466,13 +484,15 @@ body.cf-block-live-chat.cf-mode-live-chat-dim #chat.ytd-watch-flexy:hover {
 body.cf-block-thumbnails.cf-mode-thumbnails-blur ytd-thumbnail img,
 body.cf-block-thumbnails.cf-mode-thumbnails-blur yt-image img,
 body.cf-block-thumbnails.cf-mode-thumbnails-blur .yt-thumbnail-view-model img,
-body.cf-block-thumbnails.cf-mode-thumbnails-blur yt-thumbnail-view-model img {
+body.cf-block-thumbnails.cf-mode-thumbnails-blur yt-thumbnail-view-model img,
+body.cf-block-thumbnails.cf-mode-thumbnails-blur ytm-shorts-lockup-view-model-v2 img {
   opacity: 1 !important; filter: blur(8px) !important;
 }
 body.cf-block-thumbnails.cf-mode-thumbnails-blur ytd-thumbnail:hover img,
 body.cf-block-thumbnails.cf-mode-thumbnails-blur yt-image:hover img,
 body.cf-block-thumbnails.cf-mode-thumbnails-blur .yt-thumbnail-view-model:hover img,
-body.cf-block-thumbnails.cf-mode-thumbnails-blur yt-thumbnail-view-model:hover img {
+body.cf-block-thumbnails.cf-mode-thumbnails-blur yt-thumbnail-view-model:hover img,
+body.cf-block-thumbnails.cf-mode-thumbnails-blur ytm-shorts-lockup-view-model-v2:hover img {
   filter: none !important;
 }
 /* Dim mode = existing default (opacity 0). The default hide rule is already
@@ -481,7 +501,8 @@ body.cf-block-thumbnails.cf-mode-thumbnails-blur yt-thumbnail-view-model:hover i
 body.cf-block-thumbnails.cf-mode-thumbnails-dim ytd-thumbnail img,
 body.cf-block-thumbnails.cf-mode-thumbnails-dim yt-image img,
 body.cf-block-thumbnails.cf-mode-thumbnails-dim .yt-thumbnail-view-model img,
-body.cf-block-thumbnails.cf-mode-thumbnails-dim yt-thumbnail-view-model img {
+body.cf-block-thumbnails.cf-mode-thumbnails-dim yt-thumbnail-view-model img,
+body.cf-block-thumbnails.cf-mode-thumbnails-dim ytm-shorts-lockup-view-model-v2 img {
   opacity: 0.15 !important;
 }
 
@@ -567,19 +588,25 @@ body.cf-block-breaking-news.cf-mode-breaking-news-dim ytd-rich-shelf-renderer:ho
 
 /* --- mixes-playlists --- */
 body.cf-block-mixes-playlists.cf-mode-mixes-playlists-blur ytd-radio-renderer,
-body.cf-block-mixes-playlists.cf-mode-mixes-playlists-blur ytd-compact-radio-renderer {
+body.cf-block-mixes-playlists.cf-mode-mixes-playlists-blur ytd-compact-radio-renderer,
+body.cf-block-mixes-playlists.cf-mode-mixes-playlists-blur yt-lockup-view-model:has(a[href*="&list=RD"]),
+body.cf-block-mixes-playlists.cf-mode-mixes-playlists-blur yt-lockup-view-model:has(a[href*="list=RD"]) {
   display: revert !important; filter: blur(8px) !important; pointer-events: none !important;
 }
 body.cf-block-mixes-playlists.cf-mode-mixes-playlists-blur ytd-radio-renderer:hover,
-body.cf-block-mixes-playlists.cf-mode-mixes-playlists-blur ytd-compact-radio-renderer:hover {
+body.cf-block-mixes-playlists.cf-mode-mixes-playlists-blur ytd-compact-radio-renderer:hover,
+body.cf-block-mixes-playlists.cf-mode-mixes-playlists-blur yt-lockup-view-model:has(a[href*="list=RD"]):hover {
   filter: none !important; pointer-events: auto !important;
 }
 body.cf-block-mixes-playlists.cf-mode-mixes-playlists-dim ytd-radio-renderer,
-body.cf-block-mixes-playlists.cf-mode-mixes-playlists-dim ytd-compact-radio-renderer {
+body.cf-block-mixes-playlists.cf-mode-mixes-playlists-dim ytd-compact-radio-renderer,
+body.cf-block-mixes-playlists.cf-mode-mixes-playlists-dim yt-lockup-view-model:has(a[href*="&list=RD"]),
+body.cf-block-mixes-playlists.cf-mode-mixes-playlists-dim yt-lockup-view-model:has(a[href*="list=RD"]) {
   display: revert !important; opacity: 0.15 !important; pointer-events: none !important;
 }
 body.cf-block-mixes-playlists.cf-mode-mixes-playlists-dim ytd-radio-renderer:hover,
-body.cf-block-mixes-playlists.cf-mode-mixes-playlists-dim ytd-compact-radio-renderer:hover {
+body.cf-block-mixes-playlists.cf-mode-mixes-playlists-dim ytd-compact-radio-renderer:hover,
+body.cf-block-mixes-playlists.cf-mode-mixes-playlists-dim yt-lockup-view-model:has(a[href*="list=RD"]):hover {
   opacity: 1 !important; pointer-events: auto !important;
 }
 
@@ -606,25 +633,33 @@ body.cf-block-subs-most-relevant.cf-mode-subs-most-relevant-dim ytd-rich-shelf-r
 }
 
 body.cf-block-subs-members-only.cf-mode-subs-members-only-blur ytd-rich-item-renderer:has(ytd-badge-supported-renderer[aria-label="Members only"]),
-body.cf-block-subs-members-only.cf-mode-subs-members-only-blur ytd-rich-item-renderer:has([aria-label*="Members only"]) {
+body.cf-block-subs-members-only.cf-mode-subs-members-only-blur ytd-rich-item-renderer:has([aria-label*="Members only"]),
+body.cf-block-subs-members-only.cf-mode-subs-members-only-blur yt-lockup-view-model[data-cf-members-only="1"] {
   display: revert !important; filter: blur(8px) !important; pointer-events: none !important;
 }
-body.cf-block-subs-members-only.cf-mode-subs-members-only-blur ytd-rich-item-renderer:hover { filter: none !important; pointer-events: auto !important; }
+body.cf-block-subs-members-only.cf-mode-subs-members-only-blur ytd-rich-item-renderer:hover,
+body.cf-block-subs-members-only.cf-mode-subs-members-only-blur yt-lockup-view-model[data-cf-members-only="1"]:hover { filter: none !important; pointer-events: auto !important; }
 body.cf-block-subs-members-only.cf-mode-subs-members-only-dim ytd-rich-item-renderer:has(ytd-badge-supported-renderer[aria-label="Members only"]),
-body.cf-block-subs-members-only.cf-mode-subs-members-only-dim ytd-rich-item-renderer:has([aria-label*="Members only"]) {
+body.cf-block-subs-members-only.cf-mode-subs-members-only-dim ytd-rich-item-renderer:has([aria-label*="Members only"]),
+body.cf-block-subs-members-only.cf-mode-subs-members-only-dim yt-lockup-view-model[data-cf-members-only="1"] {
   display: revert !important; opacity: 0.15 !important; pointer-events: none !important;
 }
-body.cf-block-subs-members-only.cf-mode-subs-members-only-dim ytd-rich-item-renderer:hover { opacity: 1 !important; pointer-events: auto !important; }
+body.cf-block-subs-members-only.cf-mode-subs-members-only-dim ytd-rich-item-renderer:hover,
+body.cf-block-subs-members-only.cf-mode-subs-members-only-dim yt-lockup-view-model[data-cf-members-only="1"]:hover { opacity: 1 !important; pointer-events: auto !important; }
 
-body.cf-block-subs-watched.cf-mode-subs-watched-blur ytd-browse[page-subtype="subscriptions"] ytd-rich-item-renderer[data-cf-watched="1"] {
+body.cf-block-subs-watched.cf-mode-subs-watched-blur ytd-browse[page-subtype="subscriptions"] ytd-rich-item-renderer[data-cf-watched="1"],
+body.cf-block-subs-watched.cf-mode-subs-watched-blur ytd-browse[page-subtype="subscriptions"] yt-lockup-view-model[data-cf-watched="1"] {
   display: revert !important; filter: blur(8px) !important; pointer-events: none !important;
 }
-body.cf-block-subs-watched.cf-mode-subs-watched-blur ytd-browse[page-subtype="subscriptions"] ytd-rich-item-renderer[data-cf-watched="1"]:hover {
+body.cf-block-subs-watched.cf-mode-subs-watched-blur ytd-browse[page-subtype="subscriptions"] ytd-rich-item-renderer[data-cf-watched="1"]:hover,
+body.cf-block-subs-watched.cf-mode-subs-watched-blur ytd-browse[page-subtype="subscriptions"] yt-lockup-view-model[data-cf-watched="1"]:hover {
   filter: none !important; pointer-events: auto !important;
 }
-body.cf-block-subs-watched.cf-mode-subs-watched-dim ytd-browse[page-subtype="subscriptions"] ytd-rich-item-renderer[data-cf-watched="1"] {
+body.cf-block-subs-watched.cf-mode-subs-watched-dim ytd-browse[page-subtype="subscriptions"] ytd-rich-item-renderer[data-cf-watched="1"],
+body.cf-block-subs-watched.cf-mode-subs-watched-dim ytd-browse[page-subtype="subscriptions"] yt-lockup-view-model[data-cf-watched="1"] {
   display: revert !important; opacity: 0.15 !important; pointer-events: none !important;
 }
-body.cf-block-subs-watched.cf-mode-subs-watched-dim ytd-browse[page-subtype="subscriptions"] ytd-rich-item-renderer[data-cf-watched="1"]:hover {
+body.cf-block-subs-watched.cf-mode-subs-watched-dim ytd-browse[page-subtype="subscriptions"] ytd-rich-item-renderer[data-cf-watched="1"]:hover,
+body.cf-block-subs-watched.cf-mode-subs-watched-dim ytd-browse[page-subtype="subscriptions"] yt-lockup-view-model[data-cf-watched="1"]:hover {
   opacity: 1 !important; pointer-events: auto !important;
 }

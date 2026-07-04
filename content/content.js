@@ -40,6 +40,20 @@
   }
 
   const BLOCKERS = window.__cleanfeed_blockers || [];
+
+  // v1.4.24.3 — the set of "video card" containers scanned by the
+  // content-gated sweeps (channel-block, keyword-block, right-click block).
+  // Includes the legacy Polymer renderers AND the 2026 lit view-models —
+  // both DOMs ship across cohorts. These sweeps only hide a card that matches
+  // a blocked channel or a hidden keyword, so listing more container types
+  // extends coverage to the new DOM without ever over-hiding. (Unlike the CSS
+  // hide layer, this is not a broadening of a scoped selector — it stays
+  // content-gated.)
+  const CARD_SELECTOR =
+    "ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer," +
+    " ytd-compact-video-renderer, ytd-rich-grid-media, ytd-playlist-renderer," +
+    " ytd-reel-item-renderer, ytm-shorts-lockup-view-model-v2, yt-lockup-view-model";
+
   const STATE = {
     settings: {},          // {<blocker-id>: bool, ...}
     paid: false,
@@ -342,6 +356,12 @@
     const subsWatchedActive = active.some((b) => b.id === "subs-watched");
     applyWatchedSweep(subsWatchedActive);
 
+    // v1.4.24.3 — mark new-DOM members-only lockups (yt-lockup-view-model) with
+    // data-cf-members-only="1"; the CSS rule hides them. The old-DOM
+    // ytd-rich-item-renderer members cards are still hidden by pure CSS :has().
+    const membersOnlyActive = active.some((b) => b.id === "subs-members-only");
+    applyMembersOnlySweep(membersOnlyActive);
+
     // count visible elements that would be hidden — for stats
     countBlockedElements(active);
 
@@ -354,12 +374,34 @@
   // Idempotent: cards already tagged are skipped on subsequent ticks. When
   // the blocker is toggled off (active===false), un-tag everything we marked
   // so the cards reappear without a page reload.
+  // v1.4.24.3 — read an inline "width: NN%" from a progress element, or (for
+  // the new-DOM yt-thumbnail-overlay-progress-bar-view-model) from a
+  // descendant segment div that carries the width. Returns NaN when absent.
+  function _readProgressPct(el) {
+    if (!el) return NaN;
+    const scan = (node) => {
+      const style = (node && node.getAttribute && node.getAttribute("style")) || "";
+      const m = style.match(/width\s*:\s*(\d+(?:\.\d+)?)\s*%/);
+      return m ? parseFloat(m[1]) : NaN;
+    };
+    let pct = scan(el);
+    if (isFinite(pct)) return pct;
+    // New-DOM: the width lives on a descendant segment div.
+    const kids = (el.querySelectorAll && el.querySelectorAll("[style]")) || [];
+    for (const k of kids) {
+      pct = scan(k);
+      if (isFinite(pct)) return pct;
+    }
+    return NaN;
+  }
+
   function applyWatchedSweep(active) {
     if (!active) {
-      // Clean up our markers; the CSS hide rule depends on the attribute.
-      document.querySelectorAll('ytd-rich-item-renderer[data-cf-watched="1"]').forEach((el) => {
-        el.removeAttribute("data-cf-watched");
-      });
+      // Clean up markers on BOTH the old (ytd-rich-item-renderer) and the
+      // new-DOM (yt-lockup-view-model) card wrappers.
+      document.querySelectorAll(
+        'ytd-rich-item-renderer[data-cf-watched="1"], yt-lockup-view-model[data-cf-watched="1"]'
+      ).forEach((el) => el.removeAttribute("data-cf-watched"));
       return;
     }
     // Pro-only feature — skip the sweep entirely for free users (defensive;
@@ -370,23 +412,76 @@
     // page-subtype, so a marked card outside subscriptions wouldn't hide —
     // but we save CPU by scoping the sweep here too.
     if (location.pathname.indexOf("/feed/subscriptions") !== 0) return;
-    const overlays = document.querySelectorAll(
-      'ytd-rich-item-renderer ytd-thumbnail-overlay-resume-playback-renderer #progress'
-    );
-    overlays.forEach((bar) => {
-      // Parse the inline width: YT writes style="width: 97%;" on the bar.
-      const style = bar.getAttribute("style") || "";
-      const m = style.match(/width\s*:\s*(\d+(?:\.\d+)?)\s*%/);
-      if (!m) return;
-      const pct = parseFloat(m[1]);
+
+    // Tag the nearest card wrapper of a >95 %-watched progress bar. Prefer the
+    // ytd-rich-item-renderer grid cell (existing CSS covers it); fall back to
+    // a yt-lockup-view-model on fully-migrated cohorts.
+    const tagIfWatched = (progressEl) => {
+      const pct = _readProgressPct(progressEl);
       if (!isFinite(pct) || pct <= 95) return;
-      // Climb to the parent ytd-rich-item-renderer (the grid card).
-      let cur = bar;
-      while (cur && cur !== document.body && cur.tagName !== "YTD-RICH-ITEM-RENDERER") {
+      let richItem = null, lockup = null, cur = progressEl;
+      while (cur && cur !== document.body) {
+        if (!richItem && cur.tagName === "YTD-RICH-ITEM-RENDERER") richItem = cur;
+        if (!lockup && cur.tagName === "YT-LOCKUP-VIEW-MODEL") lockup = cur;
         cur = cur.parentElement;
       }
-      if (cur && cur.tagName === "YTD-RICH-ITEM-RENDERER" && cur.getAttribute("data-cf-watched") !== "1") {
-        cur.setAttribute("data-cf-watched", "1");
+      const target = richItem || lockup;
+      if (target && target.getAttribute("data-cf-watched") !== "1") {
+        target.setAttribute("data-cf-watched", "1");
+      }
+    };
+
+    // OLD DOM: ytd-thumbnail-overlay-resume-playback-renderer #progress carries
+    // style="width: NN%;" directly.
+    document.querySelectorAll(
+      'ytd-rich-item-renderer ytd-thumbnail-overlay-resume-playback-renderer #progress'
+    ).forEach(tagIfWatched);
+    // NEW DOM (2026): yt-thumbnail-overlay-progress-bar-view-model. Keep the
+    // OLD detection above — both DOMs ship across cohorts.
+    document.querySelectorAll(
+      'yt-thumbnail-overlay-progress-bar-view-model'
+    ).forEach(tagIfWatched);
+  }
+
+  // v1.4.24.3 — new-DOM members-only sweep. The migrated card is a
+  // yt-lockup-view-model whose members badge exposes no stable attribute (the
+  // old ytd-badge-supported-renderer[aria-label] is gone), so CSS :has() can't
+  // match it. Scan lockups, check a badge child's text for "members only", and
+  // mark matches with data-cf-members-only="1" so the cf-block-subs-members-only
+  // CSS rule hides them. The old CSS :has() rules for ytd-rich-item-renderer
+  // stay in styles.css (both DOMs live). Pages: "anywhere" (not subs-scoped).
+  function applyMembersOnlySweep(active) {
+    if (!active) {
+      document.querySelectorAll('yt-lockup-view-model[data-cf-members-only="1"]')
+        .forEach((el) => el.removeAttribute("data-cf-members-only"));
+      return;
+    }
+    if (!STATE.paid) return;   // Pro-only (defensive; effectiveActive filters it)
+    document.querySelectorAll("yt-lockup-view-model").forEach((lk) => {
+      // New-DOM badges render as <badge-shape> hosts: text badges expose their
+      // label in a .ytBadgeShapeText child (so it's in the host's textContent);
+      // icon badges expose it via aria-label. Confirmed against live 2026 DOM.
+      // We scan the BADGE hosts only — never the whole card — so a video merely
+      // *titled* "members only" is not hidden. Legacy class guesses kept as
+      // harmless fallbacks for other cohorts.
+      const badges = lk.querySelectorAll(
+        "badge-shape, .ytBadgeShapeText, .yt-badge-shape__text, .badge-shape-wiz__text"
+      );
+      let isMembers = false;
+      for (const b of badges) {
+        const label = (((b.getAttribute && b.getAttribute("aria-label")) || "") +
+          " " + (b.textContent || "")).toLowerCase();
+        if (label.indexOf("members only") !== -1) {
+          isMembers = true;
+          break;
+        }
+      }
+      if (isMembers) {
+        if (lk.getAttribute("data-cf-members-only") !== "1") {
+          lk.setAttribute("data-cf-members-only", "1");
+        }
+      } else if (lk.getAttribute("data-cf-members-only") === "1") {
+        lk.removeAttribute("data-cf-members-only");
       }
     });
   }
@@ -402,10 +497,7 @@
       });
       return;
     }
-    const cards = document.querySelectorAll(
-      "ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer," +
-      " ytd-compact-video-renderer, ytd-rich-grid-media, ytd-playlist-renderer"
-    );
+    const cards = document.querySelectorAll(CARD_SELECTOR);
     const kws = STATE.hiddenKeywords;
     cards.forEach((card) => {
       // Find the title — YT video cards use #video-title or yt-formatted-string#video-title-link
@@ -471,10 +563,7 @@
   function applyChannelBlocks() {
     if (!STATE.blockedChannels.length) return;
     // Match every card type YT uses across home, search, watch sidebar, channel
-    const cards = document.querySelectorAll(
-      "ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer," +
-      " ytd-compact-video-renderer, ytd-rich-grid-media, ytd-playlist-renderer"
-    );
+    const cards = document.querySelectorAll(CARD_SELECTOR);
     cards.forEach((card) => {
       const info = _findChannelInCard(card);
       if (_isCardBlocked(info)) {
@@ -507,10 +596,7 @@
     if (STATE.lastRightClicked) {
       let cur = STATE.lastRightClicked;
       while (cur && cur !== document.body) {
-        if (cur.matches && cur.matches(
-          "ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer," +
-          " ytd-compact-video-renderer, ytd-rich-grid-media, ytd-playlist-renderer"
-        )) {
+        if (cur.matches && cur.matches(CARD_SELECTOR)) {
           chInfo = _findChannelInCard(cur);
           break;
         }

@@ -187,6 +187,9 @@
         // The class form above matches nothing on migrated cohorts; the tag
         // form below does. Class form KEPT (harmless, covers any class usage).
         "yt-thumbnail-view-model img",
+        // v1.4.24.3 — Shorts lockups carry their own thumbnail image; fade
+        // those too so Hide-thumbnails also covers Shorts shelves.
+        "ytm-shorts-lockup-view-model-v2 img",
       ],
     },
     {
@@ -248,6 +251,12 @@
       selectors: [
         "ytd-radio-renderer",
         "ytd-compact-radio-renderer",
+        // v1.4.24.3 — new-DOM Mix/radio playlists render as
+        // yt-lockup-view-model whose thumbnail link carries a radio list id
+        // (list=RD…). Match those specifically so ordinary playlists
+        // (list=PL…/UU…/LL…) are NOT caught. Old renderers KEPT (both DOMs live).
+        'yt-lockup-view-model:has(a[href*="&list=RD"])',
+        'yt-lockup-view-model:has(a[href*="list=RD"])',
       ],
     },
     // v1.4.19 — three new Pro blockers for the Subscriptions feed.
@@ -273,6 +282,12 @@
       selectors: [
         'ytd-rich-item-renderer:has(ytd-badge-supported-renderer[aria-label="Members only"])',
         'ytd-rich-item-renderer:has([aria-label*="Members only"])',
+        // v1.4.24.3 — new-DOM members-only cards are yt-lockup-view-model with
+        // no stable badge attribute; content.js's applyMembersOnlySweep scans
+        // badge text and tags matches with data-cf-members-only="1". This
+        // selector lets countBlockedElements tally the JS-tagged cards. Old
+        // CSS :has() rules above KEPT (both DOMs live).
+        'yt-lockup-view-model[data-cf-members-only="1"]',
       ],
     },
     {
@@ -286,6 +301,10 @@
       // CSS rule body.cf-block-subs-watched [data-cf-watched="1"] hides them.
       selectors: [
         'ytd-browse[page-subtype="subscriptions"] ytd-rich-item-renderer[data-cf-watched="1"]',
+        // v1.4.24.3 — fully-migrated cohorts wrap the card in
+        // yt-lockup-view-model (no ytd-rich-item-renderer). applyWatchedSweep
+        // tags whichever wrapper it finds; both hide rules live in styles.css.
+        'ytd-browse[page-subtype="subscriptions"] yt-lockup-view-model[data-cf-watched="1"]',
       ],
       jsHandler: "subs-watched",
     },
