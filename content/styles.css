@@ -710,3 +710,44 @@ body.cf-block-subs-watched.cf-mode-subs-watched-dim ytd-browse[page-subtype="sub
 body.cf-block-subs-watched.cf-mode-subs-watched-dim ytd-browse[page-subtype="subscriptions"] yt-lockup-view-model[data-cf-watched="1"]:hover {
   opacity: 1 !important; pointer-events: auto !important;
 }
+
+/* --- v1.4.24.5 PAUSED-STATE PILL ------------------------------------ */
+/* Injected by content.js on the first page load of a pause session.
+ * Palette mirrors the popup design tokens (--bg-elev-2 #1c2a3a, --border,
+ * --text #e6edf6, --text-dim #93a0b3, --warn #ff7a8a) — content pages
+ * can't read popup.css custom properties, so the values are inlined. */
+.cf-pause-pill {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #1c2a3a;
+  color: #e6edf6;
+  border: 1px solid #ff7a8a;
+  border-radius: 18px;
+  padding: 8px 12px 8px 14px;
+  font-family: "Roboto", system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  opacity: 1;
+  transition: opacity 500ms ease;
+}
+.cf-pause-pill-fade {
+  opacity: 0;
+}
+.cf-pause-pill-close {
+  background: none;
+  border: none;
+  color: #93a0b3;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+.cf-pause-pill-close:hover {
+  color: #e6edf6;
+}

@@ -7,6 +7,18 @@
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body class="cf-fade-in">
+  <!-- v1.4.24.5 — paused-state banner. A paused CleanFeed is visually
+       identical to a broken one; this banner sits ABOVE all other popup
+       content whenever pausedUntil > now, and is absent otherwise
+       (renderPause toggles the hidden attr). -->
+  <section id="cf-paused-banner" class="cf-paused-banner" hidden aria-live="polite">
+    <div class="cf-paused-banner-body">
+      <strong class="cf-paused-banner-title">⏸ CleanFeed is paused — nothing is being blocked</strong>
+      <span class="cf-paused-banner-sub" id="cf-paused-remaining">Resumes in 60 min</span>
+    </div>
+    <button id="cf-resume-now" class="cf-resume-now-btn" type="button">Resume now</button>
+  </section>
+
   <header class="cf-header">
     <div class="cf-brand">
       <img src="../icons/icon-32.png" width="22" height="22" alt="" />

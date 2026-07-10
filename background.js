@@ -460,6 +460,11 @@ chrome.runtime.onInstalled.addListener((details) => {
 });
 chrome.runtime.onStartup.addListener(() => {
   _eagerlyMintApiKey("startup");
+  // v1.4.24.5 — sweep a stale (expired) pausedUntil at every browser launch
+  // and reconcile the badge + expiry alarm with whatever survives the sweep.
+  readAndCleanPausedUntil()
+    .then((until) => { _syncPauseExpiryAlarm(until); return updateBadge(); })
+    .catch(() => {});
   // v1.4.17 — same bookkeeping at every browser launch.
   ensureInstallId().catch(() => {});
   // v1.4.20-beta — second-chance cf_stats seed on every browser launch
@@ -604,6 +609,15 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     // v1.4.6 — mark existing-user storage as initialized too so the
     // popup's readiness check passes without waiting.
     await chrome.storage.local.set({ cf_initialized: true });
+  }
+  // v1.4.24.5 — an install or update must NEVER carry a pause. The install
+  // seed above already writes pausedUntil: 0; here we also remove any
+  // leftover key on the update path (a pause is a ≤1h, deliberate popup
+  // action — it does not survive a version change). Fail-safe direction:
+  // unpaused = blocking works.
+  if (details.reason === "install" || details.reason === "update") {
+    try { await chrome.storage.local.remove("pausedUntil"); } catch (_) {}
+    try { chrome.alarms.clear("cf-pause-expiry"); } catch (_) {}
   }
   // v1.4.21-phase2 — route through the unified sync. Pre-v1.4.21 this
   // block blanket-set extpayPaid=!!user.paid for every paid user, which
@@ -766,6 +780,12 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     checkFocusSchedule().catch(() => {});
     return;
   }
+  // v1.4.24.5 — pause expired: remove the stale key + reset the badge, even
+  // if the SW was torn down and restarted since the pause began.
+  if (alarm.name === "cf-pause-expiry") {
+    readAndCleanPausedUntil().then(() => updateBadge()).catch(() => {});
+    return;
+  }
   if (alarm.name !== "cf-pomodoro") return;
   const data = await chrome.storage.local.get(["focusLock"]);
   const fl = data.focusLock || {};
@@ -829,14 +849,49 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
 // -------- badge counter -------------------------------------------------
 
+// v1.4.24.5 — the ONE pause-state read in the service worker. Reads
+// pausedUntil, clamps corrupt far-future values (v1.4.9 rule: anything past
+// now + 1hr + 5min slack is garbage), and REMOVES an expired or corrupt key
+// from storage on the spot — a stale pausedUntil must never linger. The
+// remove() fires storage.onChanged → updateBadge once more; on that second
+// pass the key is absent, so there is no loop. Returns the live (future)
+// timestamp, or 0 when not paused.
+async function readAndCleanPausedUntil() {
+  let data;
+  try {
+    data = await chrome.storage.local.get(["pausedUntil"]);
+  } catch (_) { return 0; }
+  const raw = Number(data.pausedUntil) || 0;
+  const corrupt = raw > Date.now() + 60 * 60 * 1000 + 5 * 60 * 1000;
+  if (raw > 0 && (corrupt || raw <= Date.now())) {
+    try { await chrome.storage.local.remove("pausedUntil"); } catch (_) {}
+    return 0;
+  }
+  return raw > Date.now() ? raw : 0;
+}
+
+// v1.4.24.5 — alarm-backed pause expiry. updateBadge's setTimeout dies with
+// the service worker; an alarm survives SW teardown, so the badge always
+// resets and the stale key is always removed the moment the pause ends.
+// Called from storage.onChanged whenever pausedUntil changes.
+function _syncPauseExpiryAlarm(rawPausedUntil) {
+  const until = Number(rawPausedUntil) || 0;
+  try {
+    if (until > Date.now()) {
+      chrome.alarms.create("cf-pause-expiry", { when: until + 250 });
+    } else {
+      chrome.alarms.clear("cf-pause-expiry");
+    }
+  } catch (_) { /* alarms unavailable — setTimeout fallback still runs */ }
+}
+
 async function updateBadge() {
-  const data = await chrome.storage.local.get(["settings", "paid", "pausedUntil", "focusLock"]);
+  const data = await chrome.storage.local.get(["settings", "paid", "focusLock"]);
   const settings = data.settings || {};
   const paid = !!data.paid;
-  // v1.4.9 — clamp pausedUntil to (now + 1hr + 5min slack). A corrupted
-  // far-future timestamp must not pin the badge into the paused glyph.
-  let pausedUntil = Number(data.pausedUntil) || 0;
-  if (pausedUntil > Date.now() + 60 * 60 * 1000 + 5 * 60 * 1000) pausedUntil = 0;
+  // v1.4.24.5 — routed through the cleaning accessor: every badge update is
+  // also a stale-pause sweep (expired/corrupt keys are removed in storage).
+  const pausedUntil = await readAndCleanPausedUntil();
   const focusLock = data.focusLock || {};
   const focusActive = Number(focusLock.activeUntil || 0) > Date.now();
 
@@ -854,11 +909,13 @@ async function updateBadge() {
     return;
   }
 
-  // While paused, the badge shows a pause glyph and goes dim.
+  // While paused, the badge shows a pause glyph on the warn color — a paused
+  // CleanFeed must read as "attention", not blend in (pre-v1.4.24.5 this was
+  // a dim gray that looked like a disabled extension).
   if (pausedUntil > Date.now()) {
     try {
       await chrome.action.setBadgeText({ text: "⏸" });
-      await chrome.action.setBadgeBackgroundColor({ color: "#5E6C7E" });
+      await chrome.action.setBadgeBackgroundColor({ color: "#FF7A8A" });
       if (chrome.action.setBadgeTextColor) {
         await chrome.action.setBadgeTextColor({ color: "#FFFFFF" });
       }
@@ -895,6 +952,9 @@ async function updateBadge() {
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
+  // v1.4.24.5 — keep the expiry alarm in lock-step with the stored value:
+  // pause set → alarm at expiry; pause cleared/removed → alarm cleared.
+  if (changes.pausedUntil) _syncPauseExpiryAlarm(changes.pausedUntil.newValue);
   if (changes.settings || changes.paid || changes.pausedUntil || changes.focusLock) updateBadge();
   // v1.4.17 — license redemption (or revocation) flips an input to
   // recomputePaid(). The listener only fires on cleanfeed_license /

@@ -550,6 +550,58 @@ async function _completeHold() {
   renderBlockers();
 }
 
+// v1.4.24.5 — the top-of-popup paused banner. Visible IFF paused; the
+// sub-line is a live countdown re-rendered by the same 1s tick that drives
+// the pause-button text. "Resumes in N min" above a minute, seconds below.
+function renderPauseBanner() {
+  const banner = $("cf-paused-banner");
+  if (!banner) return;
+  if (!isPaused()) {
+    banner.hidden = true;
+    return;
+  }
+  banner.hidden = false;
+  const line = $("cf-paused-remaining");
+  if (!line) return;
+  const ms = STATE.pausedUntil - Date.now();
+  line.textContent = ms >= 60 * 1000
+    ? `Resumes in ${Math.ceil(ms / 60000)} min`
+    : `Resumes in ${Math.max(1, Math.ceil(ms / 1000))}s`;
+}
+
+// v1.4.24.5 — "Resume now" in the paused banner. Clears the pause, then
+// reloads YouTube tabs so blockers re-apply on a clean page (the content
+// script would also catch the storage change, but a reload guarantees no
+// half-hidden feed lingers). Shares togglePause's in-flight lock so a
+// banner click and a pause-button click can't race each other.
+async function resumeNow() {
+  if (!STATE.loaded || togglePauseInFlight) return;
+  togglePauseInFlight = true;
+  const btn = $("cf-resume-now");
+  if (btn) btn.disabled = true;
+  try {
+    STATE.pausedUntil = 0;
+    await chrome.storage.local.set({ pausedUntil: 0 });
+    pushSettingsToTabs();
+    try {
+      chrome.tabs.query(
+        { url: ["*://*.youtube.com/*", "*://music.youtube.com/*"] },
+        (tabs) => {
+          void chrome.runtime.lastError;
+          (tabs || []).forEach((t) => {
+            try { chrome.tabs.reload(t.id); } catch (_) {}
+          });
+        }
+      );
+    } catch (_) {}
+    renderPause();
+    renderBlockers();
+  } finally {
+    togglePauseInFlight = false;
+    if (btn) btn.disabled = false;
+  }
+}
+
 function renderPause() {
   const text = $("cf-pause-text");
   // While Focus Lock is active, pause is disabled — the lock owns the state.
@@ -558,6 +610,7 @@ function renderPause() {
     document.body.classList.add("cf-paused-state");
     const remaining = STATE.pausedUntil - Date.now();
     text.textContent = `Paused — ${formatRemaining(remaining)} remaining`;
+    renderPauseBanner();
     if (!pauseTickHandle) {
       pauseTickHandle = setInterval(() => {
         if (!isPaused()) {
@@ -567,11 +620,13 @@ function renderPause() {
           return;
         }
         text.textContent = `Paused — ${formatRemaining(STATE.pausedUntil - Date.now())} remaining`;
+        renderPauseBanner();
       }, 1000);
     }
   } else {
     document.body.classList.remove("cf-paused-state");
     text.textContent = "Pause for 1 hour";
+    renderPauseBanner();
     if (pauseTickHandle) {
       clearInterval(pauseTickHandle);
       pauseTickHandle = 0;
@@ -1510,6 +1565,8 @@ function _attachStaticHandlers() {
     chrome.tabs.create({ url: chrome.runtime.getURL("onboarding/welcome.html") });
   });
   $("cf-pause-btn").addEventListener("click", togglePause);
+  // v1.4.24.5 — paused-banner resume button.
+  $("cf-resume-now").addEventListener("click", resumeNow);
 
   // Hold-to-disable Focus Lock — pointerdown starts, leave/up cancels.
   const holdBtn = $("cf-focus-hold");

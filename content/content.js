@@ -1343,6 +1343,41 @@
 
   // ----- bootstrap -----------------------------------------------------
 
+  // v1.4.24.5 — paused-state pill. A paused CleanFeed is visually identical
+  // to a broken one; on the FIRST page load of a pause session, surface a
+  // small dismissible pill bottom-right so the user knows why nothing is
+  // hidden. The sessionStorage key embeds the pausedUntil timestamp, so
+  // reloads/SPA churn within the same pause stay quiet while a NEW pause
+  // (different timestamp) shows the pill again. Never shown when not paused.
+  function maybeShowPausePill() {
+    if (!isPaused()) return;
+    if (!document.body) return;
+    try {
+      const seenKey = "cf-pause-pill-" + STATE.pausedUntil;
+      if (sessionStorage.getItem(seenKey)) return;
+      sessionStorage.setItem(seenKey, "1");
+    } catch (_) { /* sessionStorage blocked — show once per load, still correct */ }
+    const pill = document.createElement("div");
+    pill.className = "cf-pause-pill";
+    const label = document.createElement("span");
+    label.textContent = "CleanFeed is paused";
+    const close = document.createElement("button");
+    close.className = "cf-pause-pill-close";
+    close.type = "button";
+    close.setAttribute("aria-label", "Dismiss");
+    close.textContent = "×";
+    const remove = () => { try { pill.remove(); } catch (_) {} };
+    close.addEventListener("click", remove);
+    pill.appendChild(label);
+    pill.appendChild(close);
+    document.body.appendChild(pill);
+    // Auto-fade after 5s (opacity transition in styles.css), then remove.
+    setTimeout(() => {
+      pill.classList.add("cf-pause-pill-fade");
+      setTimeout(remove, 600);
+    }, 5000);
+  }
+
   async function init() {
     startTimeTracker();
     _setupRightClickTracker();
@@ -1358,10 +1393,12 @@
     // Wait for body — we run at document_start
     if (document.body) {
       applyBlockers();
+      maybeShowPausePill();
       startObserver();
     } else {
       const ready = () => {
         applyBlockers();
+        maybeShowPausePill();
         startObserver();
         document.removeEventListener("DOMContentLoaded", ready);
       };
