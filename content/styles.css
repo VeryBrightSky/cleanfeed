@@ -268,6 +268,53 @@ body.cf-block-subs-watched ytd-browse[page-subtype="subscriptions"] yt-lockup-vi
   display: none !important;
 }
 
+/* --- v1.4.24.4 GRID-CELL COLLAPSE (reflow — no empty gaps) --------------- *
+ * The new-DOM hide rules above set display:none on the INNER
+ * yt-lockup-view-model, but its enclosing grid cell (ytd-rich-item-renderer)
+ * keeps its box and leaves an empty slot that doesn't reflow. Confirmed chain:
+ *   yt-lockup-view-model → #content → ytd-rich-item-renderer →
+ *   #contents(flex) → ytd-rich-grid-renderer
+ * These companion rules collapse the wrapper so siblings reflow. Each is
+ * guarded by an active-only data-cf-* tag or a specific blocked-content
+ * :has() — NEVER a bare wrapper — so normal cells are never collapsed. The
+ * inner-hide rules above are KEPT (belt and suspenders).
+ *
+ * NOTE: the mixes rule is FLATTENED to a single :has() on the wrapper
+ * (:has(a[href*="list=RD"])). A nested :has(...:has(...)) is invalid CSS —
+ * Chrome drops the whole rule — and the flattened form is equivalent because
+ * the only list=RD anchor in the cell lives inside the mix lockup. */
+
+/* members-only — JS tags the lockup, and only while the blocker is active */
+body.cf-block-subs-members-only ytd-rich-item-renderer:has(yt-lockup-view-model[data-cf-members-only="1"]) {
+  display: none !important;
+}
+/* already-watched >95% — JS tags the lockup, only while the blocker is active */
+body.cf-block-subs-watched ytd-rich-item-renderer:has(yt-lockup-view-model[data-cf-watched="1"]) {
+  display: none !important;
+}
+/* mixes / radio playlists — blocked-content match (list=RD, not PL/UU/LL/WL) */
+body.cf-block-mixes-playlists ytd-rich-item-renderer:has(a[href*="&list=RD"]),
+body.cf-block-mixes-playlists ytd-rich-item-renderer:has(a[href*="list=RD"]) {
+  display: none !important;
+}
+
+/* channel-block + keyword-block sweeps tag matched cards with data-cf-* across
+ * every page type (home rich-grid, channel grid, search list). Collapse the
+ * grid/list wrapper of a tagged inner card too. The data-cf-* attribute is set
+ * ONLY on matched (blocked) content, so these never collapse a normal cell —
+ * no body-class guard needed (these are standalone Pro sweeps, not
+ * cf-block-* toggles). */
+ytd-rich-item-renderer:has([data-cf-blocked-channel="1"]),
+ytd-video-renderer:has([data-cf-blocked-channel="1"]),
+ytd-grid-video-renderer:has([data-cf-blocked-channel="1"]) {
+  display: none !important;
+}
+ytd-rich-item-renderer:has([data-cf-keyword="1"]),
+ytd-video-renderer:has([data-cf-keyword="1"]),
+ytd-grid-video-renderer:has([data-cf-keyword="1"]) {
+  display: none !important;
+}
+
 /* --- v1.4.19 BLOCKER RENDER MODES (blur / dim) --------------------- *
  * Override the default hide for any blocker when the user sets its mode
  * to "blur" or "dim" in the popup. Specificity = 0,2,1 (two body classes
