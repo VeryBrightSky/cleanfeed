@@ -160,6 +160,16 @@ async function readAndCleanPausedUntil(storage) {
     assertTrue("3) banner styled with --warn low-opacity bg + 1px --warn border",
       popupCss.includes("rgba(255, 122, 138, 0.12)") &&
       popupCss.includes("border: 1px solid var(--warn)"));
+    // v1.4.24.6 — THE stale-banner root cause: the class's author-level
+    // `display: flex` overrides the UA `[hidden] { display: none }`, so
+    // without this guard the hidden attribute never visually hid the banner
+    // (same trap fixed for .cf-focus-banner in v1.2.3 and .cf-modal).
+    assertTrue("3) [hidden] guard beats the banner's display: flex",
+      popupCss.includes(".cf-paused-banner[hidden] { display: none !important; }"));
+    const guardIdx = popupCss.indexOf(".cf-paused-banner[hidden]");
+    const flexIdx = popupCss.indexOf(".cf-paused-banner {");
+    assertTrue("3) [hidden] guard present alongside the flex rule",
+      guardIdx !== -1 && flexIdx !== -1);
 
     // Popup JS: banner renderer + countdown + resume wiring.
     assertTrue("3) renderPauseBanner defined", popupJs.includes("function renderPauseBanner()"));
@@ -240,6 +250,106 @@ async function readAndCleanPausedUntil(storage) {
     const after = await readAndCleanPausedUntil(s);
     assertEq("4) after resume, pause read is 0 (badge → count branch)", after, 0);
     assertEq("4) after resume, banner hidden", bannerModel(after, now).hidden, true);
+    // Pure-function edge inputs: undefined / NaN / negative all hide.
+    assertEq("4) undefined pausedUntil → banner hidden", bannerModel(undefined, now).hidden, true);
+    assertEq("4) NaN pausedUntil → banner hidden", bannerModel(NaN, now).hidden, true);
+    assertEq("4) negative pausedUntil → banner hidden", bannerModel(-5, now).hidden, true);
+  }
+
+  // ========================================================================
+  // 5. v1.4.24.6 regression — resume must re-render the OPEN popup itself
+  // ========================================================================
+  {
+    // THE BUG: v1.4.24.5's resumeNow rendered LAST, after pushSettingsToTabs()
+    // and the chrome.tabs reload loop. A throw anywhere in that messaging
+    // path skipped the render — storage said 0 but the open popup kept the
+    // banner + paused button (confirmed live). The fix renders synchronously
+    // right after the storage write, with each messaging step isolated.
+
+    // 5a. Source-order guards: render comes BEFORE any tab messaging, in
+    // BOTH handlers, and messaging is exception-isolated.
+    function handlerSrc(name) {
+      const m = popupJs.match(new RegExp(`async function ${name}\\(\\) \\{[\\s\\S]*?\\n\\}`));
+      return m ? m[0] : "";
+    }
+    const resumeSrc = handlerSrc("resumeNow");
+    const toggleSrc = handlerSrc("togglePause");
+    assertTrue("5) resumeNow source extracted", resumeSrc.length > 0);
+    assertTrue("5) togglePause source extracted", toggleSrc.length > 0);
+    assertTrue("5) resumeNow renders BEFORE pushSettingsToTabs",
+      resumeSrc.indexOf("renderPause()") !== -1 &&
+      resumeSrc.indexOf("renderPause()") < resumeSrc.indexOf("pushSettingsToTabs()"));
+    assertTrue("5) resumeNow renders BEFORE the tab-reload loop",
+      resumeSrc.indexOf("renderPause()") < resumeSrc.indexOf("chrome.tabs.query"));
+    assertTrue("5) resumeNow isolates pushSettingsToTabs in try/catch",
+      resumeSrc.includes("try { pushSettingsToTabs(); } catch (_) {}"));
+    assertTrue("5) togglePause renders BEFORE pushSettingsToTabs",
+      toggleSrc.indexOf("renderPause()") !== -1 &&
+      toggleSrc.indexOf("renderPause()") < toggleSrc.indexOf("pushSettingsToTabs()"));
+    assertTrue("5) togglePause isolates pushSettingsToTabs in try/catch",
+      toggleSrc.includes("try { pushSettingsToTabs(); } catch (_) {}"));
+    // Reactive fallback: the popup's onChanged listener re-renders the pause
+    // UI when pausedUntil changes from ANY source (expiry, other surface).
+    assertTrue("5) popup onChanged(pausedUntil) re-renders pause UI",
+      /changes\.pausedUntil[\s\S]{0,200}renderPause\(\)/.test(popupJs));
+    // renderPause drives the banner in BOTH branches → banner state is a
+    // pure function of STATE.pausedUntil on every render path.
+    assertEq("5) renderPause invokes renderPauseBanner in both branches",
+      (popupJs.match(/renderPauseBanner\(\);/g) || []).length >= 3, true);
+
+    // 5b. Behavioural model of the popup handlers, mirroring the fixed
+    // order: write → render (same operation) → messaging (may throw).
+    function makePopup(messagingThrows) {
+      const store = { pausedUntil: 0 };
+      const banner = { hidden: true };
+      const btnText = { value: "Pause for 1 hour" };
+      const state = { pausedUntil: 0 };
+      function render() {
+        const paused = state.pausedUntil > Date.now();
+        banner.hidden = !paused;
+        btnText.value = paused ? "Paused — remaining" : "Pause for 1 hour";
+      }
+      function messaging() { if (messagingThrows) throw new Error("port closed"); }
+      return {
+        store, banner, btnText,
+        async pause() {
+          state.pausedUntil = Date.now() + 60 * 60 * 1000;
+          store.pausedUntil = state.pausedUntil;   // storage write
+          render();                                 // v1.4.24.6: render first
+          try { messaging(); } catch (_) {}
+        },
+        async resume() {
+          state.pausedUntil = 0;
+          store.pausedUntil = 0;                    // storage write
+          render();                                 // v1.4.24.6: render first
+          try { messaging(); } catch (_) {}
+        },
+      };
+    }
+    // Happy path: pause shows the banner immediately, resume hides it —
+    // storage and banner change in the SAME operation, no onChanged needed.
+    {
+      const p = makePopup(false);
+      await p.pause();
+      assertEq("5) pause → banner shown immediately", p.banner.hidden, false);
+      assertTrue("5) pause → storage has future pausedUntil", p.store.pausedUntil > Date.now());
+      await p.resume();
+      assertEq("5) resume → storage pausedUntil 0", p.store.pausedUntil, 0);
+      assertEq("5) resume → banner hidden in the same operation", p.banner.hidden, true);
+      assertEq("5) resume → button reset", p.btnText.value, "Pause for 1 hour");
+    }
+    // Regression path: tab messaging THROWS — the UI must still be correct
+    // (this is exactly the v1.4.24.5 stale-banner failure mode).
+    {
+      const p = makePopup(true);
+      await p.pause();
+      assertEq("5) pause with throwing messaging → banner still shown", p.banner.hidden, false);
+      await p.resume();
+      assertEq("5) resume with throwing messaging → storage 0", p.store.pausedUntil, 0);
+      assertEq("5) resume with throwing messaging → banner still hidden (no stale state)",
+        p.banner.hidden, true);
+      assertEq("5) resume with throwing messaging → button reset", p.btnText.value, "Pause for 1 hour");
+    }
   }
 
   console.log(`\nPAUSE VISIBILITY: ${pass} pass / ${fail} fail`);

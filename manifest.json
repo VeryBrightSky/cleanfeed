@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "default_locale": "en",
   "name": "__MSG_extName__",
-  "version": "1.4.24.5",
+  "version": "1.4.24.6",
   "version_name": "1.4.24",
   "description": "__MSG_extDescription__",
   "author": "CleanFeed",

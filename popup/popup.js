@@ -382,9 +382,12 @@ async function togglePause() {
       STATE.pausedUntil = Date.now() + PAUSE_DURATION_MS;
     }
     await chrome.storage.local.set({ pausedUntil: STATE.pausedUntil });
-    pushSettingsToTabs();
+    // v1.4.24.6 — render BEFORE tab messaging (same hardening as resumeNow):
+    // the banner must appear/disappear in the open popup even if messaging
+    // throws. Banner + button state are a pure function of STATE.pausedUntil.
     renderPause();
     renderBlockers();
+    try { pushSettingsToTabs(); } catch (_) {}
   } finally {
     togglePauseInFlight = false;
     // renderPause() may have re-disabled the button if Focus Lock is active;
@@ -574,6 +577,15 @@ function renderPauseBanner() {
 // script would also catch the storage change, but a reload guarantees no
 // half-hidden feed lingers). Shares togglePause's in-flight lock so a
 // banner click and a pause-button click can't race each other.
+//
+// v1.4.24.6 — the paused UI (banner + pause button) is re-rendered HERE,
+// synchronously, the moment the storage write resolves — BEFORE any tab
+// messaging. v1.4.24.5 rendered last, after pushSettingsToTabs() and the
+// chrome.tabs reload loop; an exception anywhere in that messaging path
+// skipped the render and left the open popup showing a stale paused banner
+// even though pausedUntil was already 0 (confirmed live). The DOM update
+// must never depend on the messaging succeeding, nor on a storage.onChanged
+// round-trip.
 async function resumeNow() {
   if (!STATE.loaded || togglePauseInFlight) return;
   togglePauseInFlight = true;
@@ -582,7 +594,13 @@ async function resumeNow() {
   try {
     STATE.pausedUntil = 0;
     await chrome.storage.local.set({ pausedUntil: 0 });
-    pushSettingsToTabs();
+    // 1) Popup UI first — banner hides, button resets to "Pause for 1 hour",
+    //    countdown tick is torn down. Pure function of STATE.pausedUntil.
+    renderPause();
+    renderBlockers();
+    // 2) Then best-effort tab messaging; each step isolated so a failure
+    //    here can never affect the popup UI (already updated above).
+    try { pushSettingsToTabs(); } catch (_) {}
     try {
       chrome.tabs.query(
         { url: ["*://*.youtube.com/*", "*://music.youtube.com/*"] },
@@ -594,8 +612,6 @@ async function resumeNow() {
         }
       );
     } catch (_) {}
-    renderPause();
-    renderBlockers();
   } finally {
     togglePauseInFlight = false;
     if (btn) btn.disabled = false;

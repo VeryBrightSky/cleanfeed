@@ -116,6 +116,12 @@ body.cf-fade-in {
 }
 
 /* ----- v1.4.24.5 PAUSED-STATE BANNER (above everything) ----- */
+/* v1.4.24.6 — THE stale-banner root cause: `display: flex` here is an
+ * author style, so it overrides the UA stylesheet's `[hidden] { display:
+ * none }` and the hidden attribute never actually hid the banner — it
+ * stayed painted after Resume now even with hidden=true. Same trap and
+ * same fix as .cf-focus-banner[hidden] (v1.2.3) and .cf-modal[hidden]. */
+.cf-paused-banner[hidden] { display: none !important; }
 .cf-paused-banner {
   display: flex;
   align-items: center;
