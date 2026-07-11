@@ -163,11 +163,14 @@ body.cf-block-breaking-news ytd-rich-section-renderer:has(yt-formatted-string[ti
 body.cf-block-breaking-news ytd-rich-shelf-renderer:has(yt-formatted-string[title="Breaking news"]) {
   display: none !important;
 }
+/* v1.4.24.8 — new-DOM (yt-lockup-view-model) mixes selectors keyed on
+ * a[href*="list=RD"] were REMOVED: ordinary new-DOM recommendations link
+ * through &list=RD…&start_radio=1, so the RD href hid normal videos
+ * (15/21 sidebar recs, verified live). Old-DOM coverage kept below;
+ * new-DOM Mixes are deliberately under-blocked until a real Mix
+ * discriminator is characterized. Never key mixes on list=RD hrefs. */
 body.cf-block-mixes-playlists ytd-radio-renderer,
-body.cf-block-mixes-playlists ytd-compact-radio-renderer,
-/* v1.4.24.3 — new-DOM Mix/radio playlists (list=RD…), not ordinary playlists */
-body.cf-block-mixes-playlists yt-lockup-view-model:has(a[href*="&list=RD"]),
-body.cf-block-mixes-playlists yt-lockup-view-model:has(a[href*="list=RD"]) {
+body.cf-block-mixes-playlists ytd-compact-radio-renderer {
   display: none !important;
 }
 
@@ -275,14 +278,14 @@ body.cf-block-subs-watched ytd-browse[page-subtype="subscriptions"] yt-lockup-vi
  *   yt-lockup-view-model → #content → ytd-rich-item-renderer →
  *   #contents(flex) → ytd-rich-grid-renderer
  * These companion rules collapse the wrapper so siblings reflow. Each is
- * guarded by an active-only data-cf-* tag or a specific blocked-content
- * :has() — NEVER a bare wrapper — so normal cells are never collapsed. The
- * inner-hide rules above are KEPT (belt and suspenders).
+ * guarded by an active-only data-cf-* tag — NEVER a bare wrapper — so
+ * normal cells are never collapsed. The inner-hide rules above are KEPT
+ * (belt and suspenders).
  *
- * NOTE: the mixes rule is FLATTENED to a single :has() on the wrapper
- * (:has(a[href*="list=RD"])). A nested :has(...:has(...)) is invalid CSS —
- * Chrome drops the whole rule — and the flattened form is equivalent because
- * the only list=RD anchor in the cell lives inside the mix lockup. */
+ * v1.4.24.8 — the mixes collapse rule (ytd-rich-item-renderer:has(a[href*=
+ * "list=RD"])) was REMOVED with the other RD-href mixes selectors: ordinary
+ * new-DOM cards link through &list=RD…&start_radio=1, so it could collapse
+ * normal feed cells. Never key mixes on list=RD hrefs. */
 
 /* members-only — JS tags the lockup, and only while the blocker is active */
 body.cf-block-subs-members-only ytd-rich-item-renderer:has(yt-lockup-view-model[data-cf-members-only="1"]) {
@@ -290,11 +293,6 @@ body.cf-block-subs-members-only ytd-rich-item-renderer:has(yt-lockup-view-model[
 }
 /* already-watched >95% — JS tags the lockup, only while the blocker is active */
 body.cf-block-subs-watched ytd-rich-item-renderer:has(yt-lockup-view-model[data-cf-watched="1"]) {
-  display: none !important;
-}
-/* mixes / radio playlists — blocked-content match (list=RD, not PL/UU/LL/WL) */
-body.cf-block-mixes-playlists ytd-rich-item-renderer:has(a[href*="&list=RD"]),
-body.cf-block-mixes-playlists ytd-rich-item-renderer:has(a[href*="list=RD"]) {
   display: none !important;
 }
 
@@ -634,26 +632,22 @@ body.cf-block-breaking-news.cf-mode-breaking-news-dim ytd-rich-shelf-renderer:ho
 }
 
 /* --- mixes-playlists --- */
+/* v1.4.24.8 — RD-href lockup selectors removed here too (over-matched
+ * normal recs); blur/dim modes cover the old-DOM renderers only. */
 body.cf-block-mixes-playlists.cf-mode-mixes-playlists-blur ytd-radio-renderer,
-body.cf-block-mixes-playlists.cf-mode-mixes-playlists-blur ytd-compact-radio-renderer,
-body.cf-block-mixes-playlists.cf-mode-mixes-playlists-blur yt-lockup-view-model:has(a[href*="&list=RD"]),
-body.cf-block-mixes-playlists.cf-mode-mixes-playlists-blur yt-lockup-view-model:has(a[href*="list=RD"]) {
+body.cf-block-mixes-playlists.cf-mode-mixes-playlists-blur ytd-compact-radio-renderer {
   display: revert !important; filter: blur(8px) !important; pointer-events: none !important;
 }
 body.cf-block-mixes-playlists.cf-mode-mixes-playlists-blur ytd-radio-renderer:hover,
-body.cf-block-mixes-playlists.cf-mode-mixes-playlists-blur ytd-compact-radio-renderer:hover,
-body.cf-block-mixes-playlists.cf-mode-mixes-playlists-blur yt-lockup-view-model:has(a[href*="list=RD"]):hover {
+body.cf-block-mixes-playlists.cf-mode-mixes-playlists-blur ytd-compact-radio-renderer:hover {
   filter: none !important; pointer-events: auto !important;
 }
 body.cf-block-mixes-playlists.cf-mode-mixes-playlists-dim ytd-radio-renderer,
-body.cf-block-mixes-playlists.cf-mode-mixes-playlists-dim ytd-compact-radio-renderer,
-body.cf-block-mixes-playlists.cf-mode-mixes-playlists-dim yt-lockup-view-model:has(a[href*="&list=RD"]),
-body.cf-block-mixes-playlists.cf-mode-mixes-playlists-dim yt-lockup-view-model:has(a[href*="list=RD"]) {
+body.cf-block-mixes-playlists.cf-mode-mixes-playlists-dim ytd-compact-radio-renderer {
   display: revert !important; opacity: 0.15 !important; pointer-events: none !important;
 }
 body.cf-block-mixes-playlists.cf-mode-mixes-playlists-dim ytd-radio-renderer:hover,
-body.cf-block-mixes-playlists.cf-mode-mixes-playlists-dim ytd-compact-radio-renderer:hover,
-body.cf-block-mixes-playlists.cf-mode-mixes-playlists-dim yt-lockup-view-model:has(a[href*="list=RD"]):hover {
+body.cf-block-mixes-playlists.cf-mode-mixes-playlists-dim ytd-compact-radio-renderer:hover {
   opacity: 1 !important; pointer-events: auto !important;
 }
 

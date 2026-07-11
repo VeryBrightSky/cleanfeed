@@ -251,12 +251,14 @@
       selectors: [
         "ytd-radio-renderer",
         "ytd-compact-radio-renderer",
-        // v1.4.24.3 — new-DOM Mix/radio playlists render as
-        // yt-lockup-view-model whose thumbnail link carries a radio list id
-        // (list=RD…). Match those specifically so ordinary playlists
-        // (list=PL…/UU…/LL…) are NOT caught. Old renderers KEPT (both DOMs live).
-        'yt-lockup-view-model:has(a[href*="&list=RD"])',
-        'yt-lockup-view-model:has(a[href*="list=RD"])',
+        // v1.4.24.8 — the v1.4.24.3 new-DOM selectors keyed on a[href*=
+        // "list=RD"] were REMOVED: YouTube routes ORDINARY new-DOM
+        // recommendation links through /watch?v=X&list=RDX&start_radio=1,
+        // so the RD href matched normal videos (hid 15/21 sidebar recs,
+        // verified live). Until a real Mix discriminator (collection/stack
+        // thumbnail or Mix badge) is characterized on a live new-DOM Mix,
+        // new-DOM Mixes are deliberately UNDER-blocked — never key a mixes
+        // selector on list=RD hrefs again.
       ],
     },
     // v1.4.19 — three new Pro blockers for the Subscriptions feed.

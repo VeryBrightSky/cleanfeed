@@ -36,6 +36,9 @@ function assertEq(name, actual, expected) {
 }
 
 const css = fs.readFileSync(path.join(__dirname, "..", "content", "styles.css"), "utf8");
+// v1.4.24.8 — comment-stripped copy for selector scans: comments now document
+// the banned RD selectors verbatim and must not trip the code-level checks.
+const cssCode = css.replace(/\/\*[\s\S]*?\*\//g, "");
 
 // ==========================================================================
 // 1. Collapse rules present, each with the correct guard
@@ -48,13 +51,15 @@ const css = fs.readFileSync(path.join(__dirname, "..", "content", "styles.css"),
   assertTrue("collapse: watched wrapper rule present + body-class guarded",
     css.includes('body.cf-block-subs-watched ytd-rich-item-renderer:has(yt-lockup-view-model[data-cf-watched="1"])'));
 
-  // mixes: scoped to body class + FLATTENED single :has() on the wrapper.
-  assertTrue("collapse: mixes wrapper rule present (flattened list=RD, body-class guarded)",
-    css.includes('body.cf-block-mixes-playlists ytd-rich-item-renderer:has(a[href*="list=RD"])'));
-  assertTrue("collapse: mixes wrapper rule also matches &list=RD form",
-    css.includes('body.cf-block-mixes-playlists ytd-rich-item-renderer:has(a[href*="&list=RD"])'));
+  // mixes: v1.4.24.8 — the RD-href collapse rule was REMOVED. Ordinary
+  // new-DOM cards link through &list=RD…&start_radio=1, so an RD-keyed
+  // collapse would hide normal feed cells (verified live: 15/21 sidebar
+  // recs). No mixes collapse rule may exist at all.
+  assertTrue("collapse: RD-href mixes wrapper rule is GONE",
+    !css.includes('ytd-rich-item-renderer:has(a[href*="list=RD"])') &&
+    !css.includes('ytd-rich-item-renderer:has(a[href*="&list=RD"])'));
   // Invalid nested :has() must NOT be shipped (Chrome would drop the rule).
-  assertTrue("collapse: mixes rule is NOT nested :has() (invalid in Chrome)",
+  assertTrue("collapse: no nested :has() (invalid in Chrome)",
     !css.includes('ytd-rich-item-renderer:has(yt-lockup-view-model:has('));
 
   // channel-block + keyword-block: guarded by the data-cf-* tag (set only on
@@ -76,16 +81,19 @@ const css = fs.readFileSync(path.join(__dirname, "..", "content", "styles.css"),
   // could hit a normal cell. Scan each :has() argument on a rich-item wrapper.
   const re = /ytd-rich-item-renderer:has\(([^)]*(?:\([^)]*\)[^)]*)*)\)/g;
   let m, checked = 0, bad = 0;
-  while ((m = re.exec(css)) !== null) {
+  while ((m = re.exec(cssCode)) !== null) {
     const arg = m[1];
     checked++;
     // A rich-item :has() is safe iff its argument references BLOCKED content:
-    // an active-only data-cf-* tag, a radio list id (list=RD), the members-only
-    // badge label, or a content-specific badge class (.badge-style-type-* only
-    // ever appears on that badge type) — the latter two are the pre-existing
-    // old-DOM inner-hide rules. None of these ever matches a normal cell. A
-    // bare/structural-only arg would be the cardinal sin.
-    const guarded = /data-cf-|list=RD|Members only|badge-style-type-/.test(arg);
+    // an active-only data-cf-* tag, the members-only badge label, or a
+    // content-specific badge class (.badge-style-type-* only ever appears on
+    // that badge type) — the latter two are the pre-existing old-DOM
+    // inner-hide rules. None of these ever matches a normal cell. A bare/
+    // structural-only arg would be the cardinal sin. NOTE (v1.4.24.8):
+    // list=RD is deliberately NOT an accepted guard anymore — normal new-DOM
+    // cards carry start_radio RD hrefs, so an RD-keyed rule over-matches; if
+    // one is ever reintroduced, this scan must flag it.
+    const guarded = /data-cf-|Members only|badge-style-type-/.test(arg);
     if (!guarded) { bad++; console.error(`\n    UNGUARDED rich-item collapse arg: ${arg}`); }
   }
   assertTrue("collapse: scanned at least the expected rich-item :has() rules", checked >= 5);
@@ -98,9 +106,6 @@ const css = fs.readFileSync(path.join(__dirname, "..", "content", "styles.css"),
 // A grid cell = { lockups:[{attrs}], anchors:[href], tagged:[attr names on any child] }
 function cellHasTaggedLockup(cell, attr) {
   return cell.lockups.some((l) => l.attrs[attr] === "1");
-}
-function cellHasRadioAnchor(cell) {
-  return cell.anchors.some((h) => h.indexOf("list=RD") !== -1);
 }
 function cellHasChildTag(cell, attr) {
   return cell.tagged.includes(attr);
@@ -129,16 +134,21 @@ function cell(opts) {
   assertTrue("3) watched: cell WITH tagged lockup collapses", cellHasTaggedLockup(tagged, "data-cf-watched"));
   assertTrue("3) watched: plain cell does NOT collapse (over-match guard)", !cellHasTaggedLockup(plain, "data-cf-watched"));
 }
-// ---- mixes (list=RD vs ordinary playlists) ----
+// ---- mixes (v1.4.24.8: RD anchors are NOT a collapse trigger) ----
 {
-  assertTrue("3) mixes: cell with a Mix (list=RD) anchor collapses",
-    cellHasRadioAnchor(cell({ anchors: ["/watch?v=a&list=RDabc"] })));
-  assertTrue("3) mixes: cell with only a normal video does NOT collapse",
-    !cellHasRadioAnchor(cell({ anchors: ["/watch?v=a"] })));
-  assertTrue("3) mixes: cell with a PL playlist does NOT collapse (over-match guard)",
-    !cellHasRadioAnchor(cell({ anchors: ["/watch?v=a&list=PLabc"] })));
-  assertTrue("3) mixes: cell with a UU uploads playlist does NOT collapse",
-    !cellHasRadioAnchor(cell({ anchors: ["/watch?v=a&list=UUabc"] })));
+  // Ordinary new-DOM cards carry /watch?v=X&list=RDX&start_radio=1 hrefs
+  // (radio play-endpoints), so a cell with an RD anchor is usually a NORMAL
+  // video. No collapse rule may key on it — assert the shipped CSS has no
+  // RD-based collapse and that a start_radio cell only collapses via a
+  // data-cf-* tag, never via its anchors.
+  assertTrue("3) mixes: no RD-keyed collapse rule shipped",
+    !/ytd-rich-item-renderer:has\([^)]*list=RD/.test(cssCode));
+  const normalRec = cell({ anchors: ["/watch?v=a&list=RDa&start_radio=1"] });
+  assertTrue("3) mixes: start_radio cell does NOT collapse via members rule",
+    !cellHasTaggedLockup(normalRec, "data-cf-members-only"));
+  assertTrue("3) mixes: start_radio cell does NOT collapse via child tags",
+    !cellHasChildTag(normalRec, "data-cf-blocked-channel") &&
+    !cellHasChildTag(normalRec, "data-cf-keyword"));
 }
 // ---- channel-block / keyword-block ----
 {
@@ -159,8 +169,11 @@ function cell(opts) {
     css.includes('body.cf-block-subs-members-only yt-lockup-view-model[data-cf-members-only="1"]'));
   assertTrue("kept: inner watched hide rule",
     css.includes('body.cf-block-subs-watched ytd-browse[page-subtype="subscriptions"] yt-lockup-view-model[data-cf-watched="1"]'));
-  assertTrue("kept: inner mixes hide rule",
-    css.includes('body.cf-block-mixes-playlists yt-lockup-view-model:has(a[href*="list=RD"])'));
+  // v1.4.24.8 — the inner RD mixes rule was REMOVED (over-matched normal
+  // recs); old-DOM mixes coverage is what remains.
+  assertTrue("mixes: RD inner hide rule GONE, old-DOM rule kept",
+    !css.includes('yt-lockup-view-model:has(a[href*="list=RD"])') &&
+    css.includes("body.cf-block-mixes-playlists ytd-radio-renderer"));
   assertTrue("kept: existing bare [data-cf-keyword] hide rule",
     css.includes('[data-cf-keyword="1"] { display: none !important; }'));
 }

@@ -4,9 +4,11 @@
  * covers the four additional blockers that the full selector-health sweep found
  * dead / at-risk on YouTube's lit `yt-*-view-model` / `ytm-*-view-model` DOM:
  *
- *   1. mixes-playlists — Mix/radio playlists migrated to yt-lockup-view-model
- *      with a radio list id (list=RD…). ADD RD-scoped :has() selectors WITHOUT
- *      catching ordinary playlists (list=PL…/UU…/LL…). Over-match guarded.
+ *   1. mixes-playlists — v1.4.24.8 REVERSAL: the v1.4.24.3 RD-href lockup
+ *      selectors were removed. Ordinary new-DOM recommendation links route
+ *      through &list=RD…&start_radio=1, so [href*="list=RD"] matched NORMAL
+ *      videos (hid 15/21 sidebar recs, verified live). Old-DOM renderers
+ *      remain the only mixes selectors; new-DOM Mixes are under-blocked.
  *   2. subs-members-only — new-DOM card is yt-lockup-view-model with no stable
  *      badge attribute; a JS sweep (applyMembersOnlySweep) reads badge text and
  *      tags matches with data-cf-members-only="1".
@@ -19,10 +21,9 @@
  *
  * DOM-engine note: node here has no jsdom/:has() engine, so CSS :has() matching
  * is verified LIVE in the browser step. In node we (a) assert the selector text
- * is present in the shipped blockers.js/styles.css, (b) unit-test the JS sweep
- * logic against a hand-rolled mock DOM (mirrors content.js), and (c) unit-test
- * the mixes over-match DISCRIMINATOR — the [href*="list=RD"] substring rule that
- * separates a Mix from an ordinary playlist.
+ * is present in (or, for the removed RD rules, ABSENT from) the shipped
+ * blockers.js/styles.css, and (b) unit-test the JS sweep logic against a
+ * hand-rolled mock DOM (mirrors content.js).
  *
  * Run with:  node tests/newdom-extended.js
  * Exits non-zero on first failed assertion.
@@ -58,53 +59,49 @@ const contentJs = fs.readFileSync(path.join(root, "content", "content.js"), "utf
 assertTrue("blockers.js loaded", Array.isArray(BLOCKERS) && BLOCKERS.length > 0);
 
 // ==========================================================================
-// 1. MIXES-PLAYLISTS — old renderers kept + RD-scoped new-DOM selectors added
+// 1. MIXES-PLAYLISTS — v1.4.24.8: old renderers kept, RD-href selectors GONE
 // ==========================================================================
 {
   const mixes = byId["mixes-playlists"].selectors;
   assertTrue("mixes KEEPS ytd-radio-renderer", mixes.includes("ytd-radio-renderer"));
   assertTrue("mixes KEEPS ytd-compact-radio-renderer", mixes.includes("ytd-compact-radio-renderer"));
-  assertTrue("mixes ADDS yt-lockup-view-model:has(a[href*=\"&list=RD\"])",
-    mixes.includes('yt-lockup-view-model:has(a[href*="&list=RD"])'));
-  assertTrue("mixes ADDS yt-lockup-view-model:has(a[href*=\"list=RD\"])",
-    mixes.includes('yt-lockup-view-model:has(a[href*="list=RD"])'));
-  assertTrue("styles.css hides new-DOM mix (base rule)",
-    css.includes('body.cf-block-mixes-playlists yt-lockup-view-model:has(a[href*="list=RD"])'));
-  assertTrue("styles.css hides new-DOM mix (blur mode)",
-    css.includes('cf-mode-mixes-playlists-blur yt-lockup-view-model:has(a[href*="list=RD"])'));
-  assertTrue("styles.css hides new-DOM mix (dim mode)",
-    css.includes('cf-mode-mixes-playlists-dim yt-lockup-view-model:has(a[href*="list=RD"])'));
+  // The RD-href approach is banned: ordinary new-DOM recommendation links use
+  // /watch?v=X&list=RDX&start_radio=1, so ANY list=RD selector hides normal
+  // videos (verified live: 15/21 sidebar recs vanished).
+  assertTrue("mixes has NO RD-href selector left",
+    !mixes.some((s) => s.indexOf("list=RD") !== -1));
+  assertEq("mixes selector list is exactly the two old-DOM renderers",
+    mixes, ["ytd-radio-renderer", "ytd-compact-radio-renderer"]);
 }
 
-// ----- 1b. OVER-MATCH GUARD: the [href*="list=RD"] discriminator ------------
-// Mirrors yt-lockup-view-model:has(a[href*="list=RD"]) — a lockup matches iff
-// it contains an anchor whose href includes the radio list id "list=RD". A Mix
-// must match; ordinary playlists (PL/UU/LL) and plain videos must NOT.
-function mixMatches(anchorHrefs) {
-  return anchorHrefs.some((href) => href.indexOf("list=RD") !== -1);
-}
+// ----- 1b. OVER-MATCH GUARD: no shipped SELECTOR keys on list=RD ------------
+// Scan every blocker's selector list AND every CSS selector line. list=RD may
+// appear in comments (documenting the ban) but never in a live selector.
 {
-  // Real Mix/radio hrefs → MATCH.
-  assertTrue("mix guard: &list=RD radio matches",
-    mixMatches(["/watch?v=abc123&list=RDabc123&start_radio=1"]));
-  assertTrue("mix guard: RDEM (auto-mix) matches",
-    mixMatches(["/watch?v=xy&list=RDEMxyz_mix"]));
-  assertTrue("mix guard: RDCLAK (release radio) matches",
-    mixMatches(["/watch?v=q&list=RDCLAK5uy_stuff"]));
-  // Ordinary playlists → NO MATCH (this is the over-match guard).
-  assertTrue("mix guard: normal PL playlist does NOT match",
-    !mixMatches(["/watch?v=abc&list=PLabcdef"]));
-  assertTrue("mix guard: channel-uploads UU playlist does NOT match",
-    !mixMatches(["/watch?v=abc&list=UUabcdef"]));
-  assertTrue("mix guard: liked-videos LL playlist does NOT match",
-    !mixMatches(["/watch?v=abc&list=LLabcdef"]));
-  assertTrue("mix guard: watch-later WL does NOT match",
-    !mixMatches(["/watch?v=abc&list=WL"]));
-  assertTrue("mix guard: plain video (no list) does NOT match",
-    !mixMatches(["/watch?v=abc"]));
-  // Multi-anchor lockup: matches if ANY anchor is a radio link.
-  assertTrue("mix guard: matches when one of several anchors is a Mix",
-    mixMatches(["/@channel", "/watch?v=abc&list=RDabc"]));
+  for (const b of BLOCKERS) {
+    assertTrue(`no list=RD selector in blocker '${b.id}'`,
+      !(b.selectors || []).some((s) => s.indexOf("list=RD") !== -1));
+  }
+  const cssNoComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  assertTrue("styles.css has NO list=RD selector outside comments",
+    cssNoComments.indexOf("list=RD") === -1);
+
+  // Model of a NORMAL new-DOM sidebar recommendation (the card that was
+  // wrongly hidden): a lockup whose thumbnail + title anchors carry the
+  // start_radio RD href. It must match NO mixes selector — with the RD rules
+  // gone, only the two old-DOM TAG selectors remain, and a lockup is neither.
+  const normalRec = {
+    tag: "yt-lockup-view-model",
+    anchors: ["/watch?v=kyqpSycLASY&list=RDkyqpSycLASY&start_radio=1",
+              "/watch?v=kyqpSycLASY&list=RDkyqpSycLASY&start_radio=1"],
+  };
+  const mixes = byId["mixes-playlists"].selectors;
+  const matchedBy = mixes.filter((s) => s === normalRec.tag);
+  assertEq("over-match guard: normal start_radio rec lockup matches NO mixes selector",
+    matchedBy, []);
+  // A real old-DOM Mix still matches (tag selector).
+  assertTrue("old-DOM ytd-radio-renderer still matches",
+    mixes.includes("ytd-radio-renderer"));
 }
 
 // ==========================================================================
