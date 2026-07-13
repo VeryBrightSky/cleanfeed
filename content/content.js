@@ -78,6 +78,10 @@
     // body's attributes, so external class wipes went undetected).
     commentsManuallyShown: false,
     autoplayHandledForVideo: "", // video id we've already turned autoplay off for
+    // v1.4.24.9 — last autoplay-off click we issued: { videoId, at }. Used to
+    // verify the flip actually landed before marking handled, and to
+    // cooldown retries (see disableAutoplayIfOn).
+    autoplayLastClick: null,
     blockedChannels: [],   // [{handle, name}] — videos from these channels are hidden
     focusLock: { activeUntil: 0, pinSet: false }, // PIN hash never sent to content
     lastRightClicked: null,
@@ -500,8 +504,24 @@
     const cards = document.querySelectorAll(CARD_SELECTOR);
     const kws = STATE.hiddenKeywords;
     cards.forEach((card) => {
-      // Find the title — YT video cards use #video-title or yt-formatted-string#video-title-link
-      const tEl = card.querySelector("#video-title, a#video-title-link, yt-formatted-string#video-title");
+      // Find the title. Old-DOM (Polymer) cards use #video-title ids; the
+      // new-DOM (lit view-model) cards have NO #video-title at all, which
+      // left keyword blocking silently dead there until v1.4.24.9 (audit:
+      // 0/30 new-DOM cards tagged vs 18/19 old-DOM). New-DOM paths verified
+      // live 2026-07:
+      //   yt-lockup-view-model:  h3.ytLockupMetadataViewModelHeadingReset >
+      //     a.ytLockupMetadataViewModelTitle > span[role=text]  (no title attr)
+      //   ytm-shorts-lockup-view-model-v2:  h3.shortsLockupViewModelHostMetadataTitle
+      //     (also carries an a[title])
+      // The bare `h3` fallback covers future class renames — a video card's
+      // heading IS its title. Old selectors tried first (both DOMs live).
+      const tEl =
+        card.querySelector("#video-title, a#video-title-link, yt-formatted-string#video-title") ||
+        card.querySelector(
+          ".ytLockupMetadataViewModelTitle, .yt-lockup-metadata-view-model__title," +
+          " .shortsLockupViewModelHostMetadataTitle"
+        ) ||
+        card.querySelector("h3");
       if (!tEl) return;
       const title = (tEl.getAttribute("title") || tEl.textContent || "").toLowerCase();
       if (!title) return;
@@ -684,15 +704,43 @@
     // (used since 2019) and exposes aria-checked.
     const btn = document.querySelector(".ytp-autonav-toggle-button");
     if (!btn) return;
+    // v1.4.24.9 — two races fixed here, both confirmed live:
+    //  (a) pre-.9 marked the video "handled" after merely FINDING the button,
+    //      even when aria-checked wasn't "true" yet — so when YT initialized
+    //      autoplay to on a moment later, we never re-checked.
+    //  (b) very early in page life the button renders with aria-checked=
+    //      "true" BEFORE YT binds its click handler; btn.click() then is a
+    //      silent no-op (traced live: "clicked ok, aria now=true"). So a
+    //      click alone proves nothing — we must VERIFY the flip took.
+    // Rules: mark handled ONLY once the toggle verifiably reads not-"true"
+    // after a click we issued (sync flip, or observed on a later tick for an
+    // async flip). Unverified clicks retry on later observer ticks, with a
+    // 1.5s cooldown so an in-flight async flip can settle without a
+    // double-click flapping the toggle back on.
     const checked = btn.getAttribute("aria-checked");
-    if (checked === "true") {
-      try {
-        btn.click();
-      } catch (_) {
-        return;
+    if (checked !== "true") {
+      // Off. If WE clicked this video earlier, the flip has now landed —
+      // job done; mark handled so a manual re-enable is respected.
+      if (videoId && STATE.autoplayLastClick &&
+          STATE.autoplayLastClick.videoId === videoId) {
+        STATE.autoplayHandledForVideo = videoId;
       }
+      return;
     }
-    if (videoId) STATE.autoplayHandledForVideo = videoId;
+    if (videoId && STATE.autoplayLastClick &&
+        STATE.autoplayLastClick.videoId === videoId &&
+        Date.now() - STATE.autoplayLastClick.at < 1500) {
+      return;   // recent click still settling — don't double-fire
+    }
+    try {
+      btn.click();
+    } catch (_) {
+      return;
+    }
+    if (videoId) STATE.autoplayLastClick = { videoId: videoId, at: Date.now() };
+    if (videoId && btn.getAttribute("aria-checked") !== "true") {
+      STATE.autoplayHandledForVideo = videoId;   // verified sync flip
+    }
   }
 
   function applyCustomCSS() {
